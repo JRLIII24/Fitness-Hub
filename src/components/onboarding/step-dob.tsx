@@ -108,6 +108,7 @@ export function StepDob({ dateOfBirth, onUpdate, onNext }: StepDobProps) {
                   captionLayout="dropdown-buttons"
                   fromYear={1900}
                   toYear={new Date().getFullYear()}
+                  defaultMonth={new Date(2000, 0, 1)} // Default to year 2000 for easier selection
                 />
               </PopoverContent>
             </Popover>

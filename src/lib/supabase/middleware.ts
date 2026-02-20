@@ -33,13 +33,20 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Allow unauthenticated access to auth and password reset pages
+  const publicPaths = [
+    "/",
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+  ];
+  const isPublicPath = publicPaths.some((path) =>
+    request.nextUrl.pathname.startsWith(path)
+  );
+
   // Protected routes — redirect to login if not authenticated
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/signup") &&
-    request.nextUrl.pathname !== "/"
-  ) {
+  if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -56,17 +63,27 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Enforce onboarding completion for authenticated users
-  if (user && !request.nextUrl.pathname.startsWith("/onboarding")) {
+  // Handle onboarding flow for authenticated users
+  if (user) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("onboarding_completed")
       .eq("id", user.id)
       .single();
 
-    if (profile && !profile.onboarding_completed) {
+    const isOnOnboardingPage = request.nextUrl.pathname.startsWith("/onboarding");
+
+    // Redirect to onboarding if not completed (except if already on onboarding page)
+    if (profile && !profile.onboarding_completed && !isOnOnboardingPage) {
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
+
+    // Redirect away from onboarding if already completed
+    if (profile?.onboarding_completed && isOnOnboardingPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
   }

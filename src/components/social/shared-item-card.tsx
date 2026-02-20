@@ -35,13 +35,100 @@ export function SharedItemCard({
     const snapshot = item.item_snapshot as TemplateSnapshot;
     setSaving(true);
     try {
+      let templateName = snapshot.name;
+      let templateDescription = snapshot.description;
+      let normalizedExercises: Array<{
+        exercise_id: string;
+        sort_order: number;
+        sets: Array<{
+          set_number: number;
+          reps: number | null;
+          weight_kg: number | null;
+          set_type: string | null;
+          rest_seconds: number | null;
+        }>;
+      }> = [];
+
+      // Prefer cloning from canonical template data when available.
+      if (item.template_id) {
+        const { data: source } = await supabase
+          .from("workout_templates")
+          .select(
+            "name, description, template_exercises(exercise_id, sort_order, template_exercise_sets(set_number, reps, weight_kg, set_type, rest_seconds))"
+          )
+          .eq("id", item.template_id)
+          .maybeSingle();
+
+        if (source) {
+          templateName = source.name;
+          templateDescription = source.description;
+          const sourceExercises = Array.isArray(source.template_exercises)
+            ? source.template_exercises
+            : [];
+          normalizedExercises = sourceExercises
+            .filter((ex) => !!ex.exercise_id)
+            .map((ex) => {
+              const sets = Array.isArray(ex.template_exercise_sets)
+                ? ex.template_exercise_sets
+                : [];
+              return {
+                exercise_id: ex.exercise_id,
+                sort_order: ex.sort_order,
+                sets: sets.map((s) => ({
+                  set_number: s.set_number,
+                  reps: s.reps,
+                  weight_kg: s.weight_kg,
+                  set_type: s.set_type ?? null,
+                  rest_seconds: s.rest_seconds ?? null,
+                })),
+              };
+            });
+        }
+      }
+
+      // Fallback to snapshot (for legacy shares / deleted source templates).
+      if (normalizedExercises.length === 0) {
+        for (let i = 0; i < snapshot.exercises.length; i++) {
+          const ex = snapshot.exercises[i];
+          let exerciseId = ex.exercise_id ?? null;
+
+          if (!exerciseId) {
+            const { data: exData } = await supabase
+              .from("exercises")
+              .select("id")
+              .ilike("name", ex.name)
+              .limit(1)
+              .maybeSingle();
+            exerciseId = exData?.id ?? null;
+          }
+
+          if (!exerciseId) continue;
+
+          normalizedExercises.push({
+            exercise_id: exerciseId,
+            sort_order: i + 1,
+            sets: ex.sets.map((s, idx) => ({
+              set_number: idx + 1,
+              reps: s.reps,
+              weight_kg: s.weight_kg,
+              set_type: "working",
+              rest_seconds: null,
+            })),
+          });
+        }
+      }
+
+      if (normalizedExercises.length === 0) {
+        throw new Error("No exercises available to save");
+      }
+
       // Create new template
       const { data: newTpl, error: tplErr } = await supabase
         .from("workout_templates")
         .insert({
           user_id: currentUserId,
-          name: snapshot.name,
-          description: snapshot.description,
+          name: templateName,
+          description: templateDescription,
           is_shared: false,
         })
         .select("id")
@@ -49,25 +136,14 @@ export function SharedItemCard({
 
       if (tplErr || !newTpl) throw tplErr ?? new Error("Failed to create");
 
-      // Clone exercises from snapshot
-      for (let i = 0; i < snapshot.exercises.length; i++) {
-        const ex = snapshot.exercises[i];
-        // Look up exercise by name
-        const { data: exData } = await supabase
-          .from("exercises")
-          .select("id")
-          .ilike("name", ex.name)
-          .limit(1)
-          .maybeSingle();
-
-        if (!exData) continue;
-
+      // Clone exercises and sets.
+      for (const ex of normalizedExercises) {
         const { data: newEx } = await supabase
           .from("template_exercises")
           .insert({
             template_id: newTpl.id,
-            exercise_id: exData.id,
-            sort_order: i + 1,
+            exercise_id: ex.exercise_id,
+            sort_order: ex.sort_order,
           })
           .select("id")
           .single();
@@ -76,12 +152,13 @@ export function SharedItemCard({
 
         if (ex.sets.length > 0) {
           await supabase.from("template_exercise_sets").insert(
-            ex.sets.map((s, idx) => ({
+            ex.sets.map((s) => ({
               template_exercise_id: newEx.id,
-              set_number: idx + 1,
+              set_number: s.set_number,
               reps: s.reps,
               weight_kg: s.weight_kg,
-              set_type: "working" as const,
+              set_type: s.set_type ?? "working",
+              rest_seconds: s.rest_seconds,
             }))
           );
         }

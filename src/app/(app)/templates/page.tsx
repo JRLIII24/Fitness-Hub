@@ -100,14 +100,16 @@ export default function TemplatesPage() {
     // Fetch exercises for the snapshot
     const { data: exData } = await supabase
       .from("template_exercises")
-      .select(`sort_order, exercises(name, muscle_group), template_exercise_sets(reps, weight_kg)`)
+      .select(`exercise_id, sort_order, exercises(name, muscle_group), template_exercise_sets(reps, weight_kg)`)
       .eq("template_id", template.id)
       .order("sort_order");
 
     const exercises: TemplateSnapshot["exercises"] = (exData ?? []).map((te) => {
-      const ex = te.exercises as unknown as { name: string; muscle_group: string } | null;
+      const exRelation = te.exercises as unknown as { name: string; muscle_group: string } | { name: string; muscle_group: string }[] | null;
+      const ex = Array.isArray(exRelation) ? exRelation[0] : exRelation;
       const sets = Array.isArray(te.template_exercise_sets) ? te.template_exercise_sets : [];
       return {
+        exercise_id: te.exercise_id,
         name: ex?.name ?? "Unknown",
         muscle_group: ex?.muscle_group ?? "",
         sets: sets.map((s) => ({ reps: s.reps, weight_kg: s.weight_kg })),

@@ -7,6 +7,7 @@ export interface TemplateSnapshot {
   name: string;
   description: string | null;
   exercises: Array<{
+    exercise_id?: string | null;
     name: string;
     muscle_group: string;
     sets: Array<{ reps: number | null; weight_kg: number | null }>;

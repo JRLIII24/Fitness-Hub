@@ -1,14 +1,32 @@
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
-// Service role client with full privileges
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(request: Request) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error(
+        "Missing Supabase env vars for ensure-profile route",
+        {
+          hasSupabaseUrl: Boolean(supabaseUrl),
+          hasServiceRoleKey: Boolean(serviceRoleKey),
+        }
+      );
+      return Response.json(
+        { error: "Server configuration error" },
+        { status: 500 }
+      );
+    }
+
+    // Service role client with full privileges.
+    // Lazily initialize in-handler to avoid build-time crashes when env vars are absent.
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      serviceRoleKey
+    );
+
     const supabase = await createServerClient();
     const {
       data: { user },

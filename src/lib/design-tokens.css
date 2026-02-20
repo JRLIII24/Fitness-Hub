@@ -1,0 +1,138 @@
+/**
+ * Fit-Hub Design Tokens
+ * OKLCH-based color system for perceptually uniform colors
+ * User-customizable accent color with semantic color scales
+ */
+
+:root {
+  /* ==================== BASE COLORS (OKLCH) ==================== */
+  /* Dark mode base palette - perceptually uniform lightness */
+  --base-background: oklch(12% 0.01 264);      /* Deep charcoal */
+  --base-surface: oklch(18% 0.01 264);         /* Elevated cards */
+  --base-surface-elevated: oklch(22% 0.01 264); /* Modals/dialogs */
+  --base-border: oklch(28% 0.01 264);          /* Subtle dividers */
+
+  /* Text hierarchy */
+  --text-primary: oklch(98% 0 0);         /* High contrast white */
+  --text-secondary: oklch(70% 0 0);       /* Muted gray */
+  --text-tertiary: oklch(50% 0 0);        /* Disabled */
+
+  /* ==================== SEMANTIC COLORS ==================== */
+  --success: oklch(72% 0.18 145);         /* Green (streaks, goals met) */
+  --warning: oklch(80% 0.15 85);          /* Amber (fatigue alerts) */
+  --error: oklch(65% 0.22 25);            /* Red (delete, cancel) */
+  --info: oklch(70% 0.15 240);            /* Blue (informational) */
+
+  /* ==================== MACRO COLORS ==================== */
+  --macro-protein: oklch(70% 0.15 240);   /* Blue */
+  --macro-carbs: oklch(80% 0.14 85);      /* Yellow */
+  --macro-fat: oklch(75% 0.18 340);       /* Pink */
+  --macro-fiber: oklch(72% 0.16 145);     /* Green */
+
+  /* ==================== ACCENT COLOR (User-Customizable) ==================== */
+  /* Default: Electric Blue */
+  --accent-h: 240;      /* Hue (0-360) */
+  --accent-c: 0.20;     /* Chroma (0-0.4) */
+  --accent-l: 70%;      /* Lightness (0-100%) */
+
+  /* Accent scales */
+  --accent-50: oklch(95% calc(var(--accent-c) * 0.3) var(--accent-h));
+  --accent-100: oklch(90% calc(var(--accent-c) * 0.5) var(--accent-h));
+  --accent-200: oklch(85% calc(var(--accent-c) * 0.7) var(--accent-h));
+  --accent-300: oklch(80% calc(var(--accent-c) * 0.85) var(--accent-h));
+  --accent-400: oklch(75% var(--accent-c) var(--accent-h));
+  --accent-500: oklch(var(--accent-l) var(--accent-c) var(--accent-h)); /* Base */
+  --accent-600: oklch(65% var(--accent-c) var(--accent-h));
+  --accent-700: oklch(55% calc(var(--accent-c) * 0.9) var(--accent-h));
+  --accent-800: oklch(45% calc(var(--accent-c) * 0.7) var(--accent-h));
+  --accent-900: oklch(35% calc(var(--accent-c) * 0.5) var(--accent-h));
+
+  /* ==================== SPACING SCALE (4px base grid) ==================== */
+  --space-0: 0;
+  --space-1: 0.25rem;   /* 4px  - icon padding */
+  --space-2: 0.5rem;    /* 8px  - tight gaps */
+  --space-3: 0.75rem;   /* 12px - compact card padding */
+  --space-4: 1rem;      /* 16px - standard gap */
+  --space-5: 1.25rem;   /* 20px - section spacing */
+  --space-6: 1.5rem;    /* 24px - card padding */
+  --space-8: 2rem;      /* 32px - large sections */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px - hero spacing */
+  --space-16: 4rem;     /* 64px */
+  --space-20: 5rem;     /* 80px */
+  --space-24: 6rem;     /* 96px */
+
+  /* ==================== TYPOGRAPHY SCALE (Fluid, mobile-first) ==================== */
+  --text-xs:  clamp(0.75rem, 0.7rem + 0.25vw, 0.8rem);   /* 12–13px */
+  --text-sm:  clamp(0.875rem, 0.85rem + 0.15vw, 0.9rem); /* 14–14.4px */
+  --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);   /* 16–18px */
+  --text-lg:  clamp(1.125rem, 1rem + 0.625vw, 1.5rem);    /* 18–24px */
+  --text-xl:  clamp(1.5rem, 1.25rem + 1.25vw, 2.25rem);   /* 24–36px */
+  --text-2xl: clamp(2rem, 1.5rem + 2.5vw, 3.5rem);        /* 32–56px */
+
+  /* Font weights */
+  --font-regular: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Line heights */
+  --leading-tight: 1.2;
+  --leading-base: 1.5;
+  --leading-relaxed: 1.75;
+
+  /* ==================== BORDER RADIUS (Soft rounded) ==================== */
+  --radius-sm: 6px;     /* Chips, badges */
+  --radius-md: 10px;    /* Buttons, inputs */
+  --radius-lg: 16px;    /* Cards, modals */
+  --radius-xl: 24px;    /* Large containers */
+  --radius-full: 9999px; /* Pills, avatar */
+
+  /* ==================== MOTION (Easing & Duration) ==================== */
+  /* Easing curves */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+
+  /* Duration scale */
+  --duration-instant: 150ms;
+  --duration-fast: 220ms;
+  --duration-base: 320ms;
+  --duration-slow: 480ms;
+  --duration-slower: 700ms;
+
+  /* ==================== SHADOWS ==================== */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-base: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+}
+
+/* ==================== ACCENT COLOR PRESETS ==================== */
+[data-accent="electric-blue"] {
+  --accent-h: 240; --accent-c: 0.20; --accent-l: 70%;
+}
+[data-accent="sunset-orange"] {
+  --accent-h: 25; --accent-c: 0.18; --accent-l: 72%;
+}
+[data-accent="neon-pink"] {
+  --accent-h: 340; --accent-c: 0.22; --accent-l: 70%;
+}
+[data-accent="lime-green"] {
+  --accent-h: 130; --accent-c: 0.20; --accent-l: 68%;
+}
+[data-accent="purple-haze"] {
+  --accent-h: 280; --accent-c: 0.18; --accent-l: 65%;
+}
+[data-accent="gold"] {
+  --accent-h: 55; --accent-c: 0.16; --accent-l: 75%;
+}
+[data-accent="cyan"] {
+  --accent-h: 190; --accent-c: 0.19; --accent-l: 70%;
+}
+[data-accent="magenta"] {
+  --accent-h: 320; --accent-c: 0.21; --accent-l: 68%;
+}

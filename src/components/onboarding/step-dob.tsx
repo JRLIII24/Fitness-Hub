@@ -1,16 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
 
 interface StepDobProps {
   dateOfBirth: Date | null;
@@ -19,15 +13,73 @@ interface StepDobProps {
 }
 
 export function StepDob({ dateOfBirth, onUpdate, onNext }: StepDobProps) {
-  const canProceed = () => {
-    if (!dateOfBirth) return false;
-    const age = new Date().getFullYear() - dateOfBirth.getFullYear();
-    return age >= 13 && age <= 120;
+  const today = new Date();
+
+  // Initialize from dateOfBirth or use defaults
+  const [month, setMonth] = useState(
+    dateOfBirth ? String(dateOfBirth.getMonth() + 1).padStart(2, "0") : ""
+  );
+  const [day, setDay] = useState(
+    dateOfBirth ? String(dateOfBirth.getDate()).padStart(2, "0") : ""
+  );
+  const [year, setYear] = useState(
+    dateOfBirth ? String(dateOfBirth.getFullYear()) : ""
+  );
+
+  const handleDateChange = (
+    newMonth: string,
+    newDay: string,
+    newYear: string
+  ) => {
+    // Only create date if all fields are filled
+    if (newMonth && newDay && newYear) {
+      const monthNum = parseInt(newMonth, 10);
+      const dayNum = parseInt(newDay, 10);
+      const yearNum = parseInt(newYear, 10);
+
+      // Validate ranges
+      if (
+        monthNum >= 1 &&
+        monthNum <= 12 &&
+        dayNum >= 1 &&
+        dayNum <= 31 &&
+        yearNum >= 1900 &&
+        yearNum <= today.getFullYear()
+      ) {
+        const date = new Date(yearNum, monthNum - 1, dayNum);
+        // Check if date is valid (e.g., Feb 30 would be invalid)
+        if (
+          date.getMonth() === monthNum - 1 &&
+          date.getDate() === dayNum
+        ) {
+          onUpdate(date);
+          return;
+        }
+      }
+    }
+    onUpdate(null);
+  };
+
+  const handleMonthChange = (value: string) => {
+    const sanitized = value.replace(/\D/g, "").slice(0, 2);
+    setMonth(sanitized);
+    handleDateChange(sanitized, day, year);
+  };
+
+  const handleDayChange = (value: string) => {
+    const sanitized = value.replace(/\D/g, "").slice(0, 2);
+    setDay(sanitized);
+    handleDateChange(month, sanitized, year);
+  };
+
+  const handleYearChange = (value: string) => {
+    const sanitized = value.replace(/\D/g, "").slice(0, 4);
+    setYear(sanitized);
+    handleDateChange(month, day, sanitized);
   };
 
   const getAge = () => {
     if (!dateOfBirth) return null;
-    const today = new Date();
     let age = today.getFullYear() - dateOfBirth.getFullYear();
     const monthDiff = today.getMonth() - dateOfBirth.getMonth();
     if (
@@ -37,6 +89,11 @@ export function StepDob({ dateOfBirth, onUpdate, onNext }: StepDobProps) {
       age--;
     }
     return age;
+  };
+
+  const canProceed = () => {
+    const age = getAge();
+    return age !== null && age >= 13 && age <= 120;
   };
 
   const age = getAge();
@@ -75,43 +132,47 @@ export function StepDob({ dateOfBirth, onUpdate, onNext }: StepDobProps) {
           transition={{ delay: 0.3 }}
           className="p-8 rounded-[var(--radius-xl)] backdrop-blur-lg bg-white/5 border border-white/10 space-y-4"
         >
-          <div className="space-y-2">
-            <Label htmlFor="dob" className="text-left block">
-              Date of Birth
-            </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="dob"
-                  variant="outline"
-                  className={`w-full h-14 text-lg justify-start text-left font-normal ${
-                    !dateOfBirth && "text-muted-foreground"
-                  }`}
-                >
-                  <CalendarIcon className="mr-2 h-5 w-5" />
-                  {dateOfBirth ? (
-                    format(dateOfBirth, "PPP")
-                  ) : (
-                    <span>Pick a date</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dateOfBirth || undefined}
-                  onSelect={(date) => onUpdate(date || null)}
-                  disabled={(date) =>
-                    date > new Date() || date < new Date("1900-01-01")
-                  }
-                  initialFocus
-                  captionLayout="dropdown-buttons"
-                  fromYear={1900}
-                  toYear={new Date().getFullYear()}
-                  defaultMonth={new Date(2000, 0, 1)} // Default to year 2000 for easier selection
+          <div className="space-y-3">
+            <Label className="text-left block">Date of Birth</Label>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="MM"
+                  value={month}
+                  onChange={(e) => handleMonthChange(e.target.value)}
+                  maxLength={2}
+                  className="h-14 text-lg font-semibold text-center"
+                  autoFocus
                 />
-              </PopoverContent>
-            </Popover>
+                <p className="text-xs text-muted-foreground">Month</p>
+              </div>
+              <div className="space-y-1">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="DD"
+                  value={day}
+                  onChange={(e) => handleDayChange(e.target.value)}
+                  maxLength={2}
+                  className="h-14 text-lg font-semibold text-center"
+                />
+                <p className="text-xs text-muted-foreground">Day</p>
+              </div>
+              <div className="space-y-1">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="YYYY"
+                  value={year}
+                  onChange={(e) => handleYearChange(e.target.value)}
+                  maxLength={4}
+                  className="h-14 text-lg font-semibold text-center"
+                />
+                <p className="text-xs text-muted-foreground">Year</p>
+              </div>
+            </div>
           </div>
 
           {age !== null && (

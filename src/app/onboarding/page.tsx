@@ -1,6 +1,8 @@
 "use client";
 
 import { AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { ProgressBar } from "@/components/onboarding/progress-bar";
 import { StepAccentColor } from "@/components/onboarding/step-accent-color";
@@ -9,9 +11,11 @@ import { StepHeight } from "@/components/onboarding/step-height";
 import { StepWeight } from "@/components/onboarding/step-weight";
 import { StepDob } from "@/components/onboarding/step-dob";
 import { StepGender } from "@/components/onboarding/step-gender";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 export default function OnboardingPage() {
+  const router = useRouter();
   const {
     currentStep,
     totalSteps,
@@ -38,6 +42,13 @@ export default function OnboardingPage() {
     nextStep();
   };
 
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Background gradient */}
@@ -48,6 +59,16 @@ export default function OnboardingPage() {
             "radial-gradient(circle at 30% 20%, oklch(18% 0.01 264), oklch(12% 0.01 264))",
         }}
       />
+
+      {/* Sign Out button (top-right) */}
+      <button
+        onClick={handleSignOut}
+        className="fixed top-8 right-8 p-3 rounded-full backdrop-blur-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all z-50 group"
+        aria-label="Sign out"
+        title="Sign out and return to login"
+      >
+        <LogOut className="h-5 w-5 group-hover:text-red-400 transition-colors" />
+      </button>
 
       {/* Progress bar */}
       <ProgressBar

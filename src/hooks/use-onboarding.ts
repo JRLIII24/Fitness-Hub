@@ -108,34 +108,56 @@ export function useOnboarding() {
     setLoading(true);
 
     try {
+      // Get current user
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) {
-        throw new Error("No authenticated user found");
+      if (userError) {
+        console.error("Auth error:", userError);
+        throw new Error(`Authentication error: ${userError.message}`);
       }
+
+      if (!user) {
+        throw new Error("No authenticated user found. Please log in again.");
+      }
+
+      console.log("User authenticated:", user.id);
 
       // Convert height to cm
       const heightCm = heightToCm(data.heightFeet!, data.heightInches!);
 
-      // Update profile with onboarding data
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          accent_color: data.accentColor,
-          fitness_goal: data.fitnessGoal,
-          height_cm: heightCm,
-          current_weight_kg: data.currentWeight,
-          goal_weight_kg: data.goalWeight,
-          date_of_birth: data.dateOfBirth?.toISOString().split("T")[0],
-          gender: data.gender,
-          show_weight: data.showWeight,
-          onboarding_completed: true,
-        })
-        .eq("id", user.id);
+      // Prepare update data
+      const updateData = {
+        accent_color: data.accentColor,
+        fitness_goal: data.fitnessGoal,
+        height_cm: heightCm,
+        current_weight_kg: data.currentWeight,
+        goal_weight_kg: data.goalWeight,
+        date_of_birth: data.dateOfBirth?.toISOString().split("T")[0],
+        gender: data.gender,
+        show_weight: data.showWeight,
+        onboarding_completed: true,
+      };
 
-      if (error) throw error;
+      console.log("Updating profile with:", updateData);
+
+      // Update profile with onboarding data
+      const { data: updateResult, error: updateError } = await supabase
+        .from("profiles")
+        .update(updateData)
+        .eq("id", user.id)
+        .select();
+
+      if (updateError) {
+        console.error("Update error:", updateError);
+        throw new Error(
+          `Failed to save profile: ${updateError.message || "Unknown error"}`
+        );
+      }
+
+      console.log("Profile updated successfully:", updateResult);
 
       // Apply accent color to HTML element
       document.documentElement.setAttribute("data-accent", data.accentColor);
@@ -157,9 +179,11 @@ export function useOnboarding() {
       }, 1500);
     } catch (error) {
       console.error("Onboarding submission error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to complete onboarding"
-      );
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to complete onboarding. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

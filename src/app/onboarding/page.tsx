@@ -2,7 +2,8 @@
 
 import { AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { useEffect } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { ProgressBar } from "@/components/onboarding/progress-bar";
 import { StepAccentColor } from "@/components/onboarding/step-accent-color";
@@ -13,6 +14,15 @@ import { StepDob } from "@/components/onboarding/step-dob";
 import { StepGender } from "@/components/onboarding/step-gender";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+
+function isUserMissingFromJwtError(error: unknown): boolean {
+  const e = (error ?? {}) as { message?: string };
+  const message = (e.message ?? "").toLowerCase();
+  return (
+    message.includes("user from sub claim in jwt does not exist") ||
+    (message.includes("sub claim") && message.includes("does not exist"))
+  );
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -28,6 +38,47 @@ export default function OnboardingPage() {
     progress,
   } = useOnboarding();
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function guardCompletedOnboarding() {
+      const supabase = createClient();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (cancelled) return;
+
+      if (userError && isUserMissingFromJwtError(userError)) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        toast.error("Your session expired. Please sign up again.");
+        router.replace("/signup");
+        router.refresh();
+        return;
+      }
+
+      if (!user || cancelled) return;
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled || error) return;
+      if (profile?.onboarding_completed) {
+        router.replace("/dashboard");
+        router.refresh();
+      }
+    }
+
+    guardCompletedOnboarding();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
   const handleNext = () => {
     // Show affirmation toast
     const affirmations = [
@@ -42,10 +93,10 @@ export default function OnboardingPage() {
     nextStep();
   };
 
-  const handleSignOut = async () => {
+  const handleBackToSignup = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/login");
+    router.push("/signup");
     router.refresh();
   };
 
@@ -60,14 +111,15 @@ export default function OnboardingPage() {
         }}
       />
 
-      {/* Sign Out button (top-right) */}
+      {/* Back to signup (top-left, always visible) */}
       <button
-        onClick={handleSignOut}
-        className="fixed top-8 right-8 p-3 rounded-full backdrop-blur-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all z-50 group"
-        aria-label="Sign out"
-        title="Sign out and return to login"
+        onClick={handleBackToSignup}
+        className="fixed left-6 top-6 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur-lg transition-all hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/80"
+        aria-label="Back to sign up"
+        title="Sign out and return to sign up"
       >
-        <LogOut className="h-5 w-5 group-hover:text-red-400 transition-colors" />
+        <ArrowLeft className="h-4 w-4" />
+        Back to Sign Up
       </button>
 
       {/* Progress bar */}

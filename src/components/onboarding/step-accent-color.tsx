@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Check, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface StepAccentColorProps {
   selected: string;
@@ -55,9 +55,24 @@ export function StepAccentColor({ selected, onSelect, onNext }: StepAccentColorP
   const [customColor, setCustomColor] = useState("#6366f1");
   const [isCustom, setIsCustom] = useState(false);
 
+  useEffect(() => {
+    const customMatch = selected.match(/^custom-(#[0-9a-fA-F]{6})$/);
+    if (customMatch) {
+      setIsCustom(true);
+      setCustomColor(customMatch[1]);
+      return;
+    }
+    setIsCustom(false);
+  }, [selected]);
+
+  function removeCustomPreviewStyle() {
+    document.getElementById("custom-accent-preview")?.remove();
+  }
+
   const handleSelect = (colorId: string) => {
     setIsCustom(false);
     onSelect(colorId);
+    removeCustomPreviewStyle();
     // Apply accent color immediately for live preview
     document.documentElement.setAttribute("data-accent", colorId);
   };
@@ -82,6 +97,7 @@ export function StepAccentColor({ selected, onSelect, onNext }: StepAccentColorP
       }
     `;
     document.head.appendChild(style);
+    document.documentElement.setAttribute("data-accent", "electric-blue");
   };
 
   return (

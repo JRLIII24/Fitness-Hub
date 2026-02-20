@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { applyAccentColor } from "@/hooks/use-accent-color";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
 export interface OnboardingData {
   accentColor: string;
-  fitnessGoal: "build_muscle" | "lose_weight" | "maintain" | "endurance" | null;
+  fitnessGoal: "build_muscle" | "lose_weight" | "maintain" | "improve_endurance" | null;
   heightFeet: number | null;
   heightInches: number | null;
   currentWeight: number | null;
@@ -30,14 +31,144 @@ const initialData: OnboardingData = {
   showWeight: true,
 };
 
+const APP_THEME_STORAGE_KEY = "fithub-color-theme";
+const ACCENT_STORAGE_KEY = "fithub-accent-color";
+
+type ThemePreference = "default" | "pink" | "blue";
+type AccentSelection = {
+  preset: "electric-blue" | "neon-pink" | "custom";
+  customHex: string | null;
+  themePreference: ThemePreference;
+};
+
+function parseAccentSelection(raw: string): AccentSelection {
+  if (raw === "neon-pink") {
+    return {
+      preset: "neon-pink",
+      customHex: null,
+      themePreference: "pink",
+    };
+  }
+
+  if (raw === "electric-blue") {
+    return {
+      preset: "electric-blue",
+      customHex: null,
+      themePreference: "blue",
+    };
+  }
+
+  const customMatch = raw.match(/^custom-(#[0-9a-fA-F]{6})$/);
+  if (customMatch) {
+    return {
+      preset: "custom",
+      customHex: customMatch[1],
+      themePreference: "default",
+    };
+  }
+
+  return {
+    preset: "electric-blue",
+    customHex: null,
+    themePreference: "blue",
+  };
+}
+
+function isMissingProfilesColumnError(error: unknown, columnName: string): boolean {
+  const e = (error ?? {}) as { code?: string; message?: string };
+  const message = (e.message ?? "").toLowerCase();
+  return (
+    e.code === "PGRST204" &&
+    message.includes("profiles") &&
+    message.includes(columnName.toLowerCase())
+  );
+}
+
+function isUserMissingFromJwtError(error: unknown): boolean {
+  const e = (error ?? {}) as { message?: string };
+  const message = (e.message ?? "").toLowerCase();
+  return (
+    message.includes("user from sub claim in jwt does not exist") ||
+    (message.includes("sub claim") && message.includes("does not exist"))
+  );
+}
+
+function setAppThemeClass(theme: ThemePreference | "custom") {
+  const html = document.documentElement;
+  const body = document.body;
+  const classNames = ["theme-pink", "theme-blue"];
+
+  classNames.forEach((className) => {
+    html.classList.remove(className);
+    body?.classList.remove(className);
+  });
+
+  if (theme === "pink" || theme === "blue") {
+    const className = `theme-${theme}`;
+    html.classList.add(className);
+    body?.classList.add(className);
+  }
+}
+
 export function useOnboarding() {
   const [currentStep, setCurrentStep] = useState(0);
   const [data, setData] = useState<OnboardingData>(initialData);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const totalSteps = 6;
+
+  const ensureProfileExists = useCallback(async () => {
+    const response = await fetch("/api/auth/ensure-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error || "Failed to initialize profile");
+    }
+  }, []);
+
+  const recoverInvalidSession = useCallback(async () => {
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      // Ignore sign-out failures while recovering invalid sessions.
+    }
+
+    toast.error("Your session is no longer valid. Please sign up again.");
+    router.replace("/signup");
+    router.refresh();
+  }, [router, supabase]);
+
+  const applyOnboardingAccentPreview = useCallback((accentValue: string) => {
+    const html = document.documentElement;
+    const selection = parseAccentSelection(accentValue);
+
+    if (selection.preset === "custom" && selection.customHex) {
+      // Keep data-accent deterministic for custom mode and override dynamic vars.
+      html.setAttribute("data-accent", "electric-blue");
+      const existingStyle = document.getElementById("custom-accent-preview");
+      const style = existingStyle ?? document.createElement("style");
+      style.id = "custom-accent-preview";
+      style.textContent = `
+        :root {
+          --accent-500: ${selection.customHex};
+          --accent-400: ${selection.customHex};
+          --accent-600: ${selection.customHex};
+        }
+      `;
+      if (!existingStyle) {
+        document.head.appendChild(style);
+      }
+      return;
+    }
+
+    document.getElementById("custom-accent-preview")?.remove();
+    html.setAttribute("data-accent", selection.preset);
+  }, []);
 
   // Update data for current step
   const updateData = (updates: Partial<OnboardingData>) => {
@@ -98,6 +229,43 @@ export function useOnboarding() {
     return Number((totalInches * 2.54).toFixed(2));
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapProfile() {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError && isUserMissingFromJwtError(userError)) {
+        if (!cancelled) {
+          await recoverInvalidSession();
+        }
+        return;
+      }
+
+      if (!user || cancelled) return;
+
+      try {
+        await ensureProfileExists();
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("Profile bootstrap warning:", error);
+        }
+      }
+    }
+
+    bootstrapProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [ensureProfileExists, recoverInvalidSession, supabase]);
+
+  useEffect(() => {
+    applyOnboardingAccentPreview(data.accentColor);
+  }, [applyOnboardingAccentPreview, data.accentColor]);
+
   // Submit onboarding data to Supabase
   const submit = async () => {
     if (!canProceed()) {
@@ -115,6 +283,10 @@ export function useOnboarding() {
       } = await supabase.auth.getUser();
 
       if (userError) {
+        if (isUserMissingFromJwtError(userError)) {
+          await recoverInvalidSession();
+          return;
+        }
         console.error("Auth error:", userError);
         throw new Error(`Authentication error: ${userError.message}`);
       }
@@ -123,14 +295,22 @@ export function useOnboarding() {
         throw new Error("No authenticated user found. Please log in again.");
       }
 
-      console.log("User authenticated:", user.id);
+      try {
+        await ensureProfileExists();
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("Profile ensure warning during onboarding submit:", error);
+        }
+      }
 
       // Convert height to cm
       const heightCm = heightToCm(data.heightFeet!, data.heightInches!);
 
+      const accentSelection = parseAccentSelection(data.accentColor);
+
       // Prepare update data
-      const updateData = {
-        accent_color: data.accentColor,
+      const profileData: Record<string, unknown> = {
+        id: user.id,
         fitness_goal: data.fitnessGoal,
         height_cm: heightCm,
         current_weight_kg: data.currentWeight,
@@ -139,16 +319,40 @@ export function useOnboarding() {
         gender: data.gender,
         show_weight: data.showWeight,
         onboarding_completed: true,
+        theme_preference: accentSelection.themePreference,
       };
 
-      console.log("Updating profile with:", updateData);
+      if (accentSelection.customHex) {
+        profileData.accent_color = accentSelection.customHex;
+      }
 
-      // Update profile with onboarding data
-      const { data: updateResult, error: updateError } = await supabase
+      // Upsert so onboarding succeeds even if the profile row did not exist yet.
+      let { error: updateError } = await supabase
         .from("profiles")
-        .update(updateData)
-        .eq("id", user.id)
-        .select();
+        .upsert(profileData, { onConflict: "id" })
+        .select("id")
+        .single();
+
+      // Handle projects where optional migrations haven't been applied yet.
+      if (updateError && isMissingProfilesColumnError(updateError, "accent_color")) {
+        delete profileData.accent_color;
+        const retry = await supabase
+          .from("profiles")
+          .upsert(profileData, { onConflict: "id" })
+          .select("id")
+          .single();
+        updateError = retry.error;
+      }
+
+      if (updateError && isMissingProfilesColumnError(updateError, "theme_preference")) {
+        delete profileData.theme_preference;
+        const retry = await supabase
+          .from("profiles")
+          .upsert(profileData, { onConflict: "id" })
+          .select("id")
+          .single();
+        updateError = retry.error;
+      }
 
       if (updateError) {
         console.error("Update error:", updateError);
@@ -157,10 +361,21 @@ export function useOnboarding() {
         );
       }
 
-      console.log("Profile updated successfully:", updateResult);
+      const themeToApply = accentSelection.customHex
+        ? ("custom" as const)
+        : accentSelection.themePreference;
 
-      // Apply accent color to HTML element
-      document.documentElement.setAttribute("data-accent", data.accentColor);
+      setAppThemeClass(themeToApply);
+      localStorage.setItem(APP_THEME_STORAGE_KEY, themeToApply);
+
+      if (accentSelection.customHex) {
+        localStorage.setItem(ACCENT_STORAGE_KEY, accentSelection.customHex);
+        applyAccentColor(accentSelection.customHex);
+      } else {
+        localStorage.removeItem(ACCENT_STORAGE_KEY);
+        applyAccentColor(null);
+      }
+      applyOnboardingAccentPreview(data.accentColor);
 
       // Trigger confetti celebration
       confetti({

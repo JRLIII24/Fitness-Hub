@@ -45,7 +45,7 @@ const PRIMARY_TABS: Array<{ value: SocialTab; label: string }> = [
 
 const SECONDARY_TABS: Array<{ value: SocialTab; label: string }> = [
   { value: "pods", label: "Pods" },
-  { value: "sets", label: "Forge" },
+  { value: "sets", label: "Sets" },
   { value: "profile", label: "Profile" },
 ];
 
@@ -431,7 +431,7 @@ export default function SocialPage() {
                   <Video className="size-7 text-primary" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold tracking-tight">Forge Feed</h3>
+                  <h3 className="text-lg font-semibold tracking-tight">Sets Feed</h3>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Watch short training clips, track performance cues, and post your own hard sets.
                   </p>
@@ -439,7 +439,7 @@ export default function SocialPage() {
                 <div className="flex gap-3">
                   <Link href="/sets">
                     <Button className="motion-press gap-1.5">
-                      Open Forge
+                      Open Sets
                       <ArrowUpRight className="size-4" />
                     </Button>
                   </Link>

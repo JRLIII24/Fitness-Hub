@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useClips, type ClipFeedMode } from "@/hooks/use-clips";
 import { ClipFeed } from "@/components/sets/clip-feed";
-import { Button } from "@/components/ui/button";
 import { PillSelector } from "@/components/ui/pill-selector";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -40,32 +37,19 @@ export default function SetsPage() {
         <Card className="border-white/20 bg-black/55 backdrop-blur">
           <CardContent className="px-2 py-2">
             <p className="px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/70">
-              Forge
+              Sets
             </p>
             <PillSelector
               value={feedMode}
               onChange={(v) => setFeedMode(v as ClipFeedMode)}
               ariaLabel="Sets feed mode"
               options={[
-                { value: "discover", label: "Forge" },
-                { value: "following", label: `Squad (${followingCount})` },
+                { value: "discover", label: "Discover" },
+                { value: "following", label: `Following (${followingCount})` },
               ]}
             />
           </CardContent>
         </Card>
-      </div>
-
-      {/* Upload FAB — positioned inside the max-w-[420px] video column */}
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 w-full max-w-[420px] flex justify-end pr-4 z-10 pointer-events-none">
-        <Link
-          href="/sets/upload"
-          className="pointer-events-auto"
-          aria-label="Upload clip"
-        >
-          <Button size="icon" className="rounded-full shadow-lg size-12">
-            <Plus className="size-5" />
-          </Button>
-        </Link>
       </div>
 
       <ClipFeed

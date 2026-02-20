@@ -65,16 +65,27 @@ export async function updateSession(request: NextRequest) {
 
   // Handle onboarding flow for authenticated users
   if (user) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("onboarding_completed")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
 
     const isOnOnboardingPage = request.nextUrl.pathname.startsWith("/onboarding");
+    const isApiPath = request.nextUrl.pathname.startsWith("/api/");
+    const profileMissing = !profile && !profileError;
 
-    // Redirect to onboarding if not completed (except if already on onboarding page)
-    if (profile && !profile.onboarding_completed && !isOnOnboardingPage) {
+    if (profileError && process.env.NODE_ENV !== "production") {
+      console.warn("Profile lookup warning in middleware:", profileError);
+    }
+
+    // Redirect to onboarding if profile is missing or onboarding not completed
+    // (except when already on onboarding page or hitting API endpoints).
+    if (
+      !isApiPath &&
+      !isOnOnboardingPage &&
+      (profileMissing || (profile && !profile.onboarding_completed))
+    ) {
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
       return NextResponse.redirect(url);

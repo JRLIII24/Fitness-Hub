@@ -101,16 +101,42 @@ export function SetRow({
       : null;
   const currentScore =
     set.weight_kg != null && set.reps != null ? set.weight_kg * set.reps : null;
-  const beatPrevious =
-    previousScore != null && currentScore != null && currentScore > previousScore;
+
+  // PR logic:
+  // 1) Weight PR: more weight than previous, regardless of reps.
+  // 2) Rep PR: same weight, more reps than previous.
+  const previousWeight = previousSet?.weight ?? null;
+  const previousReps = previousSet?.reps ?? null;
+  const currentWeight = set.weight_kg;
+  const currentReps = set.reps;
+  const hasComparablePrevious = previousWeight != null && previousReps != null;
+  const hasComparableCurrent = currentWeight != null && currentReps != null;
+  const weightPR =
+    hasComparablePrevious &&
+    hasComparableCurrent &&
+    currentWeight > previousWeight;
+  const repPRAtSameWeight =
+    hasComparablePrevious &&
+    hasComparableCurrent &&
+    currentWeight === previousWeight &&
+    currentReps > previousReps;
+  const beatPrevious = Boolean(weightPR || repPRAtSameWeight);
 
   // Ghost workout comparison (from last time doing this template)
   const ghostScore =
     ghostSet?.weight != null && ghostSet.reps != null
       ? ghostSet.weight * ghostSet.reps
       : null;
-  const beatGhost =
-    ghostScore != null && currentScore != null && currentScore > ghostScore;
+  const ghostWeightPR =
+    ghostSet?.weight != null && set.weight_kg != null && set.weight_kg > ghostSet.weight;
+  const ghostRepPRAtSameWeight =
+    ghostSet?.weight != null &&
+    ghostSet?.reps != null &&
+    set.weight_kg != null &&
+    set.reps != null &&
+    set.weight_kg === ghostSet.weight &&
+    set.reps > ghostSet.reps;
+  const beatGhost = Boolean(ghostWeightPR || ghostRepPRAtSameWeight);
   const matchedGhost =
     ghostScore != null && currentScore != null && currentScore === ghostScore;
   const ghostPercentage =
@@ -164,7 +190,11 @@ export function SetRow({
           <motion.div
             whileTap={{ scale: 0.9 }}
             animate={set.completed && (beatPrevious || beatGhost) ? { scale: [1, 1.15, 1] } : {}}
-            transition={{ type: "spring", stiffness: 400, damping: 15 }}
+            transition={
+              set.completed && (beatPrevious || beatGhost)
+                ? { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                : { type: "spring", stiffness: 400, damping: 15 }
+            }
           >
             <Button
               variant={set.completed ? "default" : "secondary"}
@@ -180,7 +210,9 @@ export function SetRow({
               onClick={handleComplete}
               title={
                 beatPrevious && set.completed
-                  ? "Personal Record! 🏆"
+                  ? weightPR
+                    ? "Weight PR! 🏆"
+                    : "Rep PR! 🏆"
                   : beatGhost && set.completed
                     ? "Beat your ghost! 👻"
                     : undefined

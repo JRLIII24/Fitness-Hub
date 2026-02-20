@@ -655,36 +655,68 @@ function FoodSearch({ onFound }: { onFound: (food: FoodItem) => void }) {
   const [results, setResults] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (query.trim().length < 2) {
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+        controllerRef.current = null;
+      }
       setResults([]);
+      setLoading(false);
       return;
     }
 
     debounceRef.current = setTimeout(async () => {
+      const requestId = ++requestSeqRef.current;
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      controllerRef.current = controller;
+
       setLoading(true);
       try {
-        const res = await fetch(`/api/nutrition/search?q=${encodeURIComponent(query.trim())}`);
+        const res = await fetch(
+          `/api/nutrition/search?q=${encodeURIComponent(query.trim())}`,
+          { signal: controller.signal }
+        );
         if (!res.ok) {
           const payload = await res.json().catch(() => null);
           throw new Error(payload?.error ?? "Search failed");
         }
         const data: FoodItem[] = await res.json();
-        setResults(data);
+        if (requestId === requestSeqRef.current) {
+          setResults(data);
+        }
       } catch (err) {
+        const aborted =
+          (err instanceof DOMException && err.name === "AbortError") ||
+          (err instanceof Error && err.name === "AbortError");
+        if (aborted) return;
+
         const message = err instanceof Error ? err.message : "Search failed. Please try again.";
         toast.error(message);
-        setResults([]);
+        if (requestId === requestSeqRef.current) {
+          setResults([]);
+        }
       } finally {
-        setLoading(false);
+        if (requestId === requestSeqRef.current) {
+          setLoading(false);
+        }
       }
-    }, 300);
+    }, 220);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+        controllerRef.current = null;
+      }
     };
   }, [query]);
 

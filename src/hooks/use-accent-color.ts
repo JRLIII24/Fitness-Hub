@@ -8,9 +8,13 @@ const CSS_KEYS = [
   "--primary",
   "--primary-foreground",
   "--ring",
+  "--accent",
+  "--accent-foreground",
   "--sidebar-primary",
   "--sidebar-primary-foreground",
   "--sidebar-ring",
+  "--sidebar-accent",
+  "--sidebar-accent-foreground",
 ];
 
 function isValidHexColor(value: string | null | undefined): value is string {
@@ -79,9 +83,13 @@ export function applyAccentColor(color: string | null) {
   html.style.setProperty("--primary", color);
   html.style.setProperty("--primary-foreground", foreground);
   html.style.setProperty("--ring", color);
+  html.style.setProperty("--accent", color);
+  html.style.setProperty("--accent-foreground", foreground);
   html.style.setProperty("--sidebar-primary", color);
   html.style.setProperty("--sidebar-primary-foreground", foreground);
   html.style.setProperty("--sidebar-ring", color);
+  html.style.setProperty("--sidebar-accent", color);
+  html.style.setProperty("--sidebar-accent-foreground", foreground);
 }
 
 export function useAccentColor(enabled = true, userId?: string | null) {

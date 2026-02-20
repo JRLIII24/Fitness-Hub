@@ -92,14 +92,14 @@ export function ClipFeed({
       clip_id: activeClip.id,
       clip_owner_id: activeClip.user_id,
       index: activeIndex,
-      feed_mode_hint: "forge",
+      feed_mode_hint: "discover",
     });
   }, [activeIndex, clips, currentUserId, supabase]);
 
   if (clips.length === 0 && !loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-8 py-20">
-        <p className="text-foreground text-base font-semibold tracking-tight">Forge is quiet right now</p>
+        <p className="text-foreground text-base font-semibold tracking-tight">Sets is quiet right now</p>
         <p className="text-muted-foreground text-sm mt-1">
           Post your next set or follow more lifters to bring today&apos;s session feed to life.
         </p>

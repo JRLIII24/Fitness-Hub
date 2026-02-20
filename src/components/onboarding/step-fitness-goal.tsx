@@ -5,8 +5,8 @@ import { Dumbbell, Flame, Scale, Footprints } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface StepFitnessGoalProps {
-  selected: "build_muscle" | "lose_weight" | "maintain" | "endurance" | null;
-  onSelect: (goal: "build_muscle" | "lose_weight" | "maintain" | "endurance") => void;
+  selected: "build_muscle" | "lose_weight" | "maintain" | "improve_endurance" | null;
+  onSelect: (goal: "build_muscle" | "lose_weight" | "maintain" | "improve_endurance") => void;
   onNext: () => void;
 }
 
@@ -33,7 +33,7 @@ const goals = [
     emoji: "⚖️",
   },
   {
-    id: "endurance" as const,
+    id: "improve_endurance" as const,
     label: "Improve Endurance",
     icon: Footprints,
     description: "Boost stamina and cardio",

@@ -9,6 +9,7 @@ import {
   Users,
   Clapperboard,
   Plus,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePings } from "@/hooks/use-pings";
@@ -33,16 +34,12 @@ export function BottomNav() {
   const { unreadCount: sharedUnread } = useSharedItems(userId);
   const unreadCount = pingsUnread + sharedUnread;
 
-  // Focus Mode: hide bottom nav while an active workout is in progress
-  if (pathname.startsWith("/workout") && isWorkoutActive) {
-    return null;
-  }
-
   const navLink = (
     href: string,
     label: string,
     Icon: React.ElementType,
-    badge?: number
+    badge?: number,
+    showPulse?: boolean
   ) => {
     const isActive = pathname.startsWith(href);
     return (
@@ -56,6 +53,9 @@ export function BottomNav() {
       >
         <span className="relative">
           <Icon className="size-5" />
+          {showPulse && (
+            <span className="absolute -top-1 -left-1 h-2 w-2 rounded-full bg-primary animate-pulse" />
+          )}
           {badge != null && badge > 0 && (
             <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
               {badge > 9 ? "9+" : badge}
@@ -72,7 +72,13 @@ export function BottomNav() {
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center px-2 sm:px-4">
 
         {navLink("/dashboard", "Home", LayoutDashboard)}
-        {navLink("/workout", "Workout", Dumbbell)}
+        {navLink(
+          "/workout",
+          isWorkoutActive && !pathname.startsWith("/workout") ? "Resume" : "Workout",
+          Dumbbell,
+          undefined,
+          isWorkoutActive
+        )}
 
         {/* Post FAB — raised, occupies same flex-1 slot as other items */}
         <Link
@@ -97,11 +103,12 @@ export function BottomNav() {
           )}
         >
           <Clapperboard className="size-5" />
-          <span className="truncate">Forge</span>
+          <span className="truncate">Sets</span>
         </Link>
 
         {navLink("/nutrition", "Nutrition", Apple)}
         {navLink("/social", "Social", Users, unreadCount)}
+        {navLink("/settings", "Settings", Settings)}
 
       </div>
       {/* Safe area padding for iOS home indicator */}

@@ -56,6 +56,9 @@ interface NormalizedFoodItem {
   created_by?: string | null;
 }
 
+const MAX_RESULTS = 20;
+const REMOTE_TIMEOUT_MS = 1600;
+
 function macroPerServing(
   per100: number | undefined,
   perServing: number | undefined,
@@ -219,12 +222,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Search local food_items table
+    // 1) Search local food_items table first (fast path)
     const { data: localResults, error: localError } = await supabase
       .from("food_items")
       .select("*")
-      .ilike("name", `%${query}%`)
-      .limit(10);
+      .or(`name.ilike.%${query}%,brand.ilike.%${query}%`)
+      .limit(MAX_RESULTS);
 
     if (localError) {
       console.error("Local search error:", localError);
@@ -232,19 +235,29 @@ export async function GET(req: NextRequest) {
 
     const local = (localResults ?? []) as NormalizedFoodItem[];
 
-    // 2. Search Open Food Facts
+    // If we already have a strong local result set, return immediately.
+    // This avoids external API latency for common/repeated items.
+    if (local.length >= 8) {
+      return NextResponse.json(local.slice(0, MAX_RESULTS));
+    }
+
+    // 2) Search Open Food Facts with strict timeout
     let remoteResults: NormalizedFoodItem[] = [];
     try {
       const offUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
         query
-      )}&search_simple=1&action=process&json=1&page_size=15&fields=product_name,product_name_en,brands,serving_size,serving_quantity,nutrition_data_per,code,nutriments`;
+      )}&search_simple=1&action=process&json=1&page_size=12&fields=product_name,product_name_en,brands,serving_size,serving_quantity,nutrition_data_per,code,nutriments`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REMOTE_TIMEOUT_MS);
 
       const offRes = await fetch(offUrl, {
         headers: {
           "User-Agent": "FitHub/1.0 (nutrition tracker; contact@fithub.app)",
         },
         next: { revalidate: 300 }, // cache for 5 minutes
-      });
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout));
 
       if (offRes.ok) {
         const offData: OFFSearchResponse = await offRes.json();
@@ -260,12 +273,14 @@ export async function GET(req: NextRequest) {
       // Continue with local results only
     }
 
-    // 3. Merge: local first, then remote, deduplicated by normalized name
+    // 3) Merge: local first, then remote, deduplicated by barcode/name/brand
     const seen = new Set<string>();
     const merged: NormalizedFoodItem[] = [];
 
     for (const item of local) {
-      const key = item.name.toLowerCase().trim();
+      const key = item.barcode
+        ? `barcode:${item.barcode}`
+        : `name:${item.name.toLowerCase().trim()}|brand:${(item.brand ?? "").toLowerCase().trim()}`;
       if (!seen.has(key)) {
         seen.add(key);
         merged.push(item);
@@ -273,72 +288,18 @@ export async function GET(req: NextRequest) {
     }
 
     for (const item of remoteResults) {
-      const key = item.name.toLowerCase().trim();
+      const key = item.barcode
+        ? `barcode:${item.barcode}`
+        : `name:${item.name.toLowerCase().trim()}|brand:${(item.brand ?? "").toLowerCase().trim()}`;
       if (!seen.has(key)) {
         seen.add(key);
         merged.push(item);
       }
     }
 
-    // 4. Persist remote results (OFF) to food_items table before returning
-    // This ensures they have real database UUIDs for FK constraint when logging
-    const itemsToInsert = merged.slice(0, 20).map((item) => {
-      // Only insert if from OFF (source === "openfoodfacts") and not already in local results
-      if (item.source === "openfoodfacts") {
-        return {
-          barcode: item.barcode,
-          name: item.name,
-          brand: item.brand,
-          serving_size_g: item.serving_size_g,
-          serving_description: item.serving_description,
-          calories_per_serving: item.calories_per_serving,
-          protein_g: item.protein_g,
-          carbs_g: item.carbs_g,
-          fat_g: item.fat_g,
-          fiber_g: item.fiber_g,
-          sugar_g: item.sugar_g,
-          sodium_mg: item.sodium_mg,
-          source: "openfoodfacts",
-        };
-      }
-      return null;
-    }).filter((x): x is NonNullable<typeof x> => x !== null);
-
-    // Upsert: if barcode exists, skip; if no barcode, use name+brand combo for dedup
-    if (itemsToInsert.length > 0) {
-      for (const item of itemsToInsert) {
-        try {
-          if (item.barcode) {
-            // Upsert by barcode
-            await supabase
-              .from("food_items")
-              .upsert(item, { onConflict: "barcode" });
-          } else {
-            // Try insert; if FK/constraint fails, silently ignore (item exists)
-            await supabase
-              .from("food_items")
-              .insert(item)
-              .select();
-          }
-        } catch {
-          // Suppress duplicate key or other errors
-        }
-      }
-
-      // Re-fetch merged results with real IDs from database
-      const { data: dbResults } = await supabase
-        .from("food_items")
-        .select("*")
-        .ilike("name", `%${query}%`)
-        .limit(20);
-
-      if (dbResults && dbResults.length > 0) {
-        return NextResponse.json(dbResults);
-      }
-    }
-
-    // Never return transient OFF ids; only return persisted DB rows
-    return NextResponse.json(local.slice(0, 20));
+    // NOTE: Remote items can carry transient off-* ids; they are persisted lazily
+    // by LogFoodForm before insertion into food_log (see ensurePersistedFoodItemId).
+    return NextResponse.json(merged.slice(0, MAX_RESULTS));
   } catch (err) {
     console.error("Search error:", err);
     return NextResponse.json(

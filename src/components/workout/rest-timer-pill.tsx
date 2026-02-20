@@ -287,9 +287,9 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
   return (
     <div
       className={cn(
-        "fixed left-1/2 z-[70] w-[calc(100%-1rem)] max-w-sm -translate-x-1/2",
-        "bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] md:bottom-6",
-        "max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain",
+        "fixed left-1/2 z-[90] w-[calc(100%-1rem)] max-w-sm -translate-x-1/2",
+        "bottom-[calc(env(safe-area-inset-bottom)+6rem)] md:bottom-8",
+        "max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-contain",
         className
       )}
     >

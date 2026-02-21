@@ -623,11 +623,11 @@ export default function NutritionPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Macro Rings</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-2 sm:gap-4">
-                <div className="flex scale-[0.8] justify-center sm:scale-100"><MacroRing size={104} strokeWidth={10} macro="calories" value={totalCalories} target={goals?.calories_target ?? 0} label="Calories" /></div>
-                <div className="flex scale-[0.8] justify-center sm:scale-100"><MacroRing size={104} strokeWidth={10} macro="protein" value={totalProtein} target={goals?.protein_g_target ?? 0} label="Protein" /></div>
-                <div className="flex scale-[0.8] justify-center sm:scale-100"><MacroRing size={104} strokeWidth={10} macro="carbs" value={totalCarbs} target={goals?.carbs_g_target ?? 0} label="Carbs" /></div>
-                <div className="flex scale-[0.8] justify-center sm:scale-100"><MacroRing size={104} strokeWidth={10} macro="fat" value={totalFat} target={goals?.fat_g_target ?? 0} label="Fat" /></div>
+              <CardContent className="grid grid-cols-2 gap-3">
+                <div className="flex justify-center"><MacroRing size={96} strokeWidth={9} macro="calories" value={totalCalories} target={goals?.calories_target ?? 0} label="Calories" /></div>
+                <div className="flex justify-center"><MacroRing size={96} strokeWidth={9} macro="protein" value={totalProtein} target={goals?.protein_g_target ?? 0} label="Protein" /></div>
+                <div className="flex justify-center"><MacroRing size={96} strokeWidth={9} macro="carbs" value={totalCarbs} target={goals?.carbs_g_target ?? 0} label="Carbs" /></div>
+                <div className="flex justify-center"><MacroRing size={96} strokeWidth={9} macro="fat" value={totalFat} target={goals?.fat_g_target ?? 0} label="Fat" /></div>
               </CardContent>
             </Card>
           </div>

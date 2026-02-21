@@ -1601,7 +1601,7 @@ export default function WorkoutPage() {
                         <ChevronDown className="ml-2 size-4 shrink-0 opacity-70" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[min(36rem,var(--radix-popover-trigger-width))] p-2" align="start">
+                    <PopoverContent className="w-[min(28rem,calc(100vw-2rem))] p-2" align="start">
                       <Input
                         value={liftSearch}
                         onChange={(event) => setLiftSearch(event.target.value)}

@@ -268,8 +268,8 @@ export default function HistoryPage() {
               return (
                 <Card key={session.id} className="border-white/10 bg-card/75">
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex-1 min-w-0">
                         <CardTitle className="text-base">{session.name}</CardTitle>
                         <p className="text-xs text-muted-foreground">
                           Template: {session.workout_templates?.name ?? "No template"}
@@ -281,33 +281,32 @@ export default function HistoryPage() {
                           Totals: {totalSets} sets, {totalReps} reps
                         </p>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => router.push(`/history/${session.id}/edit`)}
-                        className="shrink-0"
-                      >
-                        <Pencil className="size-3.5 mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleOpenDateDialog(session)}
-                        className="shrink-0"
-                      >
-                        <CalendarClock className="size-3.5 mr-1" />
-                        Change Date
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeleteSession(session.id)}
-                        className="shrink-0"
-                      >
-                        <Trash2 className="size-3.5 mr-1" />
-                        Delete
-                      </Button>
+                      <div className="flex flex-wrap gap-1.5 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => router.push(`/history/${session.id}/edit`)}
+                        >
+                          <Pencil className="size-3.5 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenDateDialog(session)}
+                        >
+                          <CalendarClock className="size-3.5 mr-1" />
+                          Change Date
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteSession(session.id)}
+                        >
+                          <Trash2 className="size-3.5 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">

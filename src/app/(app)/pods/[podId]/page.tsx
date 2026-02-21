@@ -82,7 +82,7 @@ export default function PodDetailPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-lg px-4 pt-5 pb-28 space-y-4">
+      <div className="mx-auto w-full max-w-lg px-4 pt-5 pb-28 space-y-4 md:max-w-2xl">
         <Skeleton className="h-8 w-48" />
         <Card><CardContent className="pt-6"><Skeleton className="h-24 w-full" /></CardContent></Card>
         <Card><CardContent className="pt-6"><Skeleton className="h-32 w-full" /></CardContent></Card>
@@ -92,7 +92,7 @@ export default function PodDetailPage({ params }: PageProps) {
 
   if (error || !pod) {
     return (
-      <div className="mx-auto max-w-lg px-4 pt-5 pb-28">
+      <div className="mx-auto w-full max-w-lg px-4 pt-5 pb-28 md:max-w-2xl">
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
@@ -107,7 +107,7 @@ export default function PodDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pt-5 pb-28 space-y-4">
+    <div className="mx-auto w-full max-w-lg px-4 pt-5 pb-28 space-y-4 md:max-w-2xl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
@@ -143,19 +143,19 @@ export default function PodDetailPage({ params }: PageProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Actions */}
-          <div className="flex gap-2">
-            <Button size="sm" onClick={() => setCommitmentOpen(true)} className="flex-1">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setCommitmentOpen(true)} className="flex-1 min-w-[120px]">
               <Target className="h-4 w-4 mr-2" />
               {currentUserProgress && currentUserProgress.commitment > 0
                 ? `${currentUserProgress.commitment}x/week`
                 : "Set Goal"}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setMessageOpen(true)} className="flex-1">
+            <Button size="sm" variant="outline" onClick={() => setMessageOpen(true)} className="flex-1 min-w-[120px]">
               <MessageSquare className="h-4 w-4 mr-2" />
               Encourage
             </Button>
             {isCreator && (
-              <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)}>
+              <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} className="shrink-0">
                 <UserPlus className="h-4 w-4" />
               </Button>
             )}

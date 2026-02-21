@@ -261,7 +261,7 @@ export default function TemplatesPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex flex-wrap justify-end gap-2 shrink-0">
                     <Button
                       size="sm"
                       variant="ghost"
@@ -285,9 +285,10 @@ export default function TemplatesPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => router.push(`/templates/${template.id}/edit`)}
+                      title="Edit exercises"
                     >
-                      <Pencil className="size-3.5 mr-1" />
-                      Edit Exercises
+                      <Pencil className="size-3.5" />
+                      <span className="hidden sm:inline ml-1">Edit Exercises</span>
                     </Button>
                     <Button
                       size="sm"

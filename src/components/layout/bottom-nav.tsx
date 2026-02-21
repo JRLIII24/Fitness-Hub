@@ -57,7 +57,7 @@ export function BottomNav() {
             <span className="absolute -top-1 -left-1 h-2 w-2 rounded-full bg-primary animate-pulse" />
           )}
           {badge != null && badge > 0 && (
-            <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+            <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
               {badge > 9 ? "9+" : badge}
             </span>
           )}

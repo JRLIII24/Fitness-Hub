@@ -333,15 +333,15 @@ export default async function DashboardPage() {
 
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <Link href="/workout">
-              <Button className="motion-press h-12 w-full justify-center rounded-xl text-sm font-semibold">Start Workout</Button>
+              <Button className="motion-press h-12 w-full justify-center rounded-xl text-xs sm:text-sm font-semibold">Start Workout</Button>
             </Link>
             <Link href="/nutrition">
-              <Button variant="secondary" className="motion-press h-12 w-full justify-center rounded-xl text-sm font-semibold">
+              <Button variant="secondary" className="motion-press h-12 w-full justify-center rounded-xl text-xs sm:text-sm font-semibold">
                 Log Nutrition
               </Button>
             </Link>
             <Link href="/history/progress">
-              <Button variant="secondary" className="motion-press h-12 w-full justify-center rounded-xl text-sm font-semibold">
+              <Button variant="secondary" className="motion-press h-12 w-full justify-center rounded-xl text-xs sm:text-sm font-semibold">
                 View Progress
               </Button>
             </Link>

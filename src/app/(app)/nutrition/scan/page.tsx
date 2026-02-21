@@ -257,7 +257,7 @@ function LogFoodForm({
                 setServings(s);
                 setCustomServings("");
               }}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
                 servings === s && !customServings
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-background text-foreground hover:border-primary/50"

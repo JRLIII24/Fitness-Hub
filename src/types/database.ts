@@ -24,6 +24,7 @@ export interface Database {
             | "maintain"
             | "improve_endurance"
             | null;
+          timezone: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -41,6 +42,7 @@ export interface Database {
             | "maintain"
             | "improve_endurance"
             | null;
+          timezone?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -58,6 +60,7 @@ export interface Database {
             | "maintain"
             | "improve_endurance"
             | null;
+          timezone?: string | null;
           updated_at?: string;
         };
       };
@@ -173,6 +176,7 @@ export interface Database {
           started_at: string;
           completed_at: string | null;
           duration_seconds: number | null;
+          session_rpe: number | null;
           notes: string | null;
           total_volume_kg: number | null;
           created_at: string;
@@ -186,6 +190,7 @@ export interface Database {
           started_at?: string;
           completed_at?: string | null;
           duration_seconds?: number | null;
+          session_rpe?: number | null;
           notes?: string | null;
           total_volume_kg?: number | null;
           created_at?: string;
@@ -195,6 +200,7 @@ export interface Database {
           status?: "in_progress" | "completed" | "cancelled";
           completed_at?: string | null;
           duration_seconds?: number | null;
+          session_rpe?: number | null;
           notes?: string | null;
           total_volume_kg?: number | null;
         };
@@ -210,6 +216,7 @@ export interface Database {
           weight_kg: number | null;
           duration_seconds: number | null;
           rpe: number | null;
+          rir: number | null;
           rest_seconds: number | null;
           completed_at: string | null;
           notes: string | null;
@@ -225,6 +232,7 @@ export interface Database {
           weight_kg?: number | null;
           duration_seconds?: number | null;
           rpe?: number | null;
+          rir?: number | null;
           rest_seconds?: number | null;
           completed_at?: string | null;
           notes?: string | null;
@@ -237,10 +245,106 @@ export interface Database {
           weight_kg?: number | null;
           duration_seconds?: number | null;
           rpe?: number | null;
+          rir?: number | null;
           rest_seconds?: number | null;
           completed_at?: string | null;
           notes?: string | null;
           sort_order?: number;
+        };
+      };
+      fatigue_daily_checkins: {
+        Row: {
+          id: string;
+          user_id: string;
+          checkin_date: string;
+          timezone: string;
+          sleep_quality: number;
+          soreness: number;
+          stress: number;
+          motivation: number;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          checkin_date: string;
+          timezone: string;
+          sleep_quality: number;
+          soreness: number;
+          stress: number;
+          motivation: number;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          checkin_date?: string;
+          timezone?: string;
+          sleep_quality?: number;
+          soreness?: number;
+          stress?: number;
+          motivation?: number;
+          notes?: string | null;
+          updated_at?: string;
+        };
+      };
+      fatigue_daily_scores: {
+        Row: {
+          id: string;
+          user_id: string;
+          score_date: string;
+          timezone: string;
+          fatigue_score: number;
+          load_subscore: number;
+          recovery_subscore: number;
+          performance_subscore: number;
+          strain: number | null;
+          session_load_today: number | null;
+          avg_load_7d: number | null;
+          avg_load_28d: number | null;
+          performance_delta: number | null;
+          inputs: Json;
+          recommendation: string;
+          confidence: "low" | "medium" | "high";
+          computed_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          score_date: string;
+          timezone: string;
+          fatigue_score: number;
+          load_subscore: number;
+          recovery_subscore: number;
+          performance_subscore: number;
+          strain?: number | null;
+          session_load_today?: number | null;
+          avg_load_7d?: number | null;
+          avg_load_28d?: number | null;
+          performance_delta?: number | null;
+          inputs?: Json;
+          recommendation: string;
+          confidence: "low" | "medium" | "high";
+          computed_at?: string;
+        };
+        Update: {
+          score_date?: string;
+          timezone?: string;
+          fatigue_score?: number;
+          load_subscore?: number;
+          recovery_subscore?: number;
+          performance_subscore?: number;
+          strain?: number | null;
+          session_load_today?: number | null;
+          avg_load_7d?: number | null;
+          avg_load_28d?: number | null;
+          performance_delta?: number | null;
+          inputs?: Json;
+          recommendation?: string;
+          confidence?: "low" | "medium" | "high";
+          computed_at?: string;
         };
       };
       food_items: {

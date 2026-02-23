@@ -21,6 +21,8 @@ interface ClipFeedProps {
   postComment: (clipId: string, content: string) => Promise<import("@/hooks/use-clips").ClipComment | null>;
 }
 
+import { useVirtualizer } from '@tanstack/react-virtual';
+
 export function ClipFeed({
   clips,
   loading,
@@ -37,50 +39,31 @@ export function ClipFeed({
   const [commentClipId, setCommentClipId] = useState<string | null>(null);
   const [commentClipOwnerId, setCommentClipOwnerId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const viewedClipIdsRef = useRef<Set<string>>(new Set());
   const supabase = useSupabase();
 
-  // IntersectionObserver: activate the clip that is most visible
+  const virtualizer = useVirtualizer({
+    count: hasMore ? clips.length + 1 : clips.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => window.innerHeight || 800,
+    overscan: 2,
+  });
+
+  // Track the most visible active index from virtualizer
   useEffect(() => {
-    const observers: IntersectionObserver[] = [];
+    const virtualItems = virtualizer.getVirtualItems();
+    if (virtualItems.length === 0) return;
 
-    itemRefs.current.forEach((el, index) => {
-      if (!el) return;
-      const observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            setActiveIndex(index);
-          }
-        },
-        { threshold: 0.6 }
-      );
-      observer.observe(el);
-      observers.push(observer);
-    });
+    const centerIndex = virtualItems[Math.floor(virtualItems.length / 2)].index;
+    if (centerIndex < clips.length && centerIndex !== activeIndex) {
+      setActiveIndex(centerIndex);
+    }
 
-    return () => {
-      observers.forEach((o) => o.disconnect());
-    };
-  }, [clips.length]);
-
-  // Load more when last clip becomes visible
-  const lastItemRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (!node || loading || !hasMore) return;
-      const observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) {
-            onLoadMore();
-          }
-        },
-        { threshold: 0.1 }
-      );
-      observer.observe(node);
-      return () => observer.disconnect();
-    },
-    [loading, hasMore, onLoadMore]
-  );
+    const lastItem = virtualItems[virtualItems.length - 1];
+    if (hasMore && !loading && lastItem && lastItem.index >= clips.length) {
+      onLoadMore();
+    }
+  }, [virtualizer.getVirtualItems(), activeIndex, clips.length, hasMore, loading, onLoadMore]);
 
   useEffect(() => {
     const activeClip = clips[activeIndex];
@@ -114,43 +97,61 @@ export function ClipFeed({
         className="h-full overflow-y-scroll snap-y snap-mandatory"
         style={{ scrollSnapType: "y mandatory" }}
       >
-        {clips.map((clip, i) => (
-          <div
-            key={clip.id}
-            ref={(el) => {
-              itemRefs.current[i] = el;
-              if (i === clips.length - 1) lastItemRef(el);
-            }}
-            className="w-full snap-start snap-always flex items-center justify-center bg-black"
-            style={{ height: "calc(100svh - 56px)" }}
-          >
-            {/* Cap width so 9:16 video is fully visible on desktop */}
-            <div className="relative w-full h-full max-w-[420px]">
-              <ClipPlayer
-                clip={clip}
-                isActive={i === activeIndex}
-                shouldPreload={Math.abs(i - activeIndex) <= 2}
-                currentUserId={currentUserId}
-                onLike={onLike}
-                onUnlike={onUnlike}
-                onOpenComments={(clipId) => {
-                  if (currentUserId) {
-                    void trackClipCommentsOpened(supabase, currentUserId, { clip_id: clipId });
-                  }
-                  setCommentClipId(clipId);
-                  setCommentClipOwnerId(clip.user_id);
-                }}
-                onDelete={onDelete}
-              />
-            </div>
-          </div>
-        ))}
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const isLoaderRow = virtualRow.index > clips.length - 1;
+            const clip = clips[virtualRow.index];
+            const i = virtualRow.index;
 
-        {loading && (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          </div>
-        )}
+            return (
+              <div
+                key={isLoaderRow ? 'loader' : clip.id}
+                ref={virtualizer.measureElement}
+                data-index={virtualRow.index}
+                className="w-full flex items-center justify-center bg-black snap-start snap-always"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: 'calc(100svh - 56px)',
+                  transform: `translateY(${virtualRow.start}px)`
+                }}
+              >
+                {isLoaderRow ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="relative w-full h-full max-w-[420px]">
+                    <ClipPlayer
+                      clip={clip}
+                      isActive={i === activeIndex}
+                      shouldPreload={Math.abs(i - activeIndex) <= 2}
+                      currentUserId={currentUserId}
+                      onLike={onLike}
+                      onUnlike={onUnlike}
+                      onOpenComments={(clipId) => {
+                        if (currentUserId) {
+                          void trackClipCommentsOpened(supabase, currentUserId, { clip_id: clipId });
+                        }
+                        setCommentClipId(clipId);
+                        setCommentClipOwnerId(clip.user_id);
+                      }}
+                      onDelete={onDelete}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <ClipCommentSheet

@@ -1,262 +1,344 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTimerStore, type Timer } from "@/stores/timer-store";
-import { Button } from "@/components/ui/button";
 import { Pause, Play, X, Plus, Minus, BellOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface SingleTimerPillProps {
-  timer: Timer;
-  onExpand?: () => void;
+// ─── PillButton ───────────────────────────────────────────────────────────────
+
+function PillButton({
+  onClick,
+  "aria-label": ariaLabel,
+  children,
+}: {
+  onClick: () => void;
+  "aria-label"?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.88 }}
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className="flex h-7 items-center gap-1 rounded-full border border-border/60 bg-secondary/40 px-2.5 text-muted-foreground transition-colors hover:text-foreground"
+    >
+      {children}
+    </motion.button>
+  );
 }
 
-/**
- * SingleTimerPill — Individual timer pill component
- */
-function SingleTimerPill({ timer, onExpand }: SingleTimerPillProps) {
-  const pauseTimer = useTimerStore((state) => state.pauseTimer);
-  const resumeTimer = useTimerStore((state) => state.resumeTimer);
-  const stopTimer = useTimerStore((state) => state.stopTimer);
-  const adjustTime = useTimerStore((state) => state.adjustTime);
+// ─── SingleTimerPill ─────────────────────────────────────────────────────────
 
-  // Subscribe to the actual timer from the store to get live updates
-  const liveTimer = useTimerStore((state) =>
-    state.timers.find((t) => t.id === timer.id)
-  );
+function SingleTimerPill({ timer, index }: { timer: Timer; index: number }) {
+  const pauseTimer = useTimerStore((s) => s.pauseTimer);
+  const resumeTimer = useTimerStore((s) => s.resumeTimer);
+  const stopTimer = useTimerStore((s) => s.stopTimer);
+  const adjustTime = useTimerStore((s) => s.adjustTime);
+
+  // Subscribe directly so we always get the latest state
+  const liveTimer = useTimerStore((s) => s.timers.find((t) => t.id === timer.id));
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [, forceUpdate] = useState(0);
 
-  // Force re-render every 100ms to update countdown display
+  // Force re-render every second while running to keep countdown live
   useEffect(() => {
-    if (!liveTimer || !liveTimer.isRunning) return;
-
-    const interval = setInterval(() => {
-      forceUpdate((n) => n + 1);
-    }, 100);
-
-    return () => clearInterval(interval);
+    if (!liveTimer?.isRunning) return;
+    const id = setInterval(() => forceUpdate((n) => n + 1), 1000);
+    return () => clearInterval(id);
   }, [liveTimer?.isRunning]);
 
-  // Calculate remaining seconds from wall-clock time (always current)
   const remainingSeconds = liveTimer
     ? Math.max(0, Math.ceil((liveTimer.endTime - Date.now()) / 1000))
     : 0;
 
-  // Hard guarantee: once timer hits 0, remove it from UI/store immediately.
+  // Auto-remove when countdown reaches zero
   useEffect(() => {
-    if (!liveTimer) return;
-    if (remainingSeconds > 0) return;
+    if (!liveTimer || remainingSeconds > 0) return;
     stopTimer(timer.id);
     setIsExpanded(false);
   }, [liveTimer, remainingSeconds, stopTimer, timer.id]);
 
   const progress =
     liveTimer && liveTimer.totalSeconds > 0
-      ? ((liveTimer.totalSeconds - remainingSeconds) / liveTimer.totalSeconds) * 100
+      ? Math.min(1, (liveTimer.totalSeconds - remainingSeconds) / liveTimer.totalSeconds)
       : 0;
-  const sweepAngle = (progress / 100) * 360;
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  // Clock geometry — 56 px ring
+  const SIZE = 56;
+  const cx = SIZE / 2;
+  const cy = SIZE / 2;
+  const r = 21;
+  const circumference = 2 * Math.PI * r;
+  const sweepAngle = progress * 360;
+
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const handleToggleExpand = () => {
-    setIsExpanded(!isExpanded);
-    onExpand?.();
-  };
+  // Urgency color shifts as time runs out — uses app theme tokens
+  const urgencyClass =
+    remainingSeconds <= 10
+      ? "text-destructive"
+      : remainingSeconds <= 30
+        ? "text-amber-400"
+        : "text-primary";
+
+  const isRunning = liveTimer?.isRunning ?? timer.isRunning;
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 16, scale: 0.94 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 10, scale: 0.92, transition: { duration: 0.2 } }}
+      transition={{ type: "spring", stiffness: 420, damping: 34, delay: index * 0.06 }}
       className={cn(
-        "relative flex flex-col gap-2 rounded-2xl border border-border bg-card/95 shadow-lg backdrop-blur-sm transition-all duration-300",
-        isExpanded ? "p-3" : "p-2",
-        timer.isRunning && "animate-[timer-breathe_2200ms_cubic-bezier(0.22,1,0.36,1)_infinite]"
+        "relative overflow-hidden rounded-2xl border bg-card shadow-lg",
+        isRunning ? "border-primary/20" : "border-border/60"
       )}
     >
-      {/* Compact Pill */}
-      <button
-        onClick={handleToggleExpand}
-        aria-label={isExpanded ? "Collapse timer controls" : "Expand timer controls"}
-        className="flex items-center gap-2 text-left transition-opacity hover:opacity-80"
-      >
-        {/* Clock-style Progress Ring */}
-        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center">
-          <svg className="absolute inset-0" width="48" height="48" viewBox="0 0 48 48">
-            {/* Tick marks */}
-            <g className="text-muted-foreground/45">
-              {Array.from({ length: 12 }).map((_, i) => {
-                const angle = (i / 12) * 360;
-                const rad = (angle * Math.PI) / 180;
-                const x1 = 24 + Math.cos(rad) * 18;
-                const y1 = 24 + Math.sin(rad) * 18;
-                const x2 = 24 + Math.cos(rad) * 20;
-                const y2 = 24 + Math.sin(rad) * 20;
-                return (
-                  <line
-                    key={`tick-${timer.id}-${i}`}
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
-                    stroke="currentColor"
-                    strokeWidth={i % 3 === 0 ? 1.4 : 1}
-                    strokeLinecap="round"
-                  />
-                );
-              })}
-            </g>
+      {/* Running pulse strip at top */}
+      <AnimatePresence>
+        {isRunning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute left-0 right-0 top-0 h-0.5 rounded-t-2xl"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, var(--color-primary), transparent)",
+            }}
+          />
+        )}
+      </AnimatePresence>
 
+      {/* Compact pill row */}
+      <button
+        onClick={() => setIsExpanded((v) => !v)}
+        aria-label={isExpanded ? "Collapse timer controls" : "Expand timer controls"}
+        className="flex w-full items-center gap-3 p-3.5 text-left transition-opacity hover:opacity-90"
+      >
+        {/* Clock ring */}
+        <div
+          className={cn("relative shrink-0", urgencyClass)}
+          style={{ width: SIZE, height: SIZE }}
+        >
+          <svg
+            width={SIZE}
+            height={SIZE}
+            viewBox={`0 0 ${SIZE} ${SIZE}`}
+            style={{ transform: "rotate(-90deg)" }}
+          >
+            {/* Tick marks */}
+            {Array.from({ length: 12 }).map((_, i) => {
+              const angle = (i / 12) * 2 * Math.PI;
+              const isMajor = i % 3 === 0;
+              return (
+                <line
+                  key={`tick-${timer.id}-${i}`}
+                  x1={cx + Math.cos(angle) * (isMajor ? 24 : 25)}
+                  y1={cy + Math.sin(angle) * (isMajor ? 24 : 25)}
+                  x2={cx + Math.cos(angle) * 27}
+                  y2={cy + Math.sin(angle) * 27}
+                  stroke={
+                    isMajor ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.07)"
+                  }
+                  strokeWidth={isMajor ? 1.5 : 1}
+                  strokeLinecap="round"
+                />
+              );
+            })}
+
+            {/* Track */}
             <circle
-              cx="24"
-              cy="24"
-              r="17"
+              cx={cx}
+              cy={cy}
+              r={r}
               fill="none"
               stroke="currentColor"
-              strokeWidth="3"
-              className="text-secondary/75"
+              strokeWidth={3.5}
+              opacity={0.12}
             />
+
+            {/* Progress arc */}
             <circle
-              cx="24"
-              cy="24"
-              r="17"
+              cx={cx}
+              cy={cy}
+              r={r}
               fill="none"
               stroke="currentColor"
-              strokeWidth="3"
-              strokeDasharray={`${2 * Math.PI * 17}`}
-              strokeDashoffset={`${2 * Math.PI * 17 * (1 - progress / 100)}`}
+              strokeWidth={3.5}
               strokeLinecap="round"
-              className="text-primary transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+              strokeDasharray={circumference}
+              strokeDashoffset={circumference * (1 - progress)}
+              style={{
+                transition:
+                  "stroke-dashoffset 0.9s cubic-bezier(0.22,1,0.36,1), opacity 0.3s",
+              }}
             />
 
             {/* Sweep hand */}
             <g
-              className="origin-center transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-              style={{ transform: `rotate(${sweepAngle - 90}deg)`, transformOrigin: "24px 24px" }}
+              style={{
+                transformOrigin: `${cx}px ${cy}px`,
+                transform: `rotate(${sweepAngle}deg)`,
+                transition: "transform 0.9s cubic-bezier(0.22,1,0.36,1)",
+              }}
             >
               <line
-                x1="24"
-                y1="24"
-                x2="39"
-                y2="24"
+                x1={cx}
+                y1={cy}
+                x2={cx + r - 4}
+                y2={cy}
                 stroke="currentColor"
-                strokeWidth="1.3"
-                className="text-primary/90"
+                strokeWidth={1.2}
                 strokeLinecap="round"
+                opacity={0.9}
               />
             </g>
-            <circle cx="24" cy="24" r="1.9" className="fill-primary" />
+
+            {/* Center dot */}
+            <circle cx={cx} cy={cy} r={2} fill="currentColor" />
           </svg>
-          <span className="text-[10px] font-bold tabular-nums text-foreground">
+
+          {/* Small time inside ring */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-[10px] font-bold tabular-nums text-foreground">
+              {formatTime(remainingSeconds)}
+            </span>
+          </div>
+        </div>
+
+        {/* Name + status */}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold tracking-tight text-foreground">
+            {timer.exerciseName}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {isRunning ? "Resting…" : "Paused"}
+          </p>
+        </div>
+
+        {/* Large time readout — right side */}
+        <div className="shrink-0 text-right">
+          <span
+            className={cn(
+              "block tabular-nums text-[26px] font-black leading-none tracking-tight transition-colors duration-300",
+              urgencyClass
+            )}
+          >
             {formatTime(remainingSeconds)}
           </span>
+          <span className="mt-0.5 block text-[9px] uppercase tracking-[0.08em] text-muted-foreground">
+            {isExpanded ? "tap to collapse" : "tap to control"}
+          </span>
         </div>
-
-        {/* Exercise Name + Rest Label */}
-        <div className="flex-1 overflow-hidden">
-          <p className="truncate text-sm font-medium text-foreground">{timer.exerciseName}</p>
-          <p className="text-xs text-muted-foreground">Rest timer</p>
-        </div>
-
-        {/* Status Indicator */}
-        <div
-          className={cn(
-            "h-2 w-2 shrink-0 rounded-full transition-colors",
-            timer.isRunning ? "bg-primary" : "bg-muted-foreground"
-          )}
-        />
       </button>
 
-      {/* Expanded Controls */}
-      {isExpanded && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2">
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => adjustTime(timer.id, -15)}
-              title="Remove 15 seconds"
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => adjustTime(timer.id, 15)}
-              title="Add 15 seconds"
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
+      {/* Expanded controls */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+            style={{ overflow: "hidden" }}
+          >
+            <div className="flex items-center justify-between gap-2 border-t border-border/50 px-3.5 py-3">
+              {/* ±15s pill buttons */}
+              <div className="flex items-center gap-1.5">
+                <PillButton
+                  onClick={() => adjustTime(timer.id, -15)}
+                  aria-label="Subtract 15 seconds"
+                >
+                  <Minus className="h-3 w-3" />
+                  <span className="text-[10px] font-semibold">15s</span>
+                </PillButton>
+                <PillButton
+                  onClick={() => adjustTime(timer.id, 15)}
+                  aria-label="Add 15 seconds"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span className="text-[10px] font-semibold">15s</span>
+                </PillButton>
+              </div>
 
-          <div className="flex items-center gap-1">
-            <Button
-              variant="secondary"
-              size="icon"
-              className="h-7 w-7"
-              onClick={timer.isRunning ? () => pauseTimer(timer.id) : () => resumeTimer(timer.id)}
-              title={timer.isRunning ? "Pause" : "Resume"}
-            >
-              {timer.isRunning ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-destructive"
-              onClick={() => {
-                stopTimer(timer.id);
-                setIsExpanded(false);
-              }}
-              title="Stop timer"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
+              {/* Play/Pause + Stop circular buttons */}
+              <div className="flex items-center gap-1.5">
+                <motion.button
+                  whileTap={{ scale: 0.88 }}
+                  onClick={() =>
+                    isRunning ? pauseTimer(timer.id) : resumeTimer(timer.id)
+                  }
+                  aria-label={isRunning ? "Pause timer" : "Resume timer"}
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full transition-all",
+                    isRunning
+                      ? "bg-primary/15 text-primary"
+                      : "bg-secondary/60 text-foreground"
+                  )}
+                >
+                  {isRunning ? (
+                    <Pause className="h-3.5 w-3.5" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5" />
+                  )}
+                </motion.button>
+
+                <motion.button
+                  whileTap={{ scale: 0.88 }}
+                  onClick={() => {
+                    stopTimer(timer.id);
+                    setIsExpanded(false);
+                  }}
+                  aria-label="Stop timer"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-destructive/25 bg-destructive/10 text-destructive transition-all"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
-/**
- * RestTimerPill — Container for multiple simultaneous timer pills
- *
- * Features:
- * - Displays all active timers as stacked pills
- * - Haptic feedback when timer expires
- * - Browser notifications (with permission)
- * - Auto-dismisses expired timers
- */
+// ─── RestTimerPill ────────────────────────────────────────────────────────────
+
 interface RestTimerPillProps {
   className?: string;
 }
 
 export function RestTimerPill({ className }: RestTimerPillProps) {
-  const getActiveTimers = useTimerStore((state) => state.getActiveTimers);
-  const notificationPermission = useTimerStore((state) => state.notificationPermission);
-  const requestNotificationPermission = useTimerStore((state) => state.requestNotificationPermission);
+  const getActiveTimers = useTimerStore((s) => s.getActiveTimers);
+  const notificationPermission = useTimerStore((s) => s.notificationPermission);
+  const requestNotificationPermission = useTimerStore(
+    (s) => s.requestNotificationPermission
+  );
 
-  // Subscribe to lastTickMs to force re-renders when timers update
-  const lastTickMs = useTimerStore((state) => state.lastTickMs);
+  // Subscribe to lastTickMs so container re-renders and passes fresh timer objects
+  const lastTickMs = useTimerStore((s) => s.lastTickMs);
   void lastTickMs;
 
   const [hasRequestedPermission, setHasRequestedPermission] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Prevent hydration mismatch by only rendering after client mount
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const activeTimers = getActiveTimers();
 
-  // Request notification permission on first timer.
-  // Must be declared before any conditional returns to preserve hook order.
   useEffect(() => {
     if (!mounted) return;
     if (
@@ -275,38 +357,42 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
     requestNotificationPermission,
   ]);
 
-  // Don't render until mounted to avoid hydration mismatch with persisted store
-  if (!mounted) {
-    return null;
-  }
-
-  if (activeTimers.length === 0) {
-    return null;
-  }
+  if (!mounted || activeTimers.length === 0) return null;
 
   return (
     <div
       className={cn(
-        "fixed left-1/2 z-[90] w-[calc(100%-1rem)] max-w-sm -translate-x-1/2",
+        "fixed left-1/2 z-[90] flex w-[calc(100%-1rem)] max-w-sm -translate-x-1/2 flex-col gap-2",
         "bottom-[calc(env(safe-area-inset-bottom)+6rem)] md:bottom-8",
         "max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-contain",
         className
       )}
     >
-      {/* Notification Permission Banner (if denied) */}
-      {notificationPermission === "denied" && (
-        <div className="pointer-events-auto mb-2 flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-          <BellOff className="h-3 w-3 shrink-0" />
-          <span>Notifications blocked. Enable in browser settings for timer alerts.</span>
-        </div>
-      )}
+      {/* Notification denied banner */}
+      <AnimatePresence>
+        {notificationPermission === "denied" && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            className="pointer-events-auto flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[0.08] px-3.5 py-2.5"
+          >
+            <BellOff className="h-3 w-3 shrink-0 text-amber-400" />
+            <span className="text-[11px] leading-snug text-muted-foreground">
+              Notifications blocked — enable in browser settings for timer alerts.
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Active Timer Pills (stacked) */}
-      {activeTimers.map((timer) => (
-        <div key={timer.id} className="pointer-events-auto mb-2">
-          <SingleTimerPill timer={timer} />
-        </div>
-      ))}
+      {/* Timer pills */}
+      <AnimatePresence mode="popLayout">
+        {activeTimers.map((timer, index) => (
+          <div key={timer.id} className="pointer-events-auto">
+            <SingleTimerPill timer={timer} index={index} />
+          </div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }

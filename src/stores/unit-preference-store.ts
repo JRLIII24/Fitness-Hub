@@ -15,7 +15,7 @@ interface UnitPreferenceState {
 export const useUnitPreferenceStore = create<UnitPreferenceState>()(
   persist(
     (set, get) => ({
-      preference: "metric",
+      preference: "imperial",
 
       setPreference: (preference: UnitPreference) => {
         set({ preference });

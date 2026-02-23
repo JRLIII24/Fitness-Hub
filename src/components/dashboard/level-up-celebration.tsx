@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, X } from "lucide-react";
+import { Zap, X, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
@@ -34,36 +34,39 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur-sm sm:items-center sm:p-6">
       <AnimatePresence>
         {showCard && (
           <motion.div
-            initial={{ scale: 0.8, opacity: 0, y: 20 }}
+            initial={{ scale: 0.75, opacity: 0, y: 24 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="relative mx-4 w-full max-w-sm"
+            transition={{ type: "spring", stiffness: 280, damping: 22 }}
+            className="relative my-auto w-full max-w-sm"
           >
-            <Card className="relative overflow-hidden border-2 border-primary/50 bg-gradient-to-br from-card via-primary/5 to-card p-6 shadow-2xl">
+            <Card className="relative max-h-[min(92dvh,42rem)] overflow-y-auto overflow-x-clip rounded-3xl border border-primary/35 bg-gradient-to-br from-card via-card to-primary/10 p-6 shadow-2xl">
               {/* Animated Background Glow */}
               <motion.div
-                className="pointer-events-none absolute inset-0 bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-pink-500/20"
+                className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-primary/15 via-accent/10 to-primary/5"
                 animate={{
-                  opacity: [0.3, 0.6, 0.3],
-                  scale: [1, 1.05, 1],
+                  opacity: [0.35, 0.75, 0.35],
                 }}
                 transition={{
-                  duration: 2,
+                  duration: 2.5,
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
               />
 
+              {/* Corner glow blobs */}
+              <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-primary/20 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-10 -left-10 h-28 w-28 rounded-full bg-accent/25 blur-3xl" />
+
               {/* Close button */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-2 h-8 w-8 z-10"
+                className="absolute right-3 top-3 z-10 h-8 w-8 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
                 onClick={onClose}
               >
                 <X className="h-4 w-4" />
@@ -81,10 +84,20 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
                     stiffness: 260,
                     damping: 20,
                   }}
-                  className="inline-block"
+                  className="flex justify-center"
                 >
-                  <div className="rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 p-4 shadow-lg">
-                    <Zap className="h-10 w-10 text-white" />
+                  <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent shadow-2xl">
+                    <Zap className="h-10 w-10 text-primary-foreground" />
+                    {[0, 120, 240].map((deg, i) => (
+                      <motion.div
+                        key={i}
+                        className="absolute h-full w-full"
+                        animate={{ rotate: [deg, deg + 360] }}
+                        transition={{ duration: 4, repeat: Infinity, ease: "linear", delay: i * 0.3 }}
+                      >
+                        <Star className="absolute -top-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 text-primary" />
+                      </motion.div>
+                    ))}
                   </div>
                 </motion.div>
 
@@ -94,11 +107,14 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                 >
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 bg-clip-text text-transparent">
+                  <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-primary">
                     Level Up!
                   </h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    You've reached level {newLevel}
+                  <p className="mt-1 text-3xl font-black tracking-tight">
+                    You reached
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    New level unlocked.
                   </p>
                 </motion.div>
 
@@ -107,14 +123,14 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4, type: "spring", stiffness: 300, damping: 20 }}
-                  className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 to-primary/5 p-6"
+                  className="rounded-2xl border border-primary/35 bg-gradient-to-r from-primary/20 to-accent/20 p-6"
                 >
-                  <div className="flex items-baseline justify-center gap-2">
-                    <span className="text-6xl font-bold tabular-nums text-primary">
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <span className="text-7xl font-black tabular-nums text-primary">
                       {newLevel}
                     </span>
-                    <span className="text-2xl font-semibold text-muted-foreground">
-                      LVL
+                    <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-muted-foreground">
+                      Level
                     </span>
                   </div>
                 </motion.div>
@@ -126,7 +142,7 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
                   transition={{ delay: 0.5 }}
                   className="text-sm text-muted-foreground"
                 >
-                  You're getting stronger! 💪
+                  You&apos;re getting stronger. Keep stacking sessions.
                 </motion.p>
 
                 {/* Continue Button */}
@@ -137,40 +153,13 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
                 >
                   <Button
                     onClick={onClose}
-                    className="w-full"
+                    className="motion-press w-full rounded-xl"
                     size="lg"
                   >
-                    Continue
+                    Continue Training
                   </Button>
                 </motion.div>
               </div>
-
-              {/* Decorative Elements */}
-              <motion.div
-                className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-yellow-400/20 blur-2xl"
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [0.3, 0.5, 0.3],
-                }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              <motion.div
-                className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-orange-400/20 blur-2xl"
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [0.3, 0.5, 0.3],
-                }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: 1.5,
-                }}
-              />
             </Card>
           </motion.div>
         )}

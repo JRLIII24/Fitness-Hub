@@ -20,6 +20,7 @@ export interface WorkoutSet {
   weight_kg: number | null;
   duration_seconds: number | null;
   rpe: number | null;
+  rir: number | null;
   rest_seconds: number | null;
   completed: boolean;
   completed_at: string | null;
@@ -50,6 +51,7 @@ export interface WorkoutSession {
   started_at: string;
   completed_at: string | null;
   duration_seconds: number | null;
+  session_rpe: number | null;
   notes: string | null;
   total_volume_kg: number | null;
 }

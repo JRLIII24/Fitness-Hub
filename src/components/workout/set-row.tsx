@@ -53,6 +53,7 @@ export function SetRow({
   const restSeconds = set.rest_seconds ?? 90;
   const weightValue = set.weight_kg === null ? "" : String(set.weight_kg);
   const repsValue = set.reps === null ? "" : String(set.reps);
+  const rirValue = set.rir === null ? "" : String(set.rir);
 
   const handleComplete = () => {
     onComplete();
@@ -92,6 +93,18 @@ export function SetRow({
     const parsed = Number.parseInt(value, 10);
     if (Number.isFinite(parsed)) {
       onUpdate({ reps: parsed });
+    }
+  };
+
+  const handleRirChange = (value: string) => {
+    if (value === "") {
+      onUpdate({ rir: null });
+      return;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed)) {
+      onUpdate({ rir: Math.max(0, Math.min(10, parsed)) });
     }
   };
 
@@ -260,7 +273,7 @@ export function SetRow({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.15fr)]">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.15fr)]">
         <div className="space-y-1">
           <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
             Weight (lbs)
@@ -287,6 +300,23 @@ export function SetRow({
             placeholder="0"
             value={repsValue}
             onChange={(e) => handleRepsChange(e.target.value)}
+            className="h-10 w-full text-center text-[18px] font-semibold tabular-nums text-foreground"
+            disabled={set.completed}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            RIR
+          </p>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={10}
+            placeholder="—"
+            value={rirValue}
+            onChange={(e) => handleRirChange(e.target.value)}
             className="h-10 w-full text-center text-[18px] font-semibold tabular-nums text-foreground"
             disabled={set.completed}
           />

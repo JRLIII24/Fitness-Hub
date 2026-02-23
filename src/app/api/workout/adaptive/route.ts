@@ -6,7 +6,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateAdaptiveWorkout } from '@/lib/adaptive/workout-generator';
-import { analyzeFatigue } from '@/lib/adaptive/fatigue';
 
 /**
  * GET /api/workout/adaptive

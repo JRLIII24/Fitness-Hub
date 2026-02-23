@@ -89,15 +89,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { template_id, accepted, time_to_decision_ms } = body;
-
-    if (typeof accepted !== 'boolean') {
-      return NextResponse.json(
-        { error: 'Missing required field: accepted' },
-        { status: 400 }
-      );
+    const bodyText = await request.text();
+    let rawBody;
+    try {
+      rawBody = JSON.parse(bodyText);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
+
+    const { parsePayload } = await import('@/lib/validation/parse');
+    const { launcherStartSchema } = await import('@/lib/validation/workout.schemas');
+
+    const parseResult = parsePayload(launcherStartSchema, rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json(parseResult.error, { status: 400 });
+    }
+
+    const body = parseResult.data;
+    const { template_id, accepted, time_to_decision_ms } = body;
 
     // Log acceptance/rejection
     if (accepted) {

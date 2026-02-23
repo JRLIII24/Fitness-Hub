@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronDown, Clock3, NotebookPen, Plus, Save, X, LayoutList, Dumbbell, Layers, CircleCheck, Activity } from "lucide-react";
+import { ChevronDown, Clock3, NotebookPen, Plus, Save, X, LayoutList, Dumbbell, Layers, CircleCheck, Activity, Zap, Send, Pencil, Copy, Trash2, Heart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { fireConfetti } from "@/lib/celebrations";
 import {
   logRetentionEvent,
   trackSessionIntentCompleted,
@@ -13,13 +13,16 @@ import {
 } from "@/lib/retention-events";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
-import type { Exercise } from "@/types/workout";
+import type { ActiveWorkout, Exercise } from "@/types/workout";
 import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS, MUSCLE_GROUPS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -34,7 +37,8 @@ import { RestTimerPill } from "@/components/workout/rest-timer-pill";
 import { FormTipsPanel } from "@/components/workout/form-tips-panel";
 import { SaveTemplateDialog } from "@/components/workout/save-template-dialog";
 import { PageHeader } from "@/components/shared/page-header";
-import { StatCard } from "@/components/ui/stat-card";
+import { SendTemplateDialog } from "@/components/social/send-template-dialog";
+import { useSharedItems, type TemplateSnapshot } from "@/hooks/use-shared-items";
 import { ExerciseSelectionCard } from "@/components/workout/exercise-selection-card";
 import { WorkoutCompleteCelebration } from "@/components/workout/workout-complete-celebration";
 import type { WorkoutStats } from "@/components/workout/workout-complete-celebration";
@@ -148,6 +152,7 @@ const DB_ALLOWED_EQUIPMENT = new Set([
   "bodyweight",
   "band",
 ]);
+const TEMPLATE_LIKES_KEY = "workout_template_likes_v1";
 
 function isMissingTableError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -232,6 +237,17 @@ export default function WorkoutPage() {
   const [presetId, setPresetId] = useState<WorkoutPresetId>("upper-body-strength");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("none");
   const [workoutName, setWorkoutName] = useState("Upper Body Strength");
+  const [setupTab, setSetupTab] = useState<"templates" | "quick">("templates");
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [templateActionBusyId, setTemplateActionBusyId] = useState<string | null>(null);
+  const [likedTemplateIds, setLikedTemplateIds] = useState<Set<string>>(new Set());
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [sendingTemplate, setSendingTemplate] = useState<{
+    id: string;
+    name: string;
+    description: string | null;
+    exercises: TemplateSnapshot["exercises"];
+  } | null>(null);
 
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<MuscleGroup>("chest");
   const [liftPickerOpen, setLiftPickerOpen] = useState(false);
@@ -266,11 +282,16 @@ export default function WorkoutPage() {
   >({});
   const [celebrationStats, setCelebrationStats] = useState<WorkoutStats | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [sessionRpePromptOpen, setSessionRpePromptOpen] = useState(false);
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [sessionRpeValue, setSessionRpeValue] = useState(7);
+  const [savingSessionRpe, setSavingSessionRpe] = useState(false);
 
   const {
     activeWorkout,
     isWorkoutActive,
     startWorkout,
+    loadWorkoutForEdit,
     cancelWorkout,
     finishWorkout,
     addExercise,
@@ -288,6 +309,7 @@ export default function WorkoutPage() {
   const startTimer = useTimerStore((state) => state.startTimer);
   const getActiveTimers = useTimerStore((state) => state.getActiveTimers);
   const stopTimer = useTimerStore((state) => state.stopTimer);
+  const { sendTemplate } = useSharedItems(userId);
 
   // Workout duration timer - force re-render every second to update elapsed time
   const [workoutDurationTick, setWorkoutDurationTick] = useState(0);
@@ -424,6 +446,24 @@ export default function WorkoutPage() {
       active = false;
     };
   }, [loadTemplates, supabase]);
+
+  useEffect(() => {
+    try {
+      const likeRaw = localStorage.getItem(TEMPLATE_LIKES_KEY);
+      const nextLikes = likeRaw ? (JSON.parse(likeRaw) as string[]) : [];
+      setLikedTemplateIds(new Set(nextLikes));
+    } catch {
+      setLikedTemplateIds(new Set());
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TEMPLATE_LIKES_KEY, JSON.stringify(Array.from(likedTemplateIds)));
+    } catch {
+      // no-op
+    }
+  }, [likedTemplateIds]);
 
   // Fetch exercises from API with debounced search
   useEffect(() => {
@@ -829,6 +869,201 @@ export default function WorkoutPage() {
     const preset = POPULAR_WORKOUTS.find((item) => item.id === value);
     if (preset) {
       setWorkoutName(preset.defaultName);
+    }
+  }
+
+  function handleToggleTemplateLike(templateId: string) {
+    setLikedTemplateIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(templateId)) next.delete(templateId);
+      else next.add(templateId);
+      return next;
+    });
+  }
+
+  async function handleSendTemplate(template: WorkoutTemplate) {
+    if (!userId) return;
+    setTemplateActionBusyId(template.id);
+    try {
+      const { data: templateExercises, error } = await supabase
+        .from("template_exercises")
+        .select("exercise_id,target_sets,target_reps,target_weight_kg,exercises(name,muscle_group)")
+        .eq("template_id", template.id)
+        .order("sort_order", { ascending: true });
+
+      if (error) throw error;
+
+      const exercises: TemplateSnapshot["exercises"] = (templateExercises ?? []).map((row) => {
+        const exercise = row.exercises as { name?: string; muscle_group?: string } | null;
+        const setCount = Math.max(1, row.target_sets ?? 1);
+        const reps = row.target_reps ? Number.parseInt(row.target_reps, 10) : null;
+        return {
+          exercise_id: row.exercise_id ?? null,
+          name: exercise?.name ?? "Exercise",
+          muscle_group: exercise?.muscle_group ?? "full_body",
+          sets: Array.from({ length: setCount }, () => ({
+            reps: Number.isFinite(reps as number) ? reps : null,
+            weight_kg: row.target_weight_kg ?? null,
+          })),
+        };
+      });
+
+      setSendingTemplate({
+        id: template.id,
+        name: template.name,
+        description: null,
+        exercises,
+      });
+      setSendDialogOpen(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to prepare template send.";
+      toast.error(message);
+    } finally {
+      setTemplateActionBusyId(null);
+    }
+  }
+
+  async function handleEditTemplate(template: WorkoutTemplate) {
+    if (!userId) return;
+    setTemplateActionBusyId(template.id);
+    try {
+      const { data: templateExercises, error } = await supabase
+        .from("template_exercises")
+        .select(
+          "sort_order,target_sets,target_reps,target_weight_kg,rest_seconds,exercise_id,exercises(id,name,slug,muscle_group,equipment,category,instructions,form_tips,image_url)"
+        )
+        .eq("template_id", template.id)
+        .order("sort_order", { ascending: true });
+
+      if (error) throw error;
+
+      const designWorkout: ActiveWorkout = {
+        id: `template-design-${template.id}`,
+        name: template.name,
+        template_id: template.id,
+        started_at: new Date().toISOString(),
+        exercises: [],
+        notes: "",
+      };
+
+      loadWorkoutForEdit(designWorkout, `template-design-${template.id}`);
+
+      for (const row of templateExercises ?? []) {
+        const exercise = row.exercises as unknown as Exercise | null;
+        if (!exercise) continue;
+
+        addExercise(exercise);
+        const exerciseIndex = useWorkoutStore.getState().activeWorkout?.exercises.length;
+        if (!exerciseIndex) continue;
+        const index = exerciseIndex - 1;
+        const setsToCreate = Math.max(1, row.target_sets ?? 1);
+        const parsedReps = row.target_reps ? Number.parseInt(row.target_reps, 10) : null;
+
+        updateSet(index, 0, {
+          reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+          weight_kg: row.target_weight_kg ?? null,
+          rest_seconds: row.rest_seconds ?? 90,
+        });
+
+        for (let i = 1; i < setsToCreate; i += 1) {
+          addSet(index);
+          updateSet(index, i, {
+            reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+            weight_kg: row.target_weight_kg ?? null,
+            rest_seconds: row.rest_seconds ?? 90,
+          });
+        }
+      }
+
+      toast.success(`Editing ${template.name} in design mode`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to open template editor.";
+      toast.error(message);
+    } finally {
+      setTemplateActionBusyId(null);
+    }
+  }
+
+  async function handleCopyTemplate(template: WorkoutTemplate) {
+    if (!userId) return;
+    setTemplateActionBusyId(template.id);
+    try {
+      const { data: sourceRows, error: sourceError } = await supabase
+        .from("template_exercises")
+        .select("exercise_id,sort_order,target_sets,target_reps,target_weight_kg,rest_seconds")
+        .eq("template_id", template.id)
+        .order("sort_order", { ascending: true });
+
+      if (sourceError) throw sourceError;
+
+      const { data: createdTemplate, error: createError } = await supabase
+        .from("workout_templates")
+        .insert({
+          user_id: userId,
+          name: `${template.name} Copy`,
+          description: `Copied from ${template.name}`,
+        })
+        .select("id")
+        .single();
+
+      if (createError || !createdTemplate) throw createError ?? new Error("Template copy failed.");
+
+      if ((sourceRows ?? []).length > 0) {
+        const copiedRows = (sourceRows ?? []).map((row) => ({
+          template_id: createdTemplate.id,
+          exercise_id: row.exercise_id,
+          sort_order: row.sort_order,
+          target_sets: row.target_sets,
+          target_reps: row.target_reps,
+          target_weight_kg: row.target_weight_kg,
+          rest_seconds: row.rest_seconds,
+        }));
+
+        const { error: copyRowsError } = await supabase.from("template_exercises").insert(copiedRows);
+        if (copyRowsError) throw copyRowsError;
+      }
+
+      await loadTemplates(userId);
+      toast.success("Template copied.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to copy template.";
+      toast.error(message);
+    } finally {
+      setTemplateActionBusyId(null);
+    }
+  }
+
+  async function handleDeleteTemplate(template: WorkoutTemplate) {
+    if (!userId) return;
+    if (!window.confirm(`Delete "${template.name}"? This cannot be undone.`)) return;
+
+    setTemplateActionBusyId(template.id);
+    try {
+      await supabase.from("template_exercises").delete().eq("template_id", template.id);
+
+      const { error } = await supabase
+        .from("workout_templates")
+        .delete()
+        .eq("id", template.id)
+        .eq("user_id", userId);
+      if (error) throw error;
+
+      if (selectedTemplateId === template.id) {
+        setSelectedTemplateId("none");
+      }
+      setLikedTemplateIds((prev) => {
+        const next = new Set(prev);
+        next.delete(template.id);
+        return next;
+      });
+
+      await loadTemplates(userId);
+      toast.success("Template deleted.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete template.";
+      toast.error(message);
+    } finally {
+      setTemplateActionBusyId(null);
     }
   }
 
@@ -1279,6 +1514,7 @@ export default function WorkoutPage() {
           set_type: set.set_type,
           reps: set.reps,
           weight_kg: set.weight_kg,
+          rir: set.rir,
           rest_seconds: set.rest_seconds,
           completed_at: set.completed ? set.completed_at ?? nowIso : null,
           sort_order: sortOrder,
@@ -1406,6 +1642,7 @@ export default function WorkoutPage() {
       exercises: exerciseRecap,
     });
     setShowCelebration(true);
+    setPendingSessionId(session.id);
   }
 
   async function handleCancelWorkout() {
@@ -1413,69 +1650,377 @@ export default function WorkoutPage() {
     toast.message("Workout cancelled");
   }
 
+  function handleCloseWorkoutCelebration() {
+    setShowCelebration(false);
+    setCelebrationStats(null);
+
+    // Open the second popup only after the first one is closed.
+    setTimeout(() => {
+      fireConfetti();
+      setSessionRpePromptOpen(true);
+    }, 650);
+  }
+
+  async function handleSaveSessionRpe() {
+    if (!pendingSessionId) return;
+
+    setSavingSessionRpe(true);
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const response = await fetch("/api/fatigue/session-rpe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: pendingSessionId,
+          session_rpe: sessionRpeValue,
+          timezone,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Could not save session effort");
+
+      toast.success("Session effort saved.");
+      setSessionRpePromptOpen(false);
+      setPendingSessionId(null);
+    } catch (error) {
+      console.error("Failed to save session effort:", error);
+      toast.error("Could not save session effort");
+    } finally {
+      setSavingSessionRpe(false);
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 pt-6 pb-24 md:px-6 lg:px-10">
-      <PageHeader
-        title="Workout"
-        subtitle="Save templates, reuse them in future sessions, and compare to previous performance."
-      />
+    <div className="min-h-screen bg-background pb-24">
+      <div className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-6 lg:px-10">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
+              <Dumbbell className="h-4 w-4 text-primary" />
+            </div>
+            <p className="text-lg font-bold tracking-tight">Workout</p>
+          </div>
+          {isWorkoutActive && activeWorkout ? (
+            <div className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              <Zap className="h-3.5 w-3.5" />
+              {plannerStats.completedSets}/{plannerStats.totalSets} sets
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-6 md:px-6 lg:px-10">
+      {!isWorkoutActive ? (
+        <PageHeader
+          title="Workout"
+          subtitle="Save templates, reuse them in future sessions, and compare to previous performance."
+        />
+      ) : null}
 
       {!isWorkoutActive ? (
-        <Card className="mx-auto w-full max-w-3xl border-white/15 bg-card/90 shadow-[0_0_30px_rgba(255,255,255,0.05)] transition-all duration-300">
-          <CardHeader>
-            <CardTitle>Start New Session</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <Card className="mx-auto w-full max-w-3xl overflow-hidden border-primary/25 bg-card/95 shadow-xl transition-all duration-300">
+          <div className="border-b border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-5 py-4 sm:px-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/30 bg-primary/15">
+                <Dumbbell className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">New Session</p>
+                <p className="text-xl font-black tracking-tight">Start a Workout</p>
+              </div>
+            </div>
+          </div>
+          <CardContent className="space-y-4 p-5 sm:p-6">
             {!dbFeaturesAvailable ? (
               <p className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
                 Supabase workout tables were not found. You can still add exercises and train now,
                 but templates/history sync will be limited until migrations are applied.
               </p>
             ) : null}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="saved-template">Use saved template</Label>
-                <Link href="/templates" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <LayoutList className="size-3" />
-                  Manage
-                </Link>
+
+            <div className="rounded-xl border border-border/70 bg-secondary/20 p-1">
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSetupTab("templates")}
+                  className={`h-9 rounded-lg text-xs font-semibold transition ${
+                    setupTab === "templates"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-card/70"
+                  }`}
+                >
+                  My Templates
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetupTab("quick");
+                    setSelectedTemplateId("none");
+                  }}
+                  className={`h-9 rounded-lg text-xs font-semibold transition ${
+                    setupTab === "quick"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-card/70"
+                  }`}
+                >
+                  Quick Start
+                </button>
               </div>
-              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                <SelectTrigger id="saved-template" className="w-full">
-                  <SelectValue
-                    placeholder={loadingTemplates ? "Loading templates..." : "No template selected"}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No template (start fresh)</SelectItem>
-                  {templates.map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="preset">Popular workout</Label>
-              <Select value={presetId} onValueChange={(value) => handlePresetChange(value as WorkoutPresetId)}>
-                <SelectTrigger id="preset" className="w-full">
-                  <SelectValue placeholder="Select a popular workout" />
-                </SelectTrigger>
-                <SelectContent>
+            {setupTab === "templates" ? (
+              <div className="space-y-3 rounded-xl border border-border/70 bg-secondary/20 p-3">
+                <div className="flex items-center justify-between">
+                  <Label
+                    htmlFor="saved-template"
+                    className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
+                  >
+                    Template Selection
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowTemplateManager((prev) => !prev)}
+                    className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <LayoutList className="size-3" />
+                    {showTemplateManager ? "Hide Manager" : "Template Manager"}
+                  </button>
+                </div>
+                {showTemplateManager ? (
+                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {loadingTemplates ? (
+                      <div className="rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-sm text-muted-foreground">
+                        Loading templates...
+                      </div>
+                    ) : templates.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-border/70 bg-card/60 px-3 py-2 text-sm text-muted-foreground">
+                        No templates yet.
+                      </div>
+                    ) : (
+                      templates.map((template) => (
+                        <div
+                          key={template.id}
+                          className={`rounded-xl border px-3 py-2 transition ${
+                            selectedTemplateId === template.id
+                              ? "border-primary/40 bg-primary/10"
+                              : "border-border/70 bg-card/70"
+                          }`}
+                        >
+                          <p className="truncate text-sm font-semibold">{template.name}</p>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleSendTemplate(template)}
+                              disabled={templateActionBusyId === template.id}
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Send className="mr-1 h-3 w-3" />
+                              Send
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleEditTemplate(template)}
+                              disabled={templateActionBusyId === template.id}
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Pencil className="mr-1 h-3 w-3" />
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleCopyTemplate(template)}
+                              disabled={templateActionBusyId === template.id}
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Copy className="mr-1 h-3 w-3" />
+                              Copy
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteTemplate(template)}
+                              disabled={templateActionBusyId === template.id}
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Trash2 className="mr-1 h-3 w-3" />
+                              Delete
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={likedTemplateIds.has(template.id) ? "default" : "secondary"}
+                              onClick={() => handleToggleTemplateLike(template.id)}
+                              className="h-7 px-2 text-xs"
+                            >
+                              <Heart className="mr-1 h-3 w-3" />
+                              {likedTemplateIds.has(template.id) ? "Liked" : "Like"}
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplateId("none")}
+                    className={`rounded-xl border px-3 py-2 text-left transition ${
+                      selectedTemplateId === "none"
+                        ? "border-primary/40 bg-primary/10"
+                        : "border-border/70 bg-card/70 hover:bg-card"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold">Start Fresh</p>
+                    <p className="text-xs text-muted-foreground">No template preloaded</p>
+                  </button>
+                  {loadingTemplates ? (
+                    <div className="rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-sm text-muted-foreground">
+                      Loading templates...
+                    </div>
+                  ) : templates.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border/70 bg-card/60 px-3 py-2 text-sm text-muted-foreground">
+                      No templates yet. Use Template Manager above to create one here.
+                    </div>
+                  ) : (
+                    templates.map((template) => (
+                      <div
+                        key={template.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setSelectedTemplateId(template.id);
+                          setWorkoutName(template.name);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          setSelectedTemplateId(template.id);
+                          setWorkoutName(template.name);
+                        }}
+                        className={`rounded-xl border px-3 py-2 text-left transition ${
+                          selectedTemplateId === template.id
+                            ? "border-primary/40 bg-primary/10"
+                            : "border-border/70 bg-card/70 hover:bg-card"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-sm font-semibold">{template.name}</p>
+                          <div className="flex items-center gap-1">
+                            {likedTemplateIds.has(template.id) ? (
+                              <Heart className="h-3.5 w-3.5 text-rose-400" />
+                            ) : null}
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Tap to preload</p>
+                        <div className="mt-1.5 flex gap-1.5">
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleToggleTemplateLike(template.id);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Enter" && event.key !== " ") return;
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleToggleTemplateLike(template.id);
+                            }}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
+                              likedTemplateIds.has(template.id)
+                                ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+                                : "border-border/70 text-muted-foreground"
+                            }`}
+                          >
+                            <Heart className="h-3 w-3" />
+                            Like
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/20 p-3">
+                <Label
+                  htmlFor="preset"
+                  className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
+                >
+                  Choose a Preset
+                </Label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {POPULAR_WORKOUTS.map((preset) => (
-                    <SelectItem key={preset.id} value={preset.id}>
-                      {preset.label}
-                    </SelectItem>
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handlePresetChange(preset.id)}
+                      className={`rounded-xl border px-3 py-2 text-left transition ${
+                        presetId === preset.id
+                          ? "border-primary/40 bg-primary/10"
+                          : "border-border/70 bg-card/70 hover:bg-card"
+                      }`}
+                    >
+                      <p className="text-xs font-semibold leading-snug">{preset.defaultName}</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        {preset.liftNames.length} exercises
+                      </p>
+                      <div className="mt-1.5 space-y-0.5">
+                        {preset.liftNames.slice(0, 2).map((lift) => (
+                          <p key={lift} className="truncate text-[10px] text-muted-foreground/90">
+                            • {lift}
+                          </p>
+                        ))}
+                        {preset.liftNames.length > 2 ? (
+                          <p className="text-[10px] text-muted-foreground/80">
+                            +{preset.liftNames.length - 2} more
+                          </p>
+                        ) : null}
+                      </div>
+                    </button>
                   ))}
-                  <SelectItem value="custom">Custom (empty workout)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePresetChange("custom")}
+                    className={`rounded-xl border px-3 py-2 text-left transition ${
+                      presetId === "custom"
+                        ? "border-primary/40 bg-primary/10"
+                        : "border-border/70 bg-card/70 hover:bg-card"
+                    }`}
+                  >
+                    <p className="text-xs font-semibold">Custom</p>
+                    <p className="text-[10px] text-muted-foreground">Start empty workout</p>
+                  </button>
+                </div>
+                <Select
+                  value={presetId}
+                  onValueChange={(value) => handlePresetChange(value as WorkoutPresetId)}
+                >
+                  <SelectTrigger id="preset" className="w-full">
+                    <SelectValue placeholder="Select a popular workout" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {POPULAR_WORKOUTS.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        {preset.label}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">Custom (empty workout)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
-              <Label htmlFor="workout-name">Workout name</Label>
+              <Label htmlFor="workout-name" className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Session Name</Label>
               <Input
                 id="workout-name"
                 value={workoutName}
@@ -1484,7 +2029,7 @@ export default function WorkoutPage() {
               />
             </div>
 
-            <Button className="w-full" onClick={handleStartWorkout}>
+            <Button className="h-11 w-full text-base font-semibold" onClick={handleStartWorkout}>
               Start Workout
             </Button>
           </CardContent>
@@ -1493,42 +2038,40 @@ export default function WorkoutPage() {
 
       {isWorkoutActive && activeWorkout ? (
         <>
-          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/90 p-5 sm:p-6">
-            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/12 blur-3xl" />
-            <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-accent/18 blur-3xl" />
-            <div className="relative space-y-4">
+          <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/10 p-5 sm:p-6">
+            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
+            <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-accent/20 blur-3xl" />
+            <div className="relative space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[12px] uppercase tracking-[0.14em] text-muted-foreground">Active Workout</p>
-                  <h2 className="mt-1 text-[28px] font-semibold leading-tight tracking-tight sm:text-[32px]">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Active Session</p>
+                  <h2 className="mt-1 text-[28px] font-black leading-tight tracking-tight sm:text-[32px]">
                     {activeWorkout.name}
                   </h2>
                 </div>
-                <div className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-3 py-1.5 text-sm font-medium text-muted-foreground">
+                <div className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
                   <Clock3 className="size-4" />
                   {formatElapsed(activeWorkout.started_at)}
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                <StatCard
-                  icon={<Activity className="h-4 w-4 text-primary" />}
-                  value={Math.round(plannerStats.totalVolumeKg).toLocaleString()}
-                  label="Volume kg"
-                  className="border-border/70 bg-card/80"
-                />
-                <StatCard
-                  icon={<CircleCheck className="h-4 w-4 text-primary" />}
-                  value={plannerStats.completedSets}
-                  label="Completed"
-                  className="border-border/70 bg-card/80"
-                />
-                <StatCard
-                  icon={<Layers className="h-4 w-4 text-primary" />}
-                  value={plannerStats.totalSets}
-                  label="Total Sets"
-                  className="border-border/70 bg-card/80"
-                />
+              <div className="flex flex-wrap gap-2">
+                <Badge className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-cyan-300">
+                  <Activity className="mr-1 h-3.5 w-3.5" />
+                  {Math.round(plannerStats.totalVolumeKg).toLocaleString()} kg
+                </Badge>
+                <Badge className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-emerald-300">
+                  <CircleCheck className="mr-1 h-3.5 w-3.5" />
+                  {plannerStats.completedSets} done
+                </Badge>
+                <Badge className="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-violet-300">
+                  <Layers className="mr-1 h-3.5 w-3.5" />
+                  {plannerStats.totalSets} total sets
+                </Badge>
+                <Badge className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-amber-300">
+                  <Dumbbell className="mr-1 h-3.5 w-3.5" />
+                  {plannerStats.exercises} exercises
+                </Badge>
               </div>
 
               <div className="space-y-1.5">
@@ -1546,8 +2089,8 @@ export default function WorkoutPage() {
             </div>
           </section>
 
-        <div className="grid gap-6 lg:grid-cols-[26rem_minmax(0,1fr)]">
-          <Card className="h-fit border-white/15 bg-card/90 shadow-[0_0_30px_rgba(255,255,255,0.05)] transition-all duration-300 lg:sticky lg:top-24">
+        <div className="grid gap-6 lg:grid-cols-[21.25rem_minmax(0,1fr)]">
+          <Card className="h-fit border-border/70 bg-card/95 shadow-sm transition-all duration-300 lg:sticky lg:top-20">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
                 <Input
@@ -1771,36 +2314,9 @@ export default function WorkoutPage() {
           </Card>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-              <StatCard
-                icon={<Dumbbell className="h-4 w-4 text-primary" />}
-                value={plannerStats.exercises}
-                label="Exercises"
-                className="border-border/70 bg-card/80"
-              />
-              <StatCard
-                icon={<Layers className="h-4 w-4 text-primary" />}
-                value={plannerStats.totalSets}
-                label="Sets"
-                className="border-border/70 bg-card/80"
-              />
-              <StatCard
-                icon={<CircleCheck className="h-4 w-4 text-primary" />}
-                value={plannerStats.completedSets}
-                label="Done"
-                className="border-border/70 bg-card/80"
-              />
-              <StatCard
-                icon={<Activity className="h-4 w-4 text-primary" />}
-                value={Math.round(plannerStats.totalVolumeKg).toLocaleString()}
-                label="Volume kg"
-                className="border-border/70 bg-card/80"
-              />
-            </div>
-
-            <Card className="border-white/10 bg-card/80">
+            <Card className="border-border/70 bg-card/90">
               <CardHeader className="pb-3">
-                <CardTitle className="text-[20px] font-semibold tracking-tight">Exercises</CardTitle>
+                <CardTitle className="text-[20px] font-bold tracking-tight">Exercises</CardTitle>
               </CardHeader>
               <CardContent>
                 {activeWorkout.exercises.length === 0 ? (
@@ -1822,11 +2338,22 @@ export default function WorkoutPage() {
                     {activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
                       <Card
                         key={exerciseBlock.exercise.id}
-                        className="border-white/10 bg-card/80 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-white/30 hover:shadow-[0_0_20px_rgba(255,255,255,0.06)]"
+                        className="overflow-hidden border-border/70 bg-card/90 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-primary/30 hover:shadow-lg"
                       >
+                        <div className="h-1 w-full bg-gradient-to-r from-primary via-primary/60 to-accent" />
                         <CardHeader className="pb-3">
                           <CardTitle className="flex items-center justify-between text-[20px] font-semibold tracking-tight">
                             <div>
+                              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                                <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
+                                  {exerciseBlock.exercise.category}
+                                </Badge>
+                                {exerciseBlock.exercise.equipment ? (
+                                  <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
+                                    {EQUIPMENT_LABELS[exerciseBlock.exercise.equipment] ?? exerciseBlock.exercise.equipment}
+                                  </Badge>
+                                ) : null}
+                              </div>
                               <p>{exerciseBlock.exercise.name}</p>
                               {previousByExerciseId[exerciseBlock.exercise.id]?.length ? (
                                 <p className="mt-1 text-xs font-normal text-muted-foreground">
@@ -1834,14 +2361,23 @@ export default function WorkoutPage() {
                                 </p>
                               ) : null}
                             </div>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => removeExercise(exerciseIndex)}
-                            >
-                              <X className="size-4 text-destructive" />
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <div className="text-right">
+                                <p className="text-lg font-bold leading-none text-primary">
+                                  {exerciseBlock.sets.filter((set) => set.completed).length}
+                                  <span className="text-sm font-medium text-muted-foreground">/{exerciseBlock.sets.length}</span>
+                                </p>
+                                <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">sets done</p>
+                              </div>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => removeExercise(exerciseIndex)}
+                              >
+                                <X className="size-4 text-destructive" />
+                              </Button>
+                            </div>
                           </CardTitle>
                         </CardHeader>
                         {/* Form Tips Panel */}
@@ -1940,7 +2476,7 @@ export default function WorkoutPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/15 bg-card/90 shadow-[0_0_24px_rgba(255,255,255,0.05)] lg:sticky lg:top-24">
+            <Card className="border-border/70 bg-card/95 shadow-sm lg:sticky lg:top-20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Session Actions</CardTitle>
               </CardHeader>
@@ -1999,19 +2535,76 @@ export default function WorkoutPage() {
         onSave={handleSaveTemplate}
       />
 
+      <SendTemplateDialog
+        open={sendDialogOpen}
+        currentUserId={userId}
+        template={sendingTemplate}
+        onClose={() => {
+          setSendDialogOpen(false);
+          setSendingTemplate(null);
+        }}
+        onSend={async (recipientId, template, message) => {
+          await sendTemplate(recipientId, template, message);
+          toast.success("Template sent to shared mailbox");
+        }}
+      />
+
       {/* Workout Complete Celebration */}
       {showCelebration && celebrationStats && (
         <WorkoutCompleteCelebration
           stats={celebrationStats}
-          onClose={() => {
-            setShowCelebration(false);
-            setCelebrationStats(null);
-          }}
+          confettiStyle="gold"
+          onClose={handleCloseWorkoutCelebration}
         />
       )}
 
+      <Dialog open={sessionRpePromptOpen} onOpenChange={setSessionRpePromptOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rate Session Effort</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Quick post-session rating. This improves your fatigue estimate.
+            </p>
+            <div className="rounded-md border border-border/60 bg-card/40 p-3 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">What is sRPE?</p>
+              <p className="mt-1">
+                sRPE means <span className="font-semibold">Session Rate of Perceived Exertion</span>:
+                how hard the <span className="font-semibold">entire workout</span> felt on a 0-10
+                scale.
+              </p>
+              <p className="mt-1">
+                0-2 = very easy, 3-5 = moderate, 6-8 = hard, 9-10 = near max effort.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Session RPE</span>
+                <span className="font-semibold tabular-nums">{sessionRpeValue.toFixed(1)}</span>
+              </div>
+              <Slider
+                min={0}
+                max={10}
+                step={0.5}
+                value={[sessionRpeValue]}
+                onValueChange={(value) => setSessionRpeValue(value[0] ?? 7)}
+              />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Very easy</span>
+                <span>Max effort</span>
+              </div>
+            </div>
+            <Button onClick={handleSaveSessionRpe} disabled={savingSessionRpe} className="w-full">
+              {savingSessionRpe ? "Saving..." : "Save Effort"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Floating Rest Timer Pill */}
       <RestTimerPill />
+      </div>
     </div>
   );
 }

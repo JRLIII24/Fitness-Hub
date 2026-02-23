@@ -155,8 +155,8 @@ function startAnimationLoop(get: () => TimerState, set: (partial: Partial<TimerS
     clearInterval(intervalId);
   }
 
-  // Start new interval at 100ms (10 updates per second for smooth countdown)
-  intervalId = setInterval(tick, 100);
+  // Start new interval at 1000ms (1 hz per LOG-01 req)
+  intervalId = setInterval(tick, 1000);
 
   // Run immediately
   tick();
@@ -287,6 +287,18 @@ export const useTimerStore = create<TimerState>()(
         // Restore notification permission
         if (state && typeof window !== "undefined" && "Notification" in window) {
           state.notificationPermission = Notification.permission;
+        }
+
+        if (typeof window !== "undefined") {
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+              const currentStore = useTimerStore.getState();
+              const validTimers = currentStore.timers.filter((t) => t.endTime > Date.now());
+              if (validTimers.some((t) => t.isRunning)) {
+                startAnimationLoop(useTimerStore.getState, useTimerStore.setState);
+              }
+            }
+          });
         }
       },
     }

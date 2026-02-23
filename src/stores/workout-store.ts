@@ -52,6 +52,7 @@ function createEmptySet(exerciseId: string, setNumber: number): WorkoutSet {
     weight_kg: null,
     duration_seconds: null,
     rpe: null,
+    rir: null,
     rest_seconds: null,
     completed: false,
     completed_at: null,
@@ -74,14 +75,9 @@ export const useWorkoutStore = create<WorkoutState>()(
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          await supabase
-            .from('active_workout_sessions')
-            .upsert({
-              user_id: user.id,
-              session_name: name,
-              started_at: startedAt,
-              exercise_count: 0,
-            });
+          // Changed to use abstracted service with offline queue for AS-01
+          const { createActiveWorkoutSession } = await import('@/lib/services/workout.service');
+          await createActiveWorkoutSession(user.id, name, startedAt);
         }
 
         // Set local state
@@ -133,10 +129,8 @@ export const useWorkoutStore = create<WorkoutState>()(
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          await supabase
-            .from('active_workout_sessions')
-            .delete()
-            .eq('user_id', user.id);
+          const { deleteActiveWorkoutSession } = await import('@/lib/services/workout.service');
+          await deleteActiveWorkoutSession(user.id);
         }
 
         // Clear local state
@@ -151,10 +145,8 @@ export const useWorkoutStore = create<WorkoutState>()(
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          await supabase
-            .from('active_workout_sessions')
-            .delete()
-            .eq('user_id', user.id);
+          const { deleteActiveWorkoutSession } = await import('@/lib/services/workout.service');
+          await deleteActiveWorkoutSession(user.id);
         }
 
         // Clear local state

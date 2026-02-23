@@ -4,7 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { analyzeFatigue } from './fatigue';
+import { getCachedOrComputeFatigueSnapshot } from '@/lib/fatigue/server';
 import type { LauncherPrediction, LauncherExercise } from '@/types/adaptive';
 
 interface AdaptiveWorkout extends LauncherPrediction {
@@ -20,18 +20,28 @@ interface AdaptiveWorkout extends LauncherPrediction {
 export async function generateAdaptiveWorkout(userId: string): Promise<AdaptiveWorkout> {
   const supabase = await createClient();
 
-  // Analyze current fatigue state
-  const fatigueAnalysis = await analyzeFatigue(userId);
-  const { fatigueScore, recommendation, reason } = fatigueAnalysis;
+  // Analyze current fatigue state from shared fatigue engine.
+  const snapshot = await getCachedOrComputeFatigueSnapshot(userId);
+  const fatigueScore = snapshot.fatigueScore;
 
-  // Determine volume adjustment
+  let recommendation: 'REST' | 'VOLUME' | 'INTENSITY' = 'VOLUME';
   let volumeAdjustment = 0;
-  if (recommendation === 'REST') {
-    volumeAdjustment = -30; // Deload: 30% less volume
-  } else if (recommendation === 'INTENSITY') {
-    volumeAdjustment = 15; // Push: 15% more volume
+
+  if (snapshot.recommendation.label === 'Very high fatigue') {
+    recommendation = 'REST';
+    volumeAdjustment = -35;
+  } else if (snapshot.recommendation.label === 'High fatigue') {
+    recommendation = 'REST';
+    volumeAdjustment = -25;
+  } else if (snapshot.recommendation.label === 'Building fatigue') {
+    recommendation = 'VOLUME';
+    volumeAdjustment = -15;
+  } else if (snapshot.recommendation.label === 'Fresh') {
+    recommendation = 'INTENSITY';
+    volumeAdjustment = 10;
   }
-  // VOLUME recommendation = 0% adjustment (normal)
+
+  const reason = snapshot.recommendation.guidance;
 
   // Get user's recent workout pattern (last completed workout or most common template)
   const { data: recentSessions } = await supabase

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { usePrimaryColor } from "@/hooks/use-primary-color";
+import { motion } from "framer-motion";
+
 import {
   Dumbbell,
   Apple,
@@ -15,22 +15,19 @@ import {
   Target,
   Clock,
   BarChart3,
-  Scan,
   Play,
-  Plus,
   TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StreakSection } from "@/components/dashboard/streak-section";
-import { MomentumProtectionCard } from "@/components/dashboard/momentum-protection-card";
+
 import { SmartLauncherWidget } from "@/components/workout/smart-launcher-widget";
 import { FatigueLevelCard } from "@/components/dashboard/fatigue-level-card";
 import { PodsDashboardCard } from "@/components/pods/pods-dashboard-card";
-import { ProUpgradeCard } from "@/components/dashboard/pro-upgrade-card";
+
+
 import type { FatigueSnapshot } from "@/lib/fatigue/types";
-import { DayPicker } from "react-day-picker";
-import "react-day-picker/style.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -321,16 +318,6 @@ export function DashboardContent({
   quickAddFoods,
   fatigueSnapshot,
 }: DashboardContentProps) {
-  // Read the active theme primary color so we can apply it as a glow on worked-out days.
-  const primaryColor = usePrimaryColor();
-
-  // Derive one Date per unique workout day — used by the mini calendar preview.
-  const workoutDays = useMemo(() => {
-    const keys = new Set(
-      sessions.map((s) => new Date(s.started_at).toISOString().split("T")[0])
-    );
-    return [...keys].map((k) => new Date(`${k}T12:00:00`));
-  }, [sessions]);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 pb-28 pt-5 md:px-6">
@@ -459,24 +446,7 @@ export function DashboardContent({
             </Link>
           </div>
 
-          {/* Momentum protection */}
-          <AnimatePresence>
-            {streakAtRisk && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <MomentumProtectionCard
-                  userId={userId}
-                  urgency={momentumUrgency}
-                  workedOutYesterday={workedOutYesterday}
-                  freezeAvailable={freezeAvailable}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+
         </div>
       </motion.section>
 
@@ -570,36 +540,7 @@ export function DashboardContent({
             </div>
           </SectionCard>
 
-          {/* Momentum Contract */}
-          {activeIntent && (
-            <SectionCard className="border-primary/25">
-              <DashboardCardHeader
-                icon={<Target className="h-3.5 w-3.5 text-primary" />}
-                title="Momentum Contract"
-              />
-              <CardDivider />
-              <div className="space-y-3 p-5">
-                <p className="text-[13px] leading-relaxed text-muted-foreground">
-                  {activeIntent.intent_payload?.suggested_goal ??
-                    "Complete one focused session tomorrow."}
-                </p>
-                <div className="flex items-center justify-between rounded-xl border border-border/50 bg-card/40 px-3 py-2.5">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Target Date
-                  </span>
-                  <span className="text-[12px] font-bold text-foreground">
-                    {activeIntent.intent_for_date ?? "Tomorrow"}
-                  </span>
-                </div>
-                <Link href="/workout">
-                  <Button className="motion-press flex w-full items-center justify-center gap-2 rounded-xl">
-                    <Dumbbell className="h-3.5 w-3.5" />
-                    Lock In Session
-                  </Button>
-                </Link>
-              </div>
-            </SectionCard>
-          )}
+
 
           {/* Nutrition */}
           <SectionCard>
@@ -778,153 +719,13 @@ export function DashboardContent({
             </div>
           </SectionCard>
 
-          {/* Workout History */}
-          <SectionCard>
-            <DashboardCardHeader
-              icon={<CalendarDays className="h-3.5 w-3.5 text-primary" />}
-              title="Workout History"
-              action={
-                <Link href="/history">
-                  <button className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-opacity hover:opacity-80">
-                    View all
-                    <ChevronRight className="h-3 w-3" />
-                  </button>
-                </Link>
-              }
-            />
-            <CardDivider />
-            <div className="space-y-4 p-5">
-              {/* Interactive calendar preview — navigate months, workout days highlighted */}
-              <div
-                className="select-none overflow-hidden"
-                style={
-                  {
-                    "--rdp-accent-color": primaryColor,
-                    "--rdp-today-color": primaryColor,
-                    "--rdp-day-height": "40px",
-                    "--rdp-day_button-height": "36px",
-                    "--rdp-day_button-width": "36px",
-                  } as React.CSSProperties
-                }
-              >
-                <DayPicker
-                  modifiers={{ workedOut: workoutDays }}
-                  modifiersClassNames={{
-                    // Adds the animation class + background tint on workout days
-                    workedOut: "rdp-day-worked-out",
-                  }}
 
-                  classNames={{
-                    // Stretch the calendar to fill the card width
-                    months: "w-full max-w-none",
-                    month: "w-full",
-                    month_grid: "w-full",
-                    // Remove fixed cell width so columns distribute evenly
-                    day: "!w-auto text-center",
-                    day_button:
-                      "mx-auto flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium text-foreground/80 transition-all duration-300 hover:bg-border/40",
-                    month_caption: "mb-1 flex h-10 items-center",
-                    caption_label: "text-[13px] font-bold text-foreground",
-                    nav: "absolute right-0 top-0 flex h-10 items-center gap-0.5",
-                    button_previous:
-                      "flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-border/40 hover:text-foreground",
-                    button_next:
-                      "flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-border/40 hover:text-foreground",
-                    weekdays: "border-b border-border/30",
-                    weekday:
-                      "py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
-                    today: "font-bold",
-                  }}
-                />
-              </div>
-
-              {/* 3 most-recent sessions */}
-              {sessions.length > 0 && (
-                <div className="space-y-2">
-                  {sessions.slice(0, 3).map((session) => (
-                    <div
-                      key={session.id}
-                      className="flex items-center justify-between rounded-xl border border-border/50 bg-card/40 px-3 py-2.5"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-semibold text-foreground">
-                          {session.name}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {formatDate(session.started_at)}
-                        </p>
-                      </div>
-                      <div className="ml-3 flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <Clock className="h-2.5 w-2.5" />
-                        {formatDuration(session.duration_seconds)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <Link href="/history">
-                <Button
-                  variant="outline"
-                  className="motion-press w-full gap-2 rounded-xl text-[12px] font-semibold"
-                >
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  View Full History
-                </Button>
-              </Link>
-            </div>
-          </SectionCard>
         </div>
 
         {/* Right aside */}
         <aside className="space-y-5">
           <PodsDashboardCard />
-          <ProUpgradeCard userId={userId} />
 
-          {/* Quick Add Foods */}
-          <SectionCard>
-            <DashboardCardHeader
-              icon={<Apple className="h-3.5 w-3.5 text-emerald-400" />}
-              title="Quick Add Foods"
-              action={
-                <Link href="/nutrition/scan">
-                  <button className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-opacity hover:opacity-80">
-                    <Scan className="h-2.5 w-2.5" />
-                    Scanner
-                    <ChevronRight className="h-3 w-3" />
-                  </button>
-                </Link>
-              }
-            />
-            <CardDivider />
-            <div className="space-y-2 p-4">
-              {quickAddFoods.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No recent foods yet. Log your first item to enable quick add.
-                </p>
-              ) : (
-                quickAddFoods.map((food) => (
-                  <Link
-                    key={food.id}
-                    href={`/nutrition/scan?quick_food_id=${encodeURIComponent(food.id)}`}
-                    className="flex w-full items-center justify-between rounded-xl border border-border/50 bg-card/40 px-3 py-2.5 transition-all hover:opacity-90 active:scale-[0.98]"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[12px] font-semibold text-foreground">
-                        {food.name}
-                      </p>
-                      <p className="truncate text-[10px] text-muted-foreground">
-                        {food.brand ?? "Tap to log quickly"}
-                      </p>
-                    </div>
-                    <div className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/15">
-                      <Plus className="h-3 w-3 text-emerald-400" />
-                    </div>
-                  </Link>
-                ))
-              )}
-            </div>
-          </SectionCard>
         </aside>
       </div>
     </div>

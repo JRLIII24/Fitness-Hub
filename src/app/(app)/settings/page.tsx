@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileForm } from "./profile-form";
-import { ExportSection } from "@/components/settings/export-section";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart3, ChevronRight } from "lucide-react";
@@ -56,7 +56,7 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      <ExportSection />
+
     </div>
   );
 }

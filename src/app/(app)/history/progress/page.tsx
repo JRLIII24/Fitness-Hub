@@ -32,8 +32,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HistoryNav } from "@/components/history/history-nav";
-import { generatePDF } from "@/lib/pdf-export";
-import { ProgressReportPdf } from "@/components/pdf/progress-report-pdf";
+import { generateProgressPDF } from "@/lib/pdf-export";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -729,11 +728,23 @@ export default function ProgressPage() {
   const handleExportPDF = async () => {
     try {
       setIsExporting(true);
-      const dateStr = format(new Date(), "yyyy-MM-dd");
-      await generatePDF("pdf-report-container", `FitHub_Progress_${dateStr}.pdf`);
+      await generateProgressPDF({
+        userName: "Athlete",
+        reportDate: new Date(),
+        totalSessions,
+        totalPRs,
+        avgVolume: volumeStats?.avg,
+        strengthCharts: allExerciseSparklines.map((c) => ({ ...c, unitLabel })),
+        personalRecords: personalRecords.map((pr) => ({
+          name: pr.name,
+          muscleGroup: pr.muscleGroup,
+          bestWeight: pr.bestWeight,
+          bestReps: pr.bestReps,
+          date: pr.dateAchieved,
+        })),
+      });
     } catch (error) {
       console.error("Failed to generate PDF:", error);
-      // Optional: show a toast here
     } finally {
       setIsExporting(false);
     }
@@ -1271,29 +1282,7 @@ export default function ProgressPage() {
         </div>
       </div>
 
-      {/* Hidden PDF Template */}
-      {sessions.length > 0 && (
-        <ProgressReportPdf
-          userName="User" // In a real app we might fetch user's name
-          reportDate={new Date()}
-          summaryStats={{
-            totalSessions,
-            totalPRs,
-            avgVolume: volumeStats?.avg,
-          }}
-          strengthCharts={allExerciseSparklines.map((c) => ({
-            ...c,
-            unitLabel,
-          }))}
-          personalRecords={personalRecords.map((pr) => ({
-            name: pr.name,
-            muscleGroup: pr.muscleGroup,
-            bestWeight: pr.bestWeight,
-            bestReps: pr.bestReps,
-            date: pr.dateAchieved,
-          }))}
-        />
-      )}
+
     </div>
   );
 }

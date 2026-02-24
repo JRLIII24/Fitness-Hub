@@ -207,7 +207,7 @@ export function SetRow({
               variant={set.completed ? "default" : "secondary"}
               size="icon"
               className={cn(
-                "h-8 w-8 shrink-0 transition-all duration-300",
+                "h-11 w-11 shrink-0 transition-all duration-300",
                 set.completed && beatPrevious
                   ? "bg-gradient-to-br from-yellow-400 to-amber-500 text-black shadow-[0_0_20px_rgba(251,191,36,0.4)] animate-pulse"
                   : set.completed && beatGhost
@@ -241,7 +241,7 @@ export function SetRow({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+            className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
             onClick={onRemove}
           >
             <Trash2 className="h-3 w-3" />
@@ -269,10 +269,14 @@ export function SetRow({
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.15fr)]">
         <div className="space-y-1">
-          <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          <label
+            htmlFor={`weight-${set.id}`}
+            className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+          >
             Weight (lbs)
-          </p>
+          </label>
           <Input
+            id={`weight-${set.id}`}
             autoFocus={autoFocusWeight}
             type="number"
             inputMode="decimal"
@@ -285,10 +289,14 @@ export function SetRow({
         </div>
 
         <div className="space-y-1">
-          <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          <label
+            htmlFor={`reps-${set.id}`}
+            className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+          >
             Reps
-          </p>
+          </label>
           <Input
+            id={`reps-${set.id}`}
             type="number"
             inputMode="numeric"
             placeholder="0"
@@ -300,10 +308,14 @@ export function SetRow({
         </div>
 
         <div className="space-y-1">
-          <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          <label
+            htmlFor={`rir-${set.id}`}
+            className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+          >
             RIR
-          </p>
+          </label>
           <Input
+            id={`rir-${set.id}`}
             type="number"
             inputMode="numeric"
             min={0}
@@ -317,7 +329,10 @@ export function SetRow({
         </div>
 
         <div className="space-y-1">
-          <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          <p
+            id={`rest-label-${set.id}`}
+            className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+          >
             Rest
           </p>
           <div className="flex items-center gap-1">
@@ -325,7 +340,7 @@ export function SetRow({
               value={String(restSeconds)}
               onValueChange={(value) => onUpdate({ rest_seconds: Number.parseInt(value, 10) })}
             >
-              <SelectTrigger className="h-10 w-full">
+              <SelectTrigger className="h-10 w-full" aria-labelledby={`rest-label-${set.id}`}>
                 <SelectValue placeholder="Rest" />
               </SelectTrigger>
               <SelectContent>

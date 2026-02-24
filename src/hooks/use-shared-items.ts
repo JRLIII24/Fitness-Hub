@@ -185,6 +185,14 @@ export function useSharedItems(userId: string | null) {
         exercises: template.exercises,
       };
 
+      // Guard: reject before hitting the network if the snapshot exceeds the DB limit.
+      const snapshotBytes = new TextEncoder().encode(JSON.stringify(snapshot)).length;
+      if (snapshotBytes > 50 * 1024) {
+        throw new Error(
+          `Template snapshot too large (${Math.round(snapshotBytes / 1024)} KB). Reduce the number of exercises or sets.`
+        );
+      }
+
       const { error } = await supabase.from("shared_items").insert({
         sender_id: userId,
         recipient_id: recipientId,
@@ -206,6 +214,14 @@ export function useSharedItems(userId: string | null) {
       message?: string
     ) => {
       if (!userId) throw new Error("Not authenticated");
+
+      // Guard: reject before hitting the network if the snapshot exceeds the DB limit.
+      const snapshotBytes = new TextEncoder().encode(JSON.stringify(snapshot)).length;
+      if (snapshotBytes > 50 * 1024) {
+        throw new Error(
+          `Meal snapshot too large (${Math.round(snapshotBytes / 1024)} KB). Reduce the number of food entries.`
+        );
+      }
 
       const { error } = await supabase.from("shared_items").insert({
         sender_id: userId,

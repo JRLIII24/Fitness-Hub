@@ -22,7 +22,7 @@ function PillButton({
       whileTap={{ scale: 0.88 }}
       onClick={onClick}
       aria-label={ariaLabel}
-      className="flex h-7 items-center gap-1 rounded-full border border-border/60 bg-secondary/40 px-2.5 text-muted-foreground transition-colors hover:text-foreground"
+      className="flex h-11 items-center gap-1 rounded-full border border-border/60 bg-secondary/40 px-2.5 text-muted-foreground transition-colors hover:text-foreground"
     >
       {children}
     </motion.button>
@@ -226,7 +226,12 @@ function SingleTimerPill({ timer, index }: { timer: Timer; index: number }) {
 
         {/* Large time readout — right side */}
         <div className="shrink-0 text-right">
+          {/* role="timer" marks this as a countdown for AT; aria-live is intentionally
+              off here to avoid 1-Hz screen-reader chatter. The sr-only live region
+              below announces at meaningful thresholds instead. */}
           <span
+            role="timer"
+            aria-label={`${Math.floor(remainingSeconds / 60)} minutes ${remainingSeconds % 60} seconds remaining`}
             className={cn(
               "block tabular-nums text-[26px] font-black leading-none tracking-tight transition-colors duration-300",
               urgencyClass
@@ -238,6 +243,15 @@ function SingleTimerPill({ timer, index }: { timer: Timer; index: number }) {
             {isExpanded ? "tap to collapse" : "tap to control"}
           </span>
         </div>
+        {/* Screen-reader live region: announces only at key thresholds to avoid
+            chatty second-by-second readouts. */}
+        <span aria-live="polite" aria-atomic="true" className="sr-only">
+          {remainingSeconds === 0
+            ? `${timer.exerciseName} rest complete`
+            : remainingSeconds === 30 || remainingSeconds === 10
+              ? `${remainingSeconds} seconds remaining`
+              : ""}
+        </span>
       </button>
 
       {/* Expanded controls */}
@@ -278,7 +292,7 @@ function SingleTimerPill({ timer, index }: { timer: Timer; index: number }) {
                   }
                   aria-label={isRunning ? "Pause timer" : "Resume timer"}
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full transition-all",
+                    "flex h-11 w-11 items-center justify-center rounded-full transition-all",
                     isRunning
                       ? "bg-primary/15 text-primary"
                       : "bg-secondary/60 text-foreground"
@@ -298,7 +312,7 @@ function SingleTimerPill({ timer, index }: { timer: Timer; index: number }) {
                     setIsExpanded(false);
                   }}
                   aria-label="Stop timer"
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-destructive/25 bg-destructive/10 text-destructive transition-all"
+                  className="flex h-11 w-11 items-center justify-center rounded-full border border-destructive/25 bg-destructive/10 text-destructive transition-all"
                 >
                   <X className="h-3.5 w-3.5" />
                 </motion.button>

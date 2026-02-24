@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/shallow";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -168,7 +170,22 @@ function isMissingTableError(error: unknown): boolean {
   );
 }
 
-function ElapsedTime({ startedAt, className }: { startedAt: string; className?: string }) {
+/**
+ * ElapsedTime — memo-isolated so its 1-second tick does NOT cause the parent
+ * WorkoutPage to re-render. startedAt is a stable string for the lifetime of
+ * a session, so memo's shallow prop comparison will always bail out.
+ *
+ * DEV: To verify isolation, uncomment the line below and confirm it does NOT
+ * increment in the parent's render count:
+ *   if (process.env.NODE_ENV === 'development') console.count('[ElapsedTime] render');
+ */
+const ElapsedTime = memo(function ElapsedTime({
+  startedAt,
+  className,
+}: {
+  startedAt: string;
+  className?: string;
+}) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -186,7 +203,7 @@ function ElapsedTime({ startedAt, className }: { startedAt: string; className?: 
   const pad = (n: number) => n.toString().padStart(2, "0");
 
   return <span className={className}>{`${pad(hrs)}:${pad(mins)}:${pad(secs)}`}</span>;
-}
+});
 
 function slugify(value: string) {
   return value
@@ -235,6 +252,20 @@ function makeCustomExercise(name: string, muscleGroup: MuscleGroup, equipment: s
   };
 }
 
+/** Returns true when viewport width ≤ 639 px (Tailwind `sm` breakpoint). */
+function useIsSmallScreen(): boolean {
+  const [isSmall, setIsSmall] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 639px)").matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const handler = (e: MediaQueryListEvent) => setIsSmall(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isSmall;
+}
+
 export default function WorkoutPage() {
   const supabase = useMemo(() => createClient(), []);
   const searchParams = useSearchParams();
@@ -258,6 +289,8 @@ export default function WorkoutPage() {
     description: string | null;
     exercises: TemplateSnapshot["exercises"];
   } | null>(null);
+
+  const isSmallScreen = useIsSmallScreen();
 
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<MuscleGroup>("chest");
   const [liftPickerOpen, setLiftPickerOpen] = useState(false);
@@ -297,6 +330,14 @@ export default function WorkoutPage() {
   const [sessionRpeValue, setSessionRpeValue] = useState(7);
   const [savingSessionRpe, setSavingSessionRpe] = useState(false);
 
+  // DEV: Uncomment to verify WorkoutPage render frequency.
+  // Should NOT increment every second — only on user interactions.
+  // if (process.env.NODE_ENV === 'development') console.count('[WorkoutPage] render');
+
+  // Scoped selectors prevent re-renders from unrelated store slices (e.g.
+  // editingWorkoutId) and from any future state fields added to WorkoutState.
+  // Actions are stable references in Zustand and are included here for
+  // explicitness — they never change so they never cause a re-render.
   const {
     activeWorkout,
     isWorkoutActive,
@@ -313,7 +354,25 @@ export default function WorkoutPage() {
     setExerciseNote,
     setWorkoutNote,
     updateWorkoutName,
-  } = useWorkoutStore();
+  } = useWorkoutStore(
+    useShallow((s) => ({
+      activeWorkout: s.activeWorkout,
+      isWorkoutActive: s.isWorkoutActive,
+      startWorkout: s.startWorkout,
+      loadWorkoutForEdit: s.loadWorkoutForEdit,
+      cancelWorkout: s.cancelWorkout,
+      finishWorkout: s.finishWorkout,
+      addExercise: s.addExercise,
+      removeExercise: s.removeExercise,
+      addSet: s.addSet,
+      updateSet: s.updateSet,
+      removeSet: s.removeSet,
+      completeSet: s.completeSet,
+      setExerciseNote: s.setExerciseNote,
+      setWorkoutNote: s.setWorkoutNote,
+      updateWorkoutName: s.updateWorkoutName,
+    }))
+  );
 
   const startTimer = useTimerStore((state) => state.startTimer);
   const getActiveTimers = useTimerStore((state) => state.getActiveTimers);
@@ -424,6 +483,22 @@ export default function WorkoutPage() {
   useEffect(() => {
     selectedMuscleGroupRef.current = selectedMuscleGroup;
   }, [selectedMuscleGroup]);
+
+  // iOS Safari fallback: AudioContext cannot beep without a prior user gesture,
+  // so timer-store dispatches 'rest-timer-complete' when audio is unavailable.
+  // We show a toast here so the user always gets feedback on rest completion.
+  useEffect(() => {
+    function handleRestComplete(e: Event) {
+      const { exerciseName } =
+        (e as CustomEvent<{ exerciseName: string }>).detail ?? {};
+      toast(
+        exerciseName ? `Rest complete — ${exerciseName}` : "Rest period complete",
+        { description: "Time to get back to it!", duration: 5000 }
+      );
+    }
+    window.addEventListener("rest-timer-complete", handleRestComplete);
+    return () => window.removeEventListener("rest-timer-complete", handleRestComplete);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1705,8 +1780,69 @@ export default function WorkoutPage() {
     }
   }
 
+  // Shared inner content for the lift picker — used by both Sheet (mobile) and Popover (desktop).
+  const liftPickerExerciseList = (
+    <>
+      <Input
+        value={liftSearch}
+        onChange={(event) => setLiftSearch(event.target.value)}
+        placeholder="Type to search lifts"
+        className="mb-2"
+        autoFocus
+      />
+      <ScrollArea className="h-96">
+        <div className="space-y-2 pr-2">
+          {loadingExercises ? (
+            <p className="px-2 py-3 text-sm text-muted-foreground">
+              Loading exercises...
+            </p>
+          ) : filteredExercises.length === 0 ? (
+            <p className="px-2 py-3 text-sm text-muted-foreground">
+              No lifts found for this filter.
+            </p>
+          ) : (
+            filteredExercises.map((exercise) => {
+              const mediaUrl = resolveExerciseMediaUrl(
+                ("gif_url" in exercise && exercise.gif_url)
+                  ? exercise.gif_url
+                  : exercise.image_url,
+                ("source" in exercise
+                  ? (exercise as { source?: string | null }).source
+                  : null) ?? null
+              );
+              return (
+                <ExerciseSelectionCard
+                  key={exercise.id}
+                  exercise={exercise}
+                  mediaUrl={mediaUrl}
+                  posterUrl={resolveExerciseMediaUrl(
+                    exercise.image_url,
+                    ("source" in exercise
+                      ? (exercise as { source?: string | null }).source
+                      : null) ?? null
+                  )}
+                  selected={selectedExerciseId === exercise.id}
+                  primaryBenefit={getPrimaryBenefit(exercise)}
+                  coachingCues={getCoachingCues(exercise)}
+                  previousPerformance={exerciseLastPerformance[exercise.id] ?? null}
+                  onSelect={() => {
+                    setSelectedExerciseId(exercise.id);
+                  }}
+                  onQuickAdd={async () => {
+                    setSelectedExerciseId(exercise.id);
+                    await addExerciseToWorkout(exercise);
+                  }}
+                />
+              );
+            })
+          )}
+        </div>
+      </ScrollArea>
+    </>
+  );
+
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
       <div className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-6 lg:px-10">
           <div className="flex items-center gap-2.5">
@@ -2150,73 +2286,45 @@ export default function WorkoutPage() {
 
                 <div className="space-y-2">
                   <Label>Available lifts</Label>
-                  <Popover open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="w-full justify-between">
+                  {isSmallScreen ? (
+                    /* Mobile: bottom Sheet avoids virtual keyboard overlap */
+                    <Sheet open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between"
+                        onClick={() => setLiftPickerOpen(true)}
+                      >
                         <span className="truncate">
                           {selectedExercise ? selectedExercise.name : "Search and choose a lift"}
                         </span>
                         <ChevronDown className="ml-2 size-4 shrink-0 opacity-70" />
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[min(28rem,calc(100vw-2rem))] p-2" align="start">
-                      <Input
-                        value={liftSearch}
-                        onChange={(event) => setLiftSearch(event.target.value)}
-                        placeholder="Type to search lifts"
-                        className="mb-2"
-                        autoFocus
-                      />
-                      <ScrollArea className="h-96">
-                        <div className="space-y-2 pr-2">
-                          {loadingExercises ? (
-                            <p className="px-2 py-3 text-sm text-muted-foreground">
-                              Loading exercises...
-                            </p>
-                          ) : filteredExercises.length === 0 ? (
-                            <p className="px-2 py-3 text-sm text-muted-foreground">
-                              No lifts found for this filter.
-                            </p>
-                          ) : (
-                            filteredExercises.map((exercise) => {
-                              const mediaUrl = resolveExerciseMediaUrl(
-                                ("gif_url" in exercise && exercise.gif_url)
-                                  ? exercise.gif_url
-                                  : exercise.image_url,
-                                ("source" in exercise
-                                  ? (exercise as { source?: string | null }).source
-                                  : null) ?? null
-                              );
-                              return (
-                                <ExerciseSelectionCard
-                                  key={exercise.id}
-                                  exercise={exercise}
-                                  mediaUrl={mediaUrl}
-                                  posterUrl={resolveExerciseMediaUrl(
-                                    exercise.image_url,
-                                    ("source" in exercise
-                                      ? (exercise as { source?: string | null }).source
-                                      : null) ?? null
-                                  )}
-                                  selected={selectedExerciseId === exercise.id}
-                                  primaryBenefit={getPrimaryBenefit(exercise)}
-                                  coachingCues={getCoachingCues(exercise)}
-                                  previousPerformance={exerciseLastPerformance[exercise.id] ?? null}
-                                  onSelect={() => {
-                                    setSelectedExerciseId(exercise.id);
-                                  }}
-                                  onQuickAdd={async () => {
-                                    setSelectedExerciseId(exercise.id);
-                                    await addExerciseToWorkout(exercise);
-                                  }}
-                                />
-                              );
-                            })
-                          )}
+                      <SheetContent side="bottom" className="h-[72dvh] flex flex-col">
+                        <SheetHeader>
+                          <SheetTitle>Choose a lift</SheetTitle>
+                        </SheetHeader>
+                        <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-0">
+                          {liftPickerExerciseList}
                         </div>
-                      </ScrollArea>
-                    </PopoverContent>
-                  </Popover>
+                      </SheetContent>
+                    </Sheet>
+                  ) : (
+                    /* Desktop: Popover anchored to trigger */
+                    <Popover open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" className="w-full justify-between">
+                          <span className="truncate">
+                            {selectedExercise ? selectedExercise.name : "Search and choose a lift"}
+                          </span>
+                          <ChevronDown className="ml-2 size-4 shrink-0 opacity-70" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[min(28rem,calc(100vw-2rem))] p-2" align="start">
+                        {liftPickerExerciseList}
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </div>
               </div>
 

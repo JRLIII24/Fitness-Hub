@@ -21,7 +21,11 @@ export default async function AppLayout({
   return (
     <div className="min-h-svh bg-background">
       <ThemeApplier />
-      <main className="pb-24">
+      {/* pb accounts for bottom-nav height (6rem) + device safe-area inset.
+          env(safe-area-inset-bottom,0px) is 0 on Android/desktop and up to
+          34px on iPhone 14 Pro+, ensuring content is never hidden behind the
+          nav or the home indicator on any device. */}
+      <main className="pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
         <PageTransition>{children}</PageTransition>
       </main>
       <BottomNav />

@@ -48,15 +48,89 @@ function pickSingleMostRecentTimer(timers: Timer[]): Timer[] {
 // Module-level interval ID (not persisted — cleaned up on unmount)
 // Removed - now using intervalId declared in startAnimationLoop
 
+// Guard flag: ensures the visibilitychange listener is registered exactly once
+// per page load regardless of how many times onRehydrateStorage fires.
+let visibilityListenerAttached = false;
+
 // Generate unique timer ID
 function generateTimerId(): string {
   return `timer-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-// Audio beep helper
-function playBeep() {
+// --------------------------------------------------------------------------
+// Audio helpers — singleton AudioContext pattern
+//
+// iOS Safari requires a user gesture to unlock AudioContext. Creating a new
+// context on every beep (old approach) always fails because beeps fire when
+// the timer expires — never during a gesture. The fix:
+//   1. Create/reuse a single AudioContext instance.
+//   2. Call unlockAudioContext() inside startTimer() — that runs during the
+//      user's tap, which is a trusted gesture context on iOS.
+//   3. By the time the timer expires, ctx.state === 'running' and the beep
+//      plays normally.
+//   4. If audio is still unavailable (denied, SSR, old browser), dispatch
+//      a DOM event so the UI can show a visible fallback toast.
+// --------------------------------------------------------------------------
+
+/** Module-level singleton — expensive to create; safe to reuse across timers. */
+let _audioCtx: AudioContext | null = null;
+
+function getOrCreateAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
   try {
-    const ctx = new AudioContext();
+    if (!_audioCtx || _audioCtx.state === "closed") {
+      _audioCtx = new AudioContext();
+    }
+    return _audioCtx;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Call during a user-gesture (e.g. the tap that starts a timer) to unlock
+ * the AudioContext on iOS Safari. ctx.resume() only works synchronously
+ * inside a trusted interaction event.
+ */
+function unlockAudioContext(): void {
+  const ctx = getOrCreateAudioContext();
+  if (ctx && ctx.state === "suspended") {
+    ctx.resume().catch(() => {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[timer-store] AudioContext.resume() failed — audio will be silent on iOS Safari"
+        );
+      }
+    });
+  }
+}
+
+/**
+ * Plays a short 880 Hz beep.
+ *
+ * Returns true if audio played. Returns false (and dispatches
+ * 'rest-timer-complete' CustomEvent) when the context is not running —
+ * e.g. iOS Safari before gesture unlock, or browsers with no Web Audio API.
+ * The workout page listens for that event and shows a toast fallback.
+ */
+function playBeep(exerciseName: string): boolean {
+  const ctx = getOrCreateAudioContext();
+
+  if (!ctx || ctx.state !== "running") {
+    if (process.env.NODE_ENV === "development") {
+      console.warn(
+        `[timer-store] Audio unavailable (state: ${ctx?.state ?? "null"}) for "${exerciseName}" — dispatching fallback event`
+      );
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("rest-timer-complete", { detail: { exerciseName } })
+      );
+    }
+    return false;
+  }
+
+  try {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
     oscillator.connect(gain);
@@ -65,11 +139,23 @@ function playBeep() {
     gain.gain.value = 0.3;
     oscillator.start();
     setTimeout(() => {
-      oscillator.stop();
-      ctx.close();
+      try {
+        oscillator.stop();
+      } catch {
+        /* context may have been suspended/closed since we started */
+      }
     }, 300);
-  } catch {
-    // Audio not available
+    return true;
+  } catch (err) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[timer-store] playBeep oscillator error:", err);
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("rest-timer-complete", { detail: { exerciseName } })
+      );
+    }
+    return false;
   }
 }
 
@@ -126,7 +212,7 @@ function startAnimationLoop(get: () => TimerState, set: (partial: Partial<TimerS
 
       // Timer expired
       if (remaining === 0) {
-        playBeep();
+        playBeep(timer.exerciseName); // passes name for fallback event on iOS
         triggerHaptic();
         showNotification(timer.exerciseName);
         return { ...timer, isRunning: false };
@@ -172,6 +258,10 @@ export const useTimerStore = create<TimerState>()(
         : null,
 
       startTimer: (exerciseId: string, exerciseName: string, seconds: number) => {
+        // Unlock AudioContext now — this call happens inside the user's tap
+        // gesture, which is the only context iOS Safari trusts for audio unlock.
+        unlockAudioContext();
+
         const timerId = generateTimerId();
         const endTime = Date.now() + seconds * 1000;
 
@@ -289,7 +379,11 @@ export const useTimerStore = create<TimerState>()(
           state.notificationPermission = Notification.permission;
         }
 
-        if (typeof window !== "undefined") {
+        // Attach once — onRehydrateStorage can fire on every page load/navigation.
+        // Without this guard, listeners stack and the handler executes N times
+        // per visibilitychange event after N page visits.
+        if (typeof window !== "undefined" && !visibilityListenerAttached) {
+          visibilityListenerAttached = true;
           document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
               const currentStore = useTimerStore.getState();

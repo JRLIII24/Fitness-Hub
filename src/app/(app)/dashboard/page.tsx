@@ -18,6 +18,12 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
+  // Safety-net cleanup: removes active_workout_sessions older than 4 hours.
+  // Handles ghost "currently working out" states left by app crashes.
+  // Fire-and-forget — dashboard load is never blocked by this.
+  // pg_cron (migration 039) is the primary scheduler; this is the fallback.
+  void supabase.rpc("cleanup_stale_workouts");
+
   const today = new Date();
   const localDayStart = new Date(today);
   localDayStart.setHours(0, 0, 0, 0);

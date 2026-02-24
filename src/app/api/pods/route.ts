@@ -57,31 +57,38 @@ export async function GET() {
       }, { status: 500 });
     }
 
-    // Get member counts and members for each pod
-    const pods = await Promise.all(
-      (podsData || []).map(async (pod) => {
-        const { data: members, count } = await supabase
-          .from('pod_members')
-          .select('user_id, joined_at, status, profiles!inner(display_name, username)', { count: 'exact' })
-          .eq('pod_id', pod.id)
-          .eq('status', 'active');
+    // Batch-fetch all active members for these pods in one query (replaces N per-pod queries).
+    const { data: allMembers } = await supabase
+      .from('pod_members')
+      .select('pod_id, user_id, joined_at, status, profiles!inner(display_name, username)')
+      .in('pod_id', podIds)
+      .eq('status', 'active');
 
-        return {
-          ...pod,
-          member_count: count || 0,
-          members: (members || []).map(m => {
-            const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
-            return {
-              user_id: m.user_id,
-              display_name: profile?.display_name || null,
-              username: profile?.username || null,
-              joined_at: m.joined_at,
-              status: m.status
-            };
-          })
-        };
-      })
-    );
+    // Group members by pod_id in JS
+    const membersByPodId = new Map<string, NonNullable<typeof allMembers>>();
+    for (const m of (allMembers || [])) {
+      const list = membersByPodId.get(m.pod_id) ?? [];
+      list.push(m);
+      membersByPodId.set(m.pod_id, list);
+    }
+
+    const pods = (podsData || []).map((pod) => {
+      const members = membersByPodId.get(pod.id) ?? [];
+      return {
+        ...pod,
+        member_count: members.length,
+        members: members.map(m => {
+          const profile = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+          return {
+            user_id: m.user_id,
+            display_name: profile?.display_name || null,
+            username: profile?.username || null,
+            joined_at: m.joined_at,
+            status: m.status
+          };
+        })
+      };
+    });
 
     return NextResponse.json({ pods });
   } catch (error) {

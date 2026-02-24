@@ -152,12 +152,6 @@ export default async function AnalyticsPage() {
     };
   });
 
-  const confidenceColors = {
-    high: "text-green-500",
-    medium: "text-yellow-500",
-    low: "text-orange-500"
-  };
-
   return (
     <div className="mx-auto w-full max-w-4xl space-y-5 px-4 pb-28 pt-6 md:px-6">
       <div>
@@ -272,7 +266,7 @@ export default async function AnalyticsPage() {
             </div>
           ))}
           <p className="text-xs text-muted-foreground pt-2">
-            High confidence predictions should have higher acceptance rates. This validates the algorithm's pattern detection.
+            High confidence predictions should have higher acceptance rates. This validates the algorithm&apos;s pattern detection.
           </p>
         </CardContent>
       </Card>

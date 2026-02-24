@@ -114,7 +114,7 @@ export function StepDob({ dateOfBirth, onUpdate, onNext }: StepDobProps) {
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-bold text-foreground"
           >
-            When's Your Birthday? 🎂
+            When&apos;s Your Birthday? 🎂
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -122,7 +122,7 @@ export function StepDob({ dateOfBirth, onUpdate, onNext }: StepDobProps) {
             transition={{ delay: 0.2 }}
             className="text-lg text-muted-foreground"
           >
-            We'll use this for age-appropriate recommendations
+            We&apos;ll use this for age-appropriate recommendations
           </motion.p>
         </div>
 

@@ -2,6 +2,7 @@
 
 
 import Link from "next/link";
+import Image from "next/image";
 import { Flame, Dumbbell, Copy, Heart, Play, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,7 +69,14 @@ function ClipThumb({ clip }: { clip: ProfileClip }) {
       aria-label="View Sets"
     >
       {clip.thumbnail_url ? (
-        <img src={clip.thumbnail_url} alt="" className="w-full h-full object-cover" />
+        <Image
+          src={clip.thumbnail_url}
+          alt=""
+          fill
+          sizes="110px"
+          unoptimized
+          className="w-full h-full object-cover"
+        />
       ) : (
         <video
           src={clip.video_url}

@@ -88,9 +88,8 @@ export async function generateAdaptiveWorkout(userId: string): Promise<AdaptiveW
 
     if (templateData) {
       const exercises = adaptExercises(
-        templateData.template_exercises as any[],
-        recommendation,
-        volumeAdjustment
+        templateData.template_exercises as unknown as TemplateExerciseRow[],
+        recommendation
       );
 
       return {
@@ -109,7 +108,7 @@ export async function generateAdaptiveWorkout(userId: string): Promise<AdaptiveW
   }
 
   // Fallback: Create a preset workout adapted to fatigue level
-  const presetWorkout = await createPresetWorkout(recommendation, volumeAdjustment);
+  const presetWorkout = await createPresetWorkout(recommendation);
 
   return {
     ...presetWorkout,
@@ -123,13 +122,35 @@ export async function generateAdaptiveWorkout(userId: string): Promise<AdaptiveW
 /**
  * Adapt exercises based on recommendation type
  */
+interface TemplateExerciseRow {
+  exercises:
+  | {
+    id: string;
+    name: string;
+    muscle_group: string;
+    equipment: string | null;
+  }
+  | Array<{
+    id: string;
+    name: string;
+    muscle_group: string;
+    equipment: string | null;
+  }>
+  | null;
+  template_exercise_sets?: Array<{
+    set_number?: number | null;
+    reps?: number | null;
+    weight_kg?: number | null;
+  }>;
+}
+
 function adaptExercises(
-  templateExercises: any[],
-  recommendation: 'REST' | 'VOLUME' | 'INTENSITY',
-  volumeAdjustment: number
+  templateExercises: TemplateExerciseRow[],
+  recommendation: 'REST' | 'VOLUME' | 'INTENSITY'
 ): LauncherExercise[] {
-  return templateExercises.map((te: any) => {
-    const exercise = te.exercises;
+  return templateExercises.flatMap((te) => {
+    const exercise = Array.isArray(te.exercises) ? te.exercises[0] : te.exercises;
+    if (!exercise) return [];
     const baseSets = te.template_exercise_sets || [];
     const firstSet = baseSets[0] || { reps: 10, weight_kg: null };
 
@@ -163,7 +184,7 @@ function adaptExercises(
       },
       target_sets: targetSets,
       target_reps: targetReps,
-      target_weight_kg: targetWeight
+      target_weight_kg: targetWeight ?? null
     };
   });
 }
@@ -172,8 +193,7 @@ function adaptExercises(
  * Create a preset workout when no template history exists
  */
 async function createPresetWorkout(
-  recommendation: 'REST' | 'VOLUME' | 'INTENSITY',
-  volumeAdjustment: number
+  recommendation: 'REST' | 'VOLUME' | 'INTENSITY'
 ): Promise<LauncherPrediction> {
   const supabase = await createClient();
 

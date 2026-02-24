@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Image from "next/image";
 import { Loader2, X, Plus, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -186,9 +187,12 @@ export function AddExerciseToTemplateDialog({ open, onClose, onAdd }: Props) {
                           return (
                         <div className="flex items-center gap-3">
                           {mediaUrl ? (
-                            <img
+                            <Image
                               src={mediaUrl}
                               alt={ex.name}
+                              width={48}
+                              height={48}
+                              unoptimized
                               className="size-12 rounded object-cover bg-muted shrink-0"
                             />
                           ) : null}

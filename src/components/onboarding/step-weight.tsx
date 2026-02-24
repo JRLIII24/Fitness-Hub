@@ -80,7 +80,7 @@ export function StepWeight({
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-bold text-foreground"
           >
-            Let's Set Your Targets ⚖️
+            Let&apos;s Set Your Targets ⚖️
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}

@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/server';
  * GET /api/pods
  * Returns all pods the user is a member of
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
 

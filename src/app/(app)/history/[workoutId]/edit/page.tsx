@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, ChevronLeft, Check, Trash2, GripVertical } from "lucide-react";
+import { Loader2, ChevronLeft, Check, Trash2 } from "lucide-react";
 import { celebratePR, triggerHaptic } from "@/lib/celebrations";
 
 interface WorkoutSession {
@@ -45,6 +45,8 @@ interface WorkoutSession {
     } | null;
   }>;
 }
+
+type EditableExerciseBlock = ActiveWorkout["exercises"][number];
 
 async function loadWorkout(
   supabase: ReturnType<typeof createClient>,
@@ -97,7 +99,10 @@ async function loadWorkout(
 
     // Group sets by exercise
     const exerciseMap = new Map<string, Exercise>();
-    const setsByExerciseId = new Map<string, any[]>();
+    const setsByExerciseId = new Map<
+      string,
+      Array<WorkoutSession["workout_sets"][number]>
+    >();
 
     for (const set of session.workout_sets) {
       // Get exercise from the nested exercises object in the set
@@ -147,7 +152,7 @@ async function loadWorkout(
         collapsed: false,
         notes: "",
       };
-    }).filter(Boolean) as any[];
+    }).filter(Boolean) as EditableExerciseBlock[];
 
     const activeWorkout: ActiveWorkout = {
       id: session.id,
@@ -289,7 +294,7 @@ export default function EditWorkoutPage() {
   // Local state for editing
   const [workoutName, setWorkoutName] = useState("");
   const [workoutNotes, setWorkoutNotes] = useState("");
-  const [exercises, setExercises] = useState<any[]>([]);
+  const [exercises, setExercises] = useState<EditableExerciseBlock[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -309,7 +314,12 @@ export default function EditWorkoutPage() {
     load();
   }, [workoutId, supabase, router]);
 
-  const handleSetUpdate = (exerciseIndex: number, setIndex: number, field: string, value: any) => {
+  const handleSetUpdate = (
+    exerciseIndex: number,
+    setIndex: number,
+    field: keyof WorkoutSet,
+    value: WorkoutSet[keyof WorkoutSet]
+  ) => {
     const newExercises = [...exercises];
     newExercises[exerciseIndex].sets[setIndex] = {
       ...newExercises[exerciseIndex].sets[setIndex],
@@ -333,10 +343,10 @@ export default function EditWorkoutPage() {
   const handleRemoveSet = (exerciseIndex: number, setIndex: number) => {
     const newExercises = [...exercises];
     newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.filter(
-      (_: any, i: number) => i !== setIndex
+      (_, i: number) => i !== setIndex
     );
     // Renumber remaining sets
-    newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.map((set: any, idx: number) => ({
+    newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.map((set, idx: number) => ({
       ...set,
       set_number: idx + 1,
     }));

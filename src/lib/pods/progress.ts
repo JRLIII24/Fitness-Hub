@@ -102,7 +102,7 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
 async function calculateStreak(userId: string, podId: string): Promise<number> {
   const supabase = await createClient();
   let streak = 0;
-  let currentWeek = getCurrentWeekStart();
+  const currentWeek = getCurrentWeekStart();
 
   // Check last 12 weeks for streak
   for (let i = 0; i < 12; i++) {

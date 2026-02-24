@@ -59,7 +59,7 @@ export function StepHeight({
             transition={{ delay: 0.2 }}
             className="text-lg text-muted-foreground"
           >
-            We'll use this to calculate your progress metrics
+            We&apos;ll use this to calculate your progress metrics
           </motion.p>
         </div>
 
@@ -132,7 +132,7 @@ export function StepHeight({
               <p className="text-sm text-muted-foreground">
                 Your height:{" "}
                 <span className="font-semibold text-foreground">
-                  {heightFeet}'{heightInches}"
+                  {heightFeet}&apos;{heightInches}&quot;
                 </span>
               </p>
             </motion.div>

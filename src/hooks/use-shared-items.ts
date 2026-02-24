@@ -87,7 +87,9 @@ export function useSharedItems(userId: string | null) {
   }, [userId, supabase]);
 
   useEffect(() => {
-    fetchItems();
+    queueMicrotask(() => {
+      void fetchItems();
+    });
   }, [fetchItems]);
 
   // Realtime subscription
@@ -104,7 +106,11 @@ export function useSharedItems(userId: string | null) {
           table: "shared_items",
           filter: `recipient_id=eq.${userId}`,
         },
-        () => fetchItems()
+        () => {
+          queueMicrotask(() => {
+            void fetchItems();
+          });
+        }
       )
       .subscribe();
 

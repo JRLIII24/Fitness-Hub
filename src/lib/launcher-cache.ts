@@ -5,7 +5,7 @@
 
 interface CachedLauncherPrediction {
   userId: string;
-  prediction: any; // LauncherPrediction from API
+  prediction: unknown; // LauncherPrediction from API
   cachedAt: number; // timestamp
   expiresAt: number; // timestamp
 }
@@ -40,13 +40,13 @@ function openDB(): Promise<IDBDatabase> {
 /**
  * Get cached prediction for a user
  */
-export async function getCachedPrediction(userId: string): Promise<any | null> {
+export async function getCachedPrediction(userId: string): Promise<unknown | null> {
   try {
     const db = await openDB();
     const transaction = db.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const request = store.get(userId);
 
       request.onsuccess = () => {
@@ -76,7 +76,7 @@ export async function getCachedPrediction(userId: string): Promise<any | null> {
 /**
  * Save prediction to cache
  */
-export async function cachePrediction(userId: string, prediction: any): Promise<void> {
+export async function cachePrediction(userId: string, prediction: unknown): Promise<void> {
   try {
     const db = await openDB();
     const transaction = db.transaction(STORE_NAME, 'readwrite');

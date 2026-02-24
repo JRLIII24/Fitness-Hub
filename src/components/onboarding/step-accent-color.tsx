@@ -30,7 +30,6 @@ function hexToOklch(hex: string): string {
   // Convert RGB to HSL to get hue
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
 
   let h = 0;
   if (max !== min) {
@@ -58,11 +57,15 @@ export function StepAccentColor({ selected, onSelect, onNext }: StepAccentColorP
   useEffect(() => {
     const customMatch = selected.match(/^custom-(#[0-9a-fA-F]{6})$/);
     if (customMatch) {
-      setIsCustom(true);
-      setCustomColor(customMatch[1]);
+      queueMicrotask(() => {
+        setIsCustom(true);
+        setCustomColor(customMatch[1]);
+      });
       return;
     }
-    setIsCustom(false);
+    queueMicrotask(() => {
+      setIsCustom(false);
+    });
   }, [selected]);
 
   function removeCustomPreviewStyle() {

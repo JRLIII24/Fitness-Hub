@@ -39,26 +39,24 @@ function SingleTimerPill({ timer, index }: { timer: Timer; index: number }) {
 
   // Subscribe directly so we always get the latest state
   const liveTimer = useTimerStore((s) => s.timers.find((t) => t.id === timer.id));
+  const lastTickMs = useTimerStore((s) => s.lastTickMs);
 
   const [isExpanded, setIsExpanded] = useState(false);
-  const [, forceUpdate] = useState(0);
-
-  // Force re-render every second while running to keep countdown live
-  useEffect(() => {
-    if (!liveTimer?.isRunning) return;
-    const id = setInterval(() => forceUpdate((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, [liveTimer?.isRunning]);
 
   const remainingSeconds = liveTimer
-    ? Math.max(0, Math.ceil((liveTimer.endTime - Date.now()) / 1000))
+    ? Math.max(
+      0,
+      Math.ceil((liveTimer.endTime - (lastTickMs || liveTimer.endTime - liveTimer.totalSeconds * 1000)) / 1000)
+    )
     : 0;
 
   // Auto-remove when countdown reaches zero
   useEffect(() => {
     if (!liveTimer || remainingSeconds > 0) return;
     stopTimer(timer.id);
-    setIsExpanded(false);
+    queueMicrotask(() => {
+      setIsExpanded(false);
+    });
   }, [liveTimer, remainingSeconds, stopTimer, timer.id]);
 
   const progress =
@@ -334,7 +332,9 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    queueMicrotask(() => {
+      setMounted(true);
+    });
   }, []);
 
   const activeTimers = getActiveTimers();
@@ -347,7 +347,9 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
       notificationPermission === "default"
     ) {
       requestNotificationPermission();
-      setHasRequestedPermission(true);
+      queueMicrotask(() => {
+        setHasRequestedPermission(true);
+      });
     }
   }, [
     mounted,

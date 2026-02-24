@@ -194,8 +194,12 @@ export function useClips(userId: string | null, mode: ClipFeedMode = "discover")
   useEffect(() => {
     if (!userId) return;
     cursorRef.current = null;
-    setHasMore(true);
-    fetchClips(true);
+    queueMicrotask(() => {
+      setHasMore(true);
+    });
+    queueMicrotask(() => {
+      void fetchClips(true);
+    });
   }, [userId, fetchClips, mode]);
 
   // Realtime: new clips + count updates

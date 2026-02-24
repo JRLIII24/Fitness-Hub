@@ -716,11 +716,6 @@ export default function ProgressPage() {
     return pills;
   }, [personalRecords]);
 
-  const selectedExerciseName = useMemo(
-    () => exerciseOptions.find((o) => o.id === selectedExerciseId)?.name ?? "",
-    [exerciseOptions, selectedExerciseId]
-  );
-
   // Total stats for header
   const totalPRs = personalRecords.length;
   const totalSessions = sessions.length;

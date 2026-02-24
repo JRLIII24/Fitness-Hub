@@ -25,7 +25,6 @@ export function StreakSection({
   const supabase = useSupabase();
   const router = useRouter();
   const [showLevelUp, setShowLevelUp] = useState(false);
-  const [newLevel, setNewLevel] = useState(level);
 
   async function handleUseFreeze() {
     try {
@@ -59,7 +58,7 @@ export function StreakSection({
 
       {showLevelUp && (
         <LevelUpCelebration
-          newLevel={newLevel}
+          newLevel={level}
           onClose={() => setShowLevelUp(false)}
         />
       )}

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { PodWithMembers, PodDetail, MemberProgress } from '@/types/pods';
+import type { PodWithMembers, PodDetail } from '@/types/pods';
 import {
   trackPodAccountabilityPingSent,
   trackPodCommitmentMissed,

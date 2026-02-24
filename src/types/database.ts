@@ -472,6 +472,199 @@ export interface Database {
         };
       };
     };
+      run_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          status: "in_progress" | "paused" | "completed" | "cancelled";
+          tag:
+            | "recovery"
+            | "conditioning"
+            | "hiit"
+            | "speed_work"
+            | "game_prep"
+            | "long_run"
+            | "tempo"
+            | "easy"
+            | null;
+          notes: string | null;
+          started_at: string;
+          completed_at: string | null;
+          duration_seconds: number | null;
+          moving_duration_seconds: number | null;
+          distance_meters: number | null;
+          avg_pace_sec_per_km: number | null;
+          best_pace_sec_per_km: number | null;
+          elevation_gain_m: number | null;
+          elevation_loss_m: number | null;
+          avg_cadence_spm: number | null;
+          estimated_calories: number | null;
+          session_rpe: number | null;
+          estimated_vo2max: number | null;
+          session_load: number | null;
+          zone_breakdown: Json;
+          primary_zone: string | null;
+          route_polyline: string | null;
+          is_treadmill: boolean;
+          map_bbox: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          status?: "in_progress" | "paused" | "completed" | "cancelled";
+          tag?:
+            | "recovery"
+            | "conditioning"
+            | "hiit"
+            | "speed_work"
+            | "game_prep"
+            | "long_run"
+            | "tempo"
+            | "easy"
+            | null;
+          notes?: string | null;
+          started_at?: string;
+          completed_at?: string | null;
+          duration_seconds?: number | null;
+          moving_duration_seconds?: number | null;
+          distance_meters?: number | null;
+          avg_pace_sec_per_km?: number | null;
+          best_pace_sec_per_km?: number | null;
+          elevation_gain_m?: number | null;
+          elevation_loss_m?: number | null;
+          avg_cadence_spm?: number | null;
+          estimated_calories?: number | null;
+          session_rpe?: number | null;
+          estimated_vo2max?: number | null;
+          session_load?: number | null;
+          zone_breakdown?: Json;
+          primary_zone?: string | null;
+          route_polyline?: string | null;
+          is_treadmill?: boolean;
+          map_bbox?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          status?: "in_progress" | "paused" | "completed" | "cancelled";
+          tag?:
+            | "recovery"
+            | "conditioning"
+            | "hiit"
+            | "speed_work"
+            | "game_prep"
+            | "long_run"
+            | "tempo"
+            | "easy"
+            | null;
+          notes?: string | null;
+          completed_at?: string | null;
+          duration_seconds?: number | null;
+          moving_duration_seconds?: number | null;
+          distance_meters?: number | null;
+          avg_pace_sec_per_km?: number | null;
+          best_pace_sec_per_km?: number | null;
+          elevation_gain_m?: number | null;
+          elevation_loss_m?: number | null;
+          avg_cadence_spm?: number | null;
+          estimated_calories?: number | null;
+          session_rpe?: number | null;
+          estimated_vo2max?: number | null;
+          session_load?: number | null;
+          zone_breakdown?: Json;
+          primary_zone?: string | null;
+          route_polyline?: string | null;
+          is_treadmill?: boolean;
+          map_bbox?: Json | null;
+        };
+      };
+      run_splits: {
+        Row: {
+          id: string;
+          run_session_id: string;
+          user_id: string;
+          split_number: number;
+          split_distance_meters: number;
+          duration_seconds: number;
+          pace_sec_per_km: number;
+          elevation_gain_m: number | null;
+          elevation_loss_m: number | null;
+          zone: string | null;
+          lat: number | null;
+          lng: number | null;
+          started_at: string;
+          completed_at: string;
+        };
+        Insert: {
+          id?: string;
+          run_session_id: string;
+          user_id: string;
+          split_number: number;
+          split_distance_meters: number;
+          duration_seconds: number;
+          pace_sec_per_km: number;
+          elevation_gain_m?: number | null;
+          elevation_loss_m?: number | null;
+          zone?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          started_at: string;
+          completed_at: string;
+        };
+        Update: {
+          split_number?: number;
+          split_distance_meters?: number;
+          duration_seconds?: number;
+          pace_sec_per_km?: number;
+          elevation_gain_m?: number | null;
+          elevation_loss_m?: number | null;
+          zone?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+        };
+      };
+      run_metrics: {
+        Row: {
+          id: string;
+          user_id: string;
+          week_start_date: string;
+          total_distance_meters: number;
+          total_duration_seconds: number;
+          total_runs: number;
+          run_load_this_week: number | null;
+          lift_load_this_week: number | null;
+          combined_load: number | null;
+          estimated_vo2max: number | null;
+          computed_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          week_start_date: string;
+          total_distance_meters?: number;
+          total_duration_seconds?: number;
+          total_runs?: number;
+          run_load_this_week?: number | null;
+          lift_load_this_week?: number | null;
+          combined_load?: number | null;
+          estimated_vo2max?: number | null;
+          computed_at?: string;
+        };
+        Update: {
+          week_start_date?: string;
+          total_distance_meters?: number;
+          total_duration_seconds?: number;
+          total_runs?: number;
+          run_load_this_week?: number | null;
+          lift_load_this_week?: number | null;
+          combined_load?: number | null;
+          estimated_vo2max?: number | null;
+          computed_at?: string;
+        };
+      };
     Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: Record<string, never>;

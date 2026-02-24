@@ -6,10 +6,7 @@ import Link from "next/link";
 import {
   Search,
   Settings,
-  Users,
   Video,
-  UsersRound,
-  User,
   Bell,
   Inbox,
   Sparkles,
@@ -104,6 +101,10 @@ export default function SocialPage() {
   }, [
     activeTab,
     currentUserId,
+    pingsUnread,
+    sharedUnread,
+    podInviteCount,
+    totalUnread,
     supabase,
   ]);
 
@@ -172,7 +173,9 @@ export default function SocialPage() {
 
   useEffect(() => {
     if (!searchQuery.trim()) {
-      setSearchResults([]);
+      queueMicrotask(() => {
+        setSearchResults([]);
+      });
       return;
     }
 

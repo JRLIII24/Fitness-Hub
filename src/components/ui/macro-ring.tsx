@@ -57,7 +57,6 @@ export function MacroRing({
   // Animate value on mount
   useEffect(() => {
     if (!animate) {
-      setAnimatedValue(value);
       return;
     }
 
@@ -103,7 +102,7 @@ export function MacroRing({
 
   const displayValue = showPercentage
     ? `${Math.round(percentage)}%`
-    : `${Math.round(animatedValue)}`;
+    : `${Math.round(animate ? animatedValue : value)}`;
 
   const valueDigits = displayValue.replace(/\D/g, "").length;
   const valueFontSize =

@@ -148,12 +148,13 @@ export async function computeAndCacheFatigueSnapshot(
     .not("weight_kg", "is", null)
     .order("completed_at", { ascending: false });
 
-  const compoundRows = (perfRows ?? []).filter((row: any) => {
-    const category = row?.exercises?.category;
+  const compoundRows = (perfRows ?? []).filter((row) => {
+    const exercise = Array.isArray(row?.exercises) ? row.exercises[0] : row?.exercises;
+    const category = exercise?.category;
     return typeof category === "string" && COMPOUND_CATEGORIES.has(category);
-  }) as any[];
+  });
 
-  const lifts = new Map<string, any[]>();
+  const lifts = new Map<string, typeof compoundRows>();
   for (const row of compoundRows) {
     const list = lifts.get(row.exercise_id) ?? [];
     list.push(row);
@@ -190,14 +191,12 @@ export async function computeAndCacheFatigueSnapshot(
     const topE1rm = e1rm(topSet.weight_kg, topSet.reps);
     const delta = (topE1rm - baselineMedian) / baselineMedian;
 
-    let isComparable = false;
     const baselineWithEffort = baselineCandidates.find(
       (r) => (r.rpe != null && topSet.rpe != null && Math.abs(r.rpe - topSet.rpe) <= 1) ||
              (r.rir != null && topSet.rir != null && Math.abs(r.rir - topSet.rir) <= 1)
     );
 
     if (baselineWithEffort) {
-      isComparable = true;
       comparableCount += 1;
     }
 

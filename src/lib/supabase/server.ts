@@ -1,8 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-// Note: Database type imported for reference. When Supabase project is connected,
-// regenerate with `supabase gen types typescript --db-only` to match @supabase/ssr v0.8.0 format
-import type { Database } from "@/types/database";
 
 export async function createClient() {
   const cookieStore = await cookies();

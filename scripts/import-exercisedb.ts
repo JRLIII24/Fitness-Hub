@@ -14,12 +14,10 @@ config({ path: resolve(__dirname, "../.env.local") });
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../src/types/database";
 import type {
-  ExerciseDBExercise,
   FreeExerciseDBExercise,
   InternalExercise,
 } from "../src/types/exercise-data";
 import {
-  normalizeExerciseDB,
   normalizeFreeExerciseDB,
   deduplicateExercises,
   validateExercise,
@@ -68,7 +66,7 @@ async function batchInsertExercises(exercises: InternalExercise[]): Promise<numb
     // The unique index will prevent duplicates automatically
     const { data, error } = await supabase
       .from("exercises")
-      .insert(batch as any)
+      .insert(batch as never[])
       .select("id");
 
     if (error) {
@@ -101,7 +99,7 @@ async function importExercises() {
     try {
       wrkoutData = await fetchJSON<FreeExerciseDBExercise[]>(WRKOUT_EXERCISES_URL);
       console.log(`✅ Fetched ${wrkoutData.length} exercises from wrkout/exercises.json\n`);
-    } catch (error) {
+    } catch {
       console.log(`⚠️  Could not fetch wrkout exercises (will continue with Free Exercise DB only)\n`);
     }
 

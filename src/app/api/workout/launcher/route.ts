@@ -12,7 +12,7 @@ import { computeLauncherWorkout, getAlternativeTemplates, logLauncherEvent } fro
  * GET /api/workout/launcher
  * Returns suggested workout based on user patterns
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
 

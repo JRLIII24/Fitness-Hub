@@ -25,7 +25,7 @@ function getDB() {
     return dbPromise;
 }
 
-export async function enqueueMutation(type: string, payload: any, idempotencyKey: string = crypto.randomUUID()) {
+export async function enqueueMutation(type: string, payload: unknown, idempotencyKey: string = crypto.randomUUID()) {
     const db = await getDB();
     if (!db) return;
     await db.put('mutations', {
@@ -61,7 +61,7 @@ export async function triggerSync() {
                 });
                 window.dispatchEvent(event);
             }
-        } catch (e) {
+        } catch {
             mutation.attempts += 1;
             mutation.lastAttemptAt = Date.now();
             await store.put(mutation);

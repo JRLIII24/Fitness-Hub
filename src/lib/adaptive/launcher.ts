@@ -4,7 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import type { LauncherPrediction, LauncherExercise, WorkoutFocus } from '@/types/adaptive';
+import type { LauncherPrediction, LauncherExercise } from '@/types/adaptive';
 
 interface WorkoutHistory {
   id: string;
@@ -12,6 +12,28 @@ interface WorkoutHistory {
   started_at: string;
   duration_mins: number;
   day_of_week: number;
+}
+
+interface TemplateExerciseQueryRow {
+  exercises:
+  | {
+    id: string;
+    name: string;
+    muscle_group: string;
+    equipment: string | null;
+  }
+  | Array<{
+    id: string;
+    name: string;
+    muscle_group: string;
+    equipment: string | null;
+  }>
+  | null;
+  template_exercise_sets?: Array<{
+    set_number?: number | null;
+    reps?: number | null;
+    weight_kg?: number | null;
+  }> | null;
 }
 
 /**
@@ -35,7 +57,7 @@ export async function computeLauncherWorkout(userId: string): Promise<LauncherPr
 
   if (error || !history || history.length === 0) {
     // No history: return preset template
-    return getPresetWorkout('full_body_compound');
+    return getPresetWorkout();
   }
 
   // Process history
@@ -86,7 +108,7 @@ export async function computeLauncherWorkout(userId: string): Promise<LauncherPr
   }
 
   // Strategy 3: Fallback to preset
-  return getPresetWorkout('full_body_compound');
+  return getPresetWorkout();
 }
 
 /**
@@ -108,17 +130,21 @@ async function getTemplateExercises(templateId: string): Promise<LauncherExercis
 
   if (!templateExercises) return [];
 
-  return templateExercises.map((te: any) => ({
-    exercise: {
-      id: te.exercises.id,
-      name: te.exercises.name,
-      muscle_group: te.exercises.muscle_group,
-      equipment: te.exercises.equipment
-    },
-    target_sets: te.template_exercise_sets?.length || 3,
-    target_reps: te.template_exercise_sets?.[0]?.reps || 10,
-    target_weight_kg: te.template_exercise_sets?.[0]?.weight_kg || null
-  }));
+  return (templateExercises as TemplateExerciseQueryRow[]).flatMap((te) => {
+    const exercise = Array.isArray(te.exercises) ? te.exercises[0] : te.exercises;
+    if (!exercise) return [];
+    return [{
+      exercise: {
+        id: exercise.id,
+        name: exercise.name,
+        muscle_group: exercise.muscle_group,
+        equipment: exercise.equipment
+      },
+      target_sets: te.template_exercise_sets?.length ?? 3,
+      target_reps: te.template_exercise_sets?.[0]?.reps ?? 10,
+      target_weight_kg: te.template_exercise_sets?.[0]?.weight_kg ?? null
+    }];
+  });
 }
 
 /**
@@ -138,7 +164,7 @@ async function getTemplateName(templateId: string): Promise<string> {
 /**
  * Get preset workout (for new users)
  */
-async function getPresetWorkout(preset: string): Promise<LauncherPrediction> {
+async function getPresetWorkout(): Promise<LauncherPrediction> {
   const supabase = await createClient();
 
   // Get common exercises for full body compound
@@ -245,7 +271,7 @@ export async function getAlternativeTemplates(userId: string, limit: number = 3)
 export async function logLauncherEvent(
   userId: string,
   eventType: 'launcher_shown' | 'launcher_accepted' | 'launcher_rejected',
-  properties: Record<string, any>
+  properties: Record<string, unknown>
 ) {
   const supabase = await createClient();
 

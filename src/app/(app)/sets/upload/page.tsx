@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { ArrowLeft, Camera, Upload, Video, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -205,9 +206,12 @@ export default function UploadClipPage() {
           <div className="flex items-center gap-3">
             <div className="relative w-16 h-[107px] rounded-lg overflow-hidden bg-black shrink-0 border border-border/60">
               {thumbnailPreview ? (
-                <img
+                <Image
                   src={thumbnailPreview}
                   alt="Thumbnail preview"
+                  fill
+                  sizes="64px"
+                  unoptimized
                   className="w-full h-full object-cover"
                 />
               ) : (

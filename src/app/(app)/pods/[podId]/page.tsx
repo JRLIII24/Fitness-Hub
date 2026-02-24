@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, UserPlus, Target, MessageSquare, Trash2, LogOut, Loader2 } from "lucide-react";
+import { ArrowLeft, UserPlus, Target, MessageSquare, Trash2, LogOut } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ interface PageProps {
 export default function PodDetailPage({ params }: PageProps) {
   const { podId } = use(params);
   const router = useRouter();
-  const { pod, loading, error, refetch, inviteMember, setCommitment, sendMessage, leavePod, deletePod } = usePodDetail(podId);
+  const { pod, loading, error, inviteMember, setCommitment, sendMessage, leavePod, deletePod } = usePodDetail(podId);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -165,7 +165,7 @@ export default function PodDetailPage({ params }: PageProps) {
 
       {/* Member Progress */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">This Week's Progress</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground">This Week&apos;s Progress</h2>
         {pod.members_progress.map((member) => {
           const isCurrentUser = member.user_id === currentUserId;
           return (

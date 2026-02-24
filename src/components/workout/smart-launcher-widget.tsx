@@ -53,7 +53,7 @@ export function SmartLauncherWidget() {
         }
 
         // Check cache first
-        const cached = await getCachedPrediction(user.id);
+        const cached = await getCachedPrediction(user.id) as LauncherResponse | null;
         if (cached) {
           console.log('[Launcher] Serving from cache');
           setData(cached);
@@ -69,7 +69,7 @@ export function SmartLauncherWidget() {
         }
         if (!res.ok) throw new Error("Failed to load launcher");
 
-        const json = await res.json();
+        const json = await res.json() as LauncherResponse;
 
         // Update cache with fresh data
         setData(json);

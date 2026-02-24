@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { ChevronDown, Plus, Zap, TrendingUp, Target } from "lucide-react";
 import type { Exercise } from "@/types/workout";
 import { Button } from "@/components/ui/button";
@@ -153,10 +154,12 @@ export function ExerciseSelectionCard({
 
         {showPoster ? (
           posterUrl || (!isVideo && mediaUrl) ? (
-            <img
+            <Image
               src={posterUrl ?? mediaUrl ?? ""}
               alt={exercise.name}
-              loading="lazy"
+              fill
+              sizes="(min-width: 768px) 22rem, 100vw"
+              unoptimized
               className={cn(
                 "h-full w-full object-cover transition-opacity duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
                 mediaLoaded ? "opacity-100" : "opacity-0"

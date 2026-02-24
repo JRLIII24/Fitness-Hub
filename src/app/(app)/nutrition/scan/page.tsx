@@ -485,7 +485,7 @@ function BarcodeScanner({
         setCameraError("Could not access camera. Try using the barcode input below.");
       }
     }
-  }, [lookupBarcode]);
+  }, [lookupBarcode, cameraActive]);
 
   const stopCamera = useCallback(() => {
     if (quaggaRef.current) {

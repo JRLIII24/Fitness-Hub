@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { toast } from "sonner";
 import { ChevronDown, Clock3, NotebookPen, Plus, Save, X, LayoutList, Dumbbell, Layers, CircleCheck, Activity, Zap, Send, Pencil, Copy, Trash2, Heart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -167,15 +168,24 @@ function isMissingTableError(error: unknown): boolean {
   );
 }
 
-function formatElapsed(startedAt: string) {
-  const elapsedMs = Date.now() - new Date(startedAt).getTime();
+function ElapsedTime({ startedAt, className }: { startedAt: string; className?: string }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const elapsedMs = now - new Date(startedAt).getTime();
   const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
   const hrs = Math.floor(totalSeconds / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
   const secs = totalSeconds % 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
 
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+  return <span className={className}>{`${pad(hrs)}:${pad(mins)}:${pad(secs)}`}</span>;
 }
 
 function slugify(value: string) {
@@ -303,27 +313,12 @@ export default function WorkoutPage() {
     setExerciseNote,
     setWorkoutNote,
     updateWorkoutName,
-    editingWorkoutId,
   } = useWorkoutStore();
 
   const startTimer = useTimerStore((state) => state.startTimer);
   const getActiveTimers = useTimerStore((state) => state.getActiveTimers);
   const stopTimer = useTimerStore((state) => state.stopTimer);
   const { sendTemplate } = useSharedItems(userId);
-
-  // Workout duration timer - force re-render every second to update elapsed time
-  const [workoutDurationTick, setWorkoutDurationTick] = useState(0);
-
-  useEffect(() => {
-    if (!isWorkoutActive) return;
-
-    // Update every second for smooth duration display
-    const interval = setInterval(() => {
-      setWorkoutDurationTick((prev) => prev + 1);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isWorkoutActive]);
 
   const allExercises = useMemo(
     () => [...customExercises, ...apiExercises],
@@ -349,10 +344,16 @@ export default function WorkoutPage() {
   }, [liftSearch, filteredByMuscleGroup]);
 
   const groupCounts = useMemo(() => {
-    const counts: Partial<Record<MuscleGroup, number>> = {};
-    for (const group of MUSCLE_GROUPS) {
-      counts[group] = allExercises.filter((exercise) => exercise.muscle_group === group).length;
+    const counts: Partial<Record<MuscleGroup, number>> = Object.fromEntries(
+      MUSCLE_GROUPS.map((group) => [group, 0])
+    ) as Partial<Record<MuscleGroup, number>>;
+
+    for (const exercise of allExercises) {
+      const key = exercise.muscle_group as MuscleGroup;
+      if (counts[key] == null) continue;
+      counts[key] = (counts[key] ?? 0) + 1;
     }
+
     return counts;
   }, [allExercises]);
 
@@ -396,9 +397,6 @@ export default function WorkoutPage() {
     plannerStats.totalSets > 0
       ? Math.min(100, Math.round((plannerStats.completedSets / plannerStats.totalSets) * 100))
       : 0;
-
-  const activeTemplateId = activeWorkout?.template_id ?? null;
-  const activeWorkoutName = activeWorkout?.name ?? null;
 
   const loadTemplates = useCallback(async (currentUserId: string) => {
     setLoadingTemplates(true);
@@ -620,12 +618,31 @@ export default function WorkoutPage() {
         return;
       }
 
-      const rows = (completedSets ?? [])
-        .filter((row: any) => row?.workout_sessions?.completed_at != null)
-        .filter((row: any) => row?.session_id != null && row?.set_number != null)
-        .sort((a: any, b: any) => {
-          const aCompleted = new Date(a.workout_sessions.completed_at).getTime();
-          const bCompleted = new Date(b.workout_sessions.completed_at).getTime();
+      type WorkoutSessionLink = { completed_at: string | null };
+      type CompletedSetRow = {
+        exercise_id: string;
+        set_number: number | null;
+        reps: number | null;
+        weight_kg: number | null;
+        session_id: string;
+        workout_sessions: WorkoutSessionLink | WorkoutSessionLink[] | null;
+      };
+
+      const rows = ((completedSets ?? []) as CompletedSetRow[])
+        .map((row) => {
+          const session = Array.isArray(row.workout_sessions)
+            ? row.workout_sessions[0]
+            : row.workout_sessions;
+          return {
+            ...row,
+            completed_at: session?.completed_at ?? null,
+          };
+        })
+        .filter((row) => row.completed_at != null)
+        .filter((row) => row.session_id != null && row.set_number != null)
+        .sort((a, b) => {
+          const aCompleted = new Date(a.completed_at ?? 0).getTime();
+          const bCompleted = new Date(b.completed_at ?? 0).getTime();
           if (aCompleted !== bCompleted) return bCompleted - aCompleted;
           const sessionCmp = String(b.session_id).localeCompare(String(a.session_id));
           if (sessionCmp !== 0) return sessionCmp;
@@ -652,7 +669,7 @@ export default function WorkoutPage() {
           detailedByExercise[row.exercise_id] = [];
         }
         detailedByExercise[row.exercise_id].push({
-          setNumber: row.set_number,
+          setNumber: row.set_number ?? 0,
           reps: row.reps ?? null,
           weight: row.weight_kg ?? null,
         });
@@ -733,8 +750,6 @@ export default function WorkoutPage() {
     if (!fromLauncher && !fromAdaptive) return;
 
     const templateId = searchParams.get('template_id');
-    const volumeAdj = fromAdaptive ? parseFloat(searchParams.get('volume_adj') || '0') : 0;
-
     // Auto-start the workout
     async function autoStart() {
       setHasAutoStarted(true);
@@ -1410,7 +1425,7 @@ export default function WorkoutPage() {
       const ghostSetByNumber = new Map(ghostSets.map((gs) => [gs.setNumber, gs]));
       let beatGhostForExercise = false;
 
-      const setsWithPRFlags = exerciseBlock.sets.map((set, setIndex) => {
+      const setsWithPRFlags = exerciseBlock.sets.map((set) => {
         let isPR = false;
 
         if (set.completed && previousBest) {
@@ -2051,7 +2066,7 @@ export default function WorkoutPage() {
                 </div>
                 <div className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
                   <Clock3 className="size-4" />
-                  {formatElapsed(activeWorkout.started_at)}
+                  <ElapsedTime startedAt={activeWorkout.started_at} />
                 </div>
               </div>
 
@@ -2101,7 +2116,7 @@ export default function WorkoutPage() {
                 />
                 <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
                   <Clock3 className="size-4" />
-                  {formatElapsed(activeWorkout.started_at)}
+                  <ElapsedTime startedAt={activeWorkout.started_at} />
                 </span>
               </div>
               {activeWorkout.template_id ? (
@@ -2209,9 +2224,12 @@ export default function WorkoutPage() {
                 <div className="rounded-xl border border-border/70 bg-card/80 p-3">
                   <div className="flex items-center gap-3">
                     {selectedExerciseMediaUrl ? (
-                      <img
+                      <Image
                         src={selectedExerciseMediaUrl}
                         alt={selectedExercise.name}
+                        width={64}
+                        height={64}
+                        unoptimized
                         className="size-16 rounded-md object-cover bg-muted shrink-0"
                       />
                     ) : (

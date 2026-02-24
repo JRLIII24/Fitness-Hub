@@ -29,15 +29,6 @@ function normalizeMediaUrl(url: string | null | undefined, source?: string | nul
   return null;
 }
 
-interface SearchParams {
-  query?: string;
-  muscle_group?: string;
-  equipment?: string;
-  category?: string;
-  source?: string;
-  limit?: string;
-}
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

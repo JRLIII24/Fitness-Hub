@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Flame, Snowflake, Trophy } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,17 +39,19 @@ export function StreakBadge({
   className,
 }: StreakBadgeProps) {
   const [showMilestoneNotification, setShowMilestoneNotification] = useState<number | null>(null);
-  const [previousMilestones, setPreviousMilestones] = useState<number[]>(milestonesUnlocked);
+  const previousMilestonesRef = useRef<number[]>(milestonesUnlocked);
 
   // Detect new milestone unlocks
   useEffect(() => {
     const newMilestones = milestonesUnlocked.filter(
-      (m) => !previousMilestones.includes(m)
+      (m) => !previousMilestonesRef.current.includes(m)
     );
 
     if (newMilestones.length > 0) {
       const latestMilestone = Math.max(...newMilestones);
-      setShowMilestoneNotification(latestMilestone);
+      queueMicrotask(() => {
+        setShowMilestoneNotification(latestMilestone);
+      });
 
       // Confetti celebration
       confetti({
@@ -63,10 +65,9 @@ export function StreakBadge({
       setTimeout(() => {
         setShowMilestoneNotification(null);
       }, 5000);
-
-      setPreviousMilestones(milestonesUnlocked);
     }
-  }, [milestonesUnlocked, previousMilestones]);
+    previousMilestonesRef.current = milestonesUnlocked;
+  }, [milestonesUnlocked]);
 
   const nextMilestone = [7, 30, 100, 365].find((m) => m > currentStreak) ?? null;
   const daysToNext = nextMilestone ? nextMilestone - currentStreak : null;

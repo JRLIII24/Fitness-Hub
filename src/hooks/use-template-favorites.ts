@@ -10,7 +10,9 @@ export function useTemplateFavorites(userId: string | null) {
 
   useEffect(() => {
     if (!userId) return;
-    setLoading(true);
+    queueMicrotask(() => {
+      setLoading(true);
+    });
     supabase
       .from("template_favorites")
       .select("template_id")

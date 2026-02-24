@@ -58,23 +58,19 @@ function applyThemeClass(theme: AppTheme) {
 
 export function useAppTheme(userId: string | null) {
   const supabase = useSupabase();
-  const [appTheme, setAppThemeState] = useState<AppTheme>("default");
+  const [appTheme, setAppThemeState] = useState<AppTheme>(() => readStoredTheme() ?? "default");
   const [canPersistTheme, setCanPersistTheme] = useState(true);
   const lastLocalThemeChangeAt = useRef(0);
-  const appThemeRef = useRef<AppTheme>("default");
+  const appThemeRef = useRef<AppTheme>(appTheme);
 
   useEffect(() => {
     appThemeRef.current = appTheme;
   }, [appTheme]);
 
-  // Apply from localStorage immediately on mount (no flash)
+  // Keep class synchronized with the current in-memory theme.
   useEffect(() => {
-    const stored = readStoredTheme();
-    if (stored) {
-      setAppThemeState(stored);
-      applyThemeClass(stored);
-    }
-  }, []);
+    applyThemeClass(appTheme);
+  }, [appTheme]);
 
   // Sync from DB once userId is known
   useEffect(() => {

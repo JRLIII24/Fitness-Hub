@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect } from "react";
 import { ClipPlayer } from "./clip-player";
 import { ClipCommentSheet } from "./clip-comment-sheet";
 import type { WorkoutClip } from "@/hooks/use-clips";
@@ -42,6 +42,7 @@ export function ClipFeed({
   const viewedClipIdsRef = useRef<Set<string>>(new Set());
   const supabase = useSupabase();
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: hasMore ? clips.length + 1 : clips.length,
     getScrollElement: () => containerRef.current,
@@ -63,7 +64,7 @@ export function ClipFeed({
     if (hasMore && !loading && lastItem && lastItem.index >= clips.length) {
       onLoadMore();
     }
-  }, [virtualizer.getVirtualItems(), activeIndex, clips.length, hasMore, loading, onLoadMore]);
+  }, [virtualizer, activeIndex, clips.length, hasMore, loading, onLoadMore]);
 
   useEffect(() => {
     const activeClip = clips[activeIndex];

@@ -45,7 +45,9 @@ export function usePings(userId: string | null) {
   }, [userId, supabase]);
 
   useEffect(() => {
-    fetchPings();
+    queueMicrotask(() => {
+      void fetchPings();
+    });
   }, [fetchPings]);
 
   // Realtime subscription for new pings
@@ -63,7 +65,9 @@ export function usePings(userId: string | null) {
           filter: `recipient_id=eq.${userId}`,
         },
         () => {
-          fetchPings();
+          queueMicrotask(() => {
+            void fetchPings();
+          });
         }
       )
       .subscribe();

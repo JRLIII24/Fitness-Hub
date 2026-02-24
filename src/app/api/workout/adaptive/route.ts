@@ -11,7 +11,7 @@ import { generateAdaptiveWorkout } from '@/lib/adaptive/workout-generator';
  * GET /api/workout/adaptive
  * Returns adaptive workout based on current fatigue analysis
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient();
 

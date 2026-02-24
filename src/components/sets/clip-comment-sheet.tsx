@@ -42,10 +42,15 @@ export function ClipCommentSheet({
 
   useEffect(() => {
     if (!clipId) {
-      setComments([]);
+      queueMicrotask(() => {
+        setComments([]);
+        setLoading(false);
+      });
       return;
     }
-    setLoading(true);
+    queueMicrotask(() => {
+      setLoading(true);
+    });
     fetchComments(clipId).then((data) => {
       setComments(data);
       setLoading(false);
@@ -56,12 +61,16 @@ export function ClipCommentSheet({
   // Check mutual follow when sheet opens
   useEffect(() => {
     if (!clipId || !currentUserId || !clipOwnerId) {
-      setCanComment(null);
+      queueMicrotask(() => {
+        setCanComment(null);
+      });
       return;
     }
     // Can't comment on your own clip
     if (currentUserId === clipOwnerId) {
-      setCanComment(false);
+      queueMicrotask(() => {
+        setCanComment(false);
+      });
       return;
     }
     (async () => {

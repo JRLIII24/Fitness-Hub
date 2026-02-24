@@ -223,7 +223,7 @@ export function SharedItemCard({
             </div>
           </div>
           {item.message && (
-            <p className="text-xs text-muted-foreground italic">"{item.message}"</p>
+            <p className="text-xs text-muted-foreground italic">&quot;{item.message}&quot;</p>
           )}
           <div className="grid grid-cols-2 gap-2 pt-1">
             <Button
@@ -334,7 +334,7 @@ export function SharedItemCard({
         })}
 
         {item.message && (
-          <p className="text-xs text-muted-foreground italic">"{item.message}"</p>
+          <p className="text-xs text-muted-foreground italic">&quot;{item.message}&quot;</p>
         )}
 
         <Button

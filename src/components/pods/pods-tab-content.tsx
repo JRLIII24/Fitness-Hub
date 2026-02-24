@@ -133,7 +133,7 @@ export function PodsTabContent({ onInviteUpdate }: PodsTabContentProps) {
             <ul className="text-muted-foreground space-y-1 text-xs list-disc list-inside">
               <li>Create or join groups of 2-8 members</li>
               <li>Set weekly workout commitments together</li>
-              <li>Track each other's progress</li>
+              <li>Track each other&apos;s progress</li>
               <li>Send encouragement messages</li>
             </ul>
           </div>

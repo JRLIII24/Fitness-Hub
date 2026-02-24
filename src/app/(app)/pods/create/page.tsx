@@ -125,7 +125,7 @@ export default function CreatePodPage() {
             <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
               <p className="font-semibold">What happens next?</p>
               <ul className="text-muted-foreground space-y-1 list-disc list-inside">
-                <li>You'll be added as the first member</li>
+                <li>You&apos;ll be added as the first member</li>
                 <li>Invite up to 7 more people</li>
                 <li>Set weekly workout goals together</li>
                 <li>Send encouragement messages</li>

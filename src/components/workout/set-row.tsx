@@ -108,10 +108,6 @@ export function SetRow({
     }
   };
 
-  const previousScore =
-    previousSet?.weight != null && previousSet.reps != null
-      ? previousSet.weight * previousSet.reps
-      : null;
   const currentScore =
     set.weight_kg != null && set.reps != null ? set.weight_kg * set.reps : null;
 
@@ -150,8 +146,6 @@ export function SetRow({
     set.weight_kg === ghostSet.weight &&
     set.reps > ghostSet.reps;
   const beatGhost = Boolean(ghostWeightPR || ghostRepPRAtSameWeight);
-  const matchedGhost =
-    ghostScore != null && currentScore != null && currentScore === ghostScore;
   const ghostPercentage =
     ghostScore != null && currentScore != null && ghostScore > 0
       ? Math.round((currentScore / ghostScore) * 100)

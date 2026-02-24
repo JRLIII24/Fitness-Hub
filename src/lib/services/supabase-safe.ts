@@ -8,7 +8,7 @@ export type MutationResult<T> =
  * Wraps a Supabase async call with robust error handling.
  */
 export async function safeSupabaseCall<T>(
-    promise: PromiseLike<{ data: T | null; error: any }>
+    promise: PromiseLike<{ data: T | null; error: unknown }>
 ): Promise<MutationResult<T>> {
     try {
         const { data, error } = await promise;

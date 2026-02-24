@@ -94,14 +94,12 @@ export function applyAccentColor(color: string | null) {
 
 export function useAccentColor(enabled = true, userId?: string | null) {
   const supabase = useSupabase();
-  const [accentColor, setAccentColorState] = useState<string | null>(null);
+  const [accentColor, setAccentColorState] = useState<string | null>(() => readStoredAccentColor());
   const [canPersistAccent, setCanPersistAccent] = useState(true);
 
   useEffect(() => {
-    const stored = readStoredAccentColor();
-    setAccentColorState(stored);
-    applyAccentColor(enabled ? stored : null);
-  }, [enabled]);
+    applyAccentColor(enabled ? accentColor : null);
+  }, [enabled, accentColor]);
 
   useEffect(() => {
     if (!userId || !canPersistAccent) return;

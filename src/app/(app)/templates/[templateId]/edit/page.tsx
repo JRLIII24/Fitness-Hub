@@ -9,9 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, ChevronLeft, Trash2, Plus, Share2 } from "lucide-react";
+import { Loader2, ChevronLeft, Trash2, Plus, Globe } from "lucide-react";
 import { AddExerciseToTemplateDialog } from "@/components/workout/add-exercise-to-template-dialog";
 import { Switch } from "@/components/ui/switch";
+import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
+
+// Category options — all filter values except "All"
+const CATEGORY_OPTIONS = MUSCLE_FILTERS.filter(f => f !== "All");
 
 interface TemplateExercise {
   id: string;
@@ -38,7 +42,8 @@ interface Template {
   id: string;
   name: string;
   description: string | null;
-  is_shared: boolean;
+  is_public: boolean;
+  primary_muscle_group: string | null;
   template_exercises: TemplateExercise[];
 }
 
@@ -53,8 +58,9 @@ export default function EditTemplatePage() {
   const [template, setTemplate] = useState<Template | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [isShared, setIsShared] = useState(false);
-  const [togglingShare, setTogglingShare] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
+  const [togglingPublic, setTogglingPublic] = useState(false);
+  const [primaryMuscleGroup, setPrimaryMuscleGroup] = useState<string | null>(null);
   const [addExerciseOpen, setAddExerciseOpen] = useState(false);
 
   useEffect(() => {
@@ -63,11 +69,11 @@ export default function EditTemplatePage() {
         const { data, error } = await supabase
           .from("workout_templates")
           .select(
-            `id,name,description,is_shared,
+            `id, name, description, is_public, primary_muscle_group,
             template_exercises(
-              id,exercise_id,sort_order,
-              exercises(id,name,muscle_group,equipment),
-              template_exercise_sets(id,set_number,reps,weight_kg,duration_seconds,set_type,rest_seconds)
+              id, exercise_id, sort_order,
+              exercises(id, name, muscle_group, equipment),
+              template_exercise_sets(id, set_number, reps, weight_kg, duration_seconds, set_type, rest_seconds)
             )`
           )
           .eq("id", templateId)
@@ -84,10 +90,12 @@ export default function EditTemplatePage() {
           return;
         }
 
-        setTemplate(data as unknown as Template);
-        setName(data.name);
-        setDescription(data.description || "");
-        setIsShared((data as unknown as Template).is_shared ?? false);
+        const t = data as unknown as Template;
+        setTemplate(t);
+        setName(t.name);
+        setDescription(t.description || "");
+        setIsPublic(t.is_public ?? false);
+        setPrimaryMuscleGroup(t.primary_muscle_group ?? null);
       } finally {
         setLoading(false);
       }
@@ -104,6 +112,7 @@ export default function EditTemplatePage() {
         .update({
           name: name.trim(),
           description: description.trim() || null,
+          primary_muscle_group: primaryMuscleGroup,
         })
         .eq("id", templateId);
 
@@ -119,20 +128,25 @@ export default function EditTemplatePage() {
     }
   }
 
-  async function handleShareToggle(newValue: boolean) {
-    setTogglingShare(true);
+  async function handlePublishToggle(newValue: boolean) {
+    // Must have a category set before publishing
+    if (newValue && !primaryMuscleGroup) {
+      toast.error("Please select a category before publishing to the marketplace.");
+      return;
+    }
+    setTogglingPublic(true);
     try {
       const { error } = await supabase
         .from("workout_templates")
-        .update({ is_shared: newValue })
+        .update({ is_public: newValue })
         .eq("id", templateId);
       if (error) throw error;
-      setIsShared(newValue);
-      toast.success(newValue ? "Template is now public" : "Template is now private");
+      setIsPublic(newValue);
+      toast.success(newValue ? "Template published to marketplace" : "Template removed from marketplace");
     } catch {
-      toast.error("Failed to update sharing");
+      toast.error("Failed to update visibility");
     } finally {
-      setTogglingShare(false);
+      setTogglingPublic(false);
     }
   }
 
@@ -140,7 +154,6 @@ export default function EditTemplatePage() {
     if (!confirm("Remove this exercise from the template?")) return;
 
     try {
-      // Delete the template exercise and its sets
       const { error } = await supabase
         .from("template_exercises")
         .delete()
@@ -170,14 +183,12 @@ export default function EditTemplatePage() {
     sets: Array<{ reps: number | null; weight_kg: number | null }>
   ) {
     try {
-      // Get the next sort order
       const maxSortOrder =
         Math.max(
           ...template!.template_exercises.map((e) => e.sort_order),
           0
         ) + 1;
 
-      // Insert template exercise
       const { data: templateExerciseData, error: teError } = await supabase
         .from("template_exercises")
         .insert({
@@ -186,14 +197,13 @@ export default function EditTemplatePage() {
           sort_order: maxSortOrder,
         })
         .select(
-          `id,exercise_id,sort_order,
-          exercises(id,name,muscle_group,equipment)`
+          `id, exercise_id, sort_order,
+          exercises(id, name, muscle_group, equipment)`
         )
         .single();
 
       if (teError) throw teError;
 
-      // Insert sets
       const setRows = sets.map((s, idx) => ({
         template_exercise_id: templateExerciseData.id,
         set_number: idx + 1,
@@ -206,27 +216,23 @@ export default function EditTemplatePage() {
         const { error: setsError } = await supabase
           .from("template_exercise_sets")
           .insert(setRows);
-
         if (setsError) throw setsError;
       }
 
-      // Reload template
       const { data } = await supabase
         .from("workout_templates")
         .select(
-          `id,name,description,
+          `id, name, description, is_public, primary_muscle_group,
           template_exercises(
-            id,exercise_id,sort_order,
-            exercises(id,name,muscle_group,equipment),
-            template_exercise_sets(id,set_number,reps,weight_kg,duration_seconds,set_type,rest_seconds)
+            id, exercise_id, sort_order,
+            exercises(id, name, muscle_group, equipment),
+            template_exercise_sets(id, set_number, reps, weight_kg, duration_seconds, set_type, rest_seconds)
           )`
         )
         .eq("id", templateId)
         .single();
 
-      if (data) {
-        setTemplate(data as unknown as Template);
-      }
+      if (data) setTemplate(data as unknown as Template);
 
       toast.success("Exercise added to template");
       setAddExerciseOpen(false);
@@ -284,12 +290,12 @@ export default function EditTemplatePage() {
         <h1 className="text-2xl font-bold">Edit Template</h1>
       </div>
 
-      {/* Template Details */}
+      {/* ── Template Details ───────────────────────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle>Template Details</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="name">Template Name</Label>
             <Input
@@ -299,6 +305,7 @@ export default function EditTemplatePage() {
               placeholder="Template name"
             />
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="description">Description (optional)</Label>
             <Textarea
@@ -310,27 +317,67 @@ export default function EditTemplatePage() {
             />
           </div>
 
-          {/* Share toggle */}
+          {/* ── Category ──────────────────────────────────────────────── */}
+          <div className="space-y-2.5">
+            <Label>
+              Category
+              <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                (required to publish to marketplace)
+              </span>
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_OPTIONS.map((cat) => {
+                const val = cat.toLowerCase();
+                const on  = primaryMuscleGroup === val;
+                const gc  = getMuscleColor(val);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setPrimaryMuscleGroup(on ? null : val)}
+                    className="rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all duration-150"
+                    style={{
+                      background:   on ? gc.bgAlpha      : "rgba(255,255,255,0.04)",
+                      border:       `1px solid ${on ? gc.borderAlpha : "rgba(255,255,255,0.1)"}`,
+                      color:        on ? gc.labelColor   : "hsl(var(--muted-foreground))",
+                      fontWeight:   on ? 700 : 500,
+                    }}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+            {!primaryMuscleGroup && (
+              <p className="text-[11px] text-muted-foreground">
+                Select a category so users can find this template by muscle group.
+              </p>
+            )}
+          </div>
+
+          {/* ── Publish to Marketplace ────────────────────────────────── */}
           <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
             <div className="flex items-center gap-2">
-              <Share2 className="size-4 text-muted-foreground" />
+              <Globe className="size-4 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">Share Template</p>
+                <p className="text-sm font-medium">Publish to Marketplace</p>
                 <p className="text-xs text-muted-foreground">
-                  Make this template visible to other users
+                  {primaryMuscleGroup
+                    ? "Let the community discover and import your template"
+                    : "Select a category above to enable publishing"}
                 </p>
               </div>
             </div>
             <Switch
-              checked={isShared}
-              onCheckedChange={handleShareToggle}
-              disabled={togglingShare}
+              checked={isPublic}
+              onCheckedChange={handlePublishToggle}
+              disabled={togglingPublic || (!isPublic && !primaryMuscleGroup)}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Exercises */}
+      {/* ── Exercises ─────────────────────────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Exercises</h2>
@@ -404,7 +451,7 @@ export default function EditTemplatePage() {
         )}
       </div>
 
-      {/* Action Buttons */}
+      {/* ── Action Buttons ────────────────────────────────────────────── */}
       <div className="grid gap-3">
         <Button onClick={handleSave} disabled={saving} size="lg">
           {saving ? (

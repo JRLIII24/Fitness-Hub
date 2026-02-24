@@ -12,6 +12,7 @@ import { EditTemplateDialog } from "@/components/workout/edit-template-dialog";
 import { SendTemplateDialog } from "@/components/social/send-template-dialog";
 import { useSharedItems, type TemplateSnapshot } from "@/hooks/use-shared-items";
 import { useTemplateFavorites } from "@/hooks/use-template-favorites";
+import { getMuscleColor } from "@/components/marketplace/muscle-colors";
 
 interface WorkoutTemplate {
   id: string;
@@ -20,6 +21,7 @@ interface WorkoutTemplate {
   description: string | null;
   color: string | null;
   estimated_duration_min: number | null;
+  primary_muscle_group: string | null;
   save_count?: number;
   created_at?: string;
   updated_at?: string;
@@ -125,7 +127,7 @@ export default function TemplatesPage() {
     setEditDialogOpen(true);
   }
 
-  async function handleEditSave(updates: { name: string; description: string | null }) {
+  async function handleEditSave(updates: { name: string; description: string | null; primary_muscle_group: string | null }) {
     if (!editingTemplate) return;
 
     try {
@@ -134,6 +136,7 @@ export default function TemplatesPage() {
         .update({
           name: updates.name,
           description: updates.description,
+          primary_muscle_group: updates.primary_muscle_group,
         })
         .eq("id", editingTemplate.id);
 
@@ -142,7 +145,7 @@ export default function TemplatesPage() {
       setTemplates((prev) =>
         prev.map((t) =>
           t.id === editingTemplate.id
-            ? { ...t, name: updates.name, description: updates.description }
+            ? { ...t, name: updates.name, description: updates.description, primary_muscle_group: updates.primary_muscle_group }
             : t
         )
       );
@@ -239,12 +242,30 @@ export default function TemplatesPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {templates.map((template) => (
+          {templates.map((template) => {
+            const gc = template.primary_muscle_group
+              ? getMuscleColor(template.primary_muscle_group)
+              : null;
+            return (
             <Card key={template.id}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <CardTitle className="text-base">{template.name}</CardTitle>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                      <CardTitle className="text-base">{template.name}</CardTitle>
+                      {gc && template.primary_muscle_group && (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[10px] font-bold capitalize"
+                          style={{
+                            background: gc.bgAlpha,
+                            color:      gc.labelColor,
+                            border:     `1px solid ${gc.borderAlpha}`,
+                          }}
+                        >
+                          {template.primary_muscle_group.replace(/_/g, " ")}
+                        </span>
+                      )}
+                    </div>
                     {template.description && (
                       <p className="mt-1 text-xs text-muted-foreground">
                         {template.description}
@@ -252,7 +273,7 @@ export default function TemplatesPage() {
                     )}
                     {template.estimated_duration_min && (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Est. duration: {template.estimated_duration_min} min
+                        Est. {template.estimated_duration_min} min
                       </p>
                     )}
                     {(template.save_count ?? 0) > 0 && (
@@ -314,7 +335,8 @@ export default function TemplatesPage() {
                 </div>
               </CardHeader>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

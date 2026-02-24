@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import { Pencil, Trash2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { usePrimaryColor } from "@/hooks/use-primary-color";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/page-header";
+import { HistoryNav } from "@/components/history/history-nav";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +52,7 @@ function dayKey(date: Date) {
 export default function HistoryPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const primaryColor = usePrimaryColor();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
@@ -190,17 +193,17 @@ export default function HistoryPage() {
       prev.map((session) =>
         session.id === targetSession.id
           ? {
-              ...session,
-              started_at: updatePayload.started_at,
-              completed_at:
-                updatePayload.completed_at === undefined
-                  ? session.completed_at
-                  : updatePayload.completed_at,
-              duration_seconds:
-                updatePayload.duration_seconds === undefined
-                  ? session.duration_seconds
-                  : updatePayload.duration_seconds,
-            }
+            ...session,
+            started_at: updatePayload.started_at,
+            completed_at:
+              updatePayload.completed_at === undefined
+                ? session.completed_at
+                : updatePayload.completed_at,
+            duration_seconds:
+              updatePayload.duration_seconds === undefined
+                ? session.duration_seconds
+                : updatePayload.duration_seconds,
+          }
           : session
       )
     );
@@ -213,10 +216,13 @@ export default function HistoryPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-4 px-4 pt-6 pb-28 md:px-6 lg:px-10">
-      <PageHeader
-        title="History"
-        subtitle="Calendar + daily logs with templates, muscle groups, reps, and sets."
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <PageHeader
+          title="History"
+          subtitle="Calendar + daily logs with templates, muscle groups, reps, and sets."
+        />
+        <HistoryNav />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
         <Card className="h-fit max-w-3xl">
@@ -224,15 +230,37 @@ export default function HistoryPage() {
             <CardTitle>Workout Calendar</CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <DayPicker
-              mode="single"
-              selected={selectedDay}
-              onSelect={(day) => {
-                if (day) setSelectedDay(day);
-              }}
-              modifiers={{ workedOut: workoutDays }}
-              modifiersClassNames={{ workedOut: "bg-primary/20 rounded-md font-semibold" }}
-            />
+            <div
+              style={
+                {
+                  "--rdp-accent-color": primaryColor,
+                  "--rdp-today-color": primaryColor,
+                  "--rdp-day_button-height": "38px",
+                  "--rdp-day_button-width": "38px",
+                } as React.CSSProperties
+              }
+            >
+              <DayPicker
+                mode="single"
+                selected={selectedDay}
+                onSelect={(day) => {
+                  if (day) setSelectedDay(day);
+                }}
+                modifiers={{ workedOut: workoutDays }}
+                modifiersClassNames={{
+                  workedOut: "rdp-day-worked-out",
+                }}
+
+                classNames={{
+                  day_button:
+                    "mx-auto flex h-[38px] w-[38px] items-center justify-center rounded-full text-sm font-medium text-foreground/80 transition-all duration-300 hover:bg-border/40",
+                  weekdays: "border-b border-border/30",
+                  weekday:
+                    "py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
+                  caption_label: "text-sm font-bold text-foreground",
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
 

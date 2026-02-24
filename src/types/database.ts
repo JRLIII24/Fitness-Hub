@@ -113,6 +113,9 @@ export interface Database {
           description: string | null;
           color: string | null;
           estimated_duration_min: number | null;
+          is_public: boolean;
+          save_count: number;
+          primary_muscle_group: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -123,6 +126,9 @@ export interface Database {
           description?: string | null;
           color?: string | null;
           estimated_duration_min?: number | null;
+          is_public?: boolean;
+          save_count?: number;
+          primary_muscle_group?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -131,7 +137,57 @@ export interface Database {
           description?: string | null;
           color?: string | null;
           estimated_duration_min?: number | null;
+          is_public?: boolean;
+          primary_muscle_group?: string | null;
           updated_at?: string;
+        };
+      };
+      template_saves: {
+        Row: {
+          id: string;
+          template_id: string;
+          user_id: string;
+          saved_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          user_id: string;
+          saved_at?: string;
+        };
+        Update: {
+          saved_at?: string;
+        };
+      };
+      pod_challenges: {
+        Row: {
+          id: string;
+          pod_id: string;
+          name: string;
+          challenge_type: "volume" | "consistency" | "distance";
+          start_date: string;
+          end_date: string;
+          target_value: number | null;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          pod_id: string;
+          name: string;
+          challenge_type: "volume" | "consistency" | "distance";
+          start_date: string;
+          end_date: string;
+          target_value?: number | null;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          challenge_type?: "volume" | "consistency" | "distance";
+          start_date?: string;
+          end_date?: string;
+          target_value?: number | null;
         };
       };
       template_exercises: {
@@ -666,7 +722,20 @@ export interface Database {
         };
       };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      get_pod_challenge_leaderboard: {
+        Args: { p_challenge_id: string };
+        Returns: Array<{
+          user_id: string;
+          display_name: string | null;
+          avatar_url: string | null;
+          score: number;
+          rank: number;
+          workouts_cnt: number;
+          runs_cnt: number;
+        }>;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

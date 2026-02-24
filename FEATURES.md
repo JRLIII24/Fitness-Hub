@@ -680,6 +680,150 @@
 
 ---
 
+## Advanced Features (Phase 1 – February 2026)
+
+### 🏆 Pod Challenges & Live Leaderboards
+
+Weekly competitive challenges within an Accountability Pod, with real-time ranked scoring.
+
+**Challenge Types:**
+| Type | Measures | Score Unit |
+|------|----------|-----------|
+| `volume` | Total kg lifted across all completed workout sessions | kg |
+| `consistency` | Total sessions completed (workouts + runs combined) | sessions |
+| `distance` | Total kilometres run in completed run sessions | km |
+
+**How it works:**
+1. Any active pod member can create a challenge via the pod page
+2. Set a date window (`start_date` – `end_date`) and optional per-member target
+3. The leaderboard refreshes in near real-time (<3 s) via the `get_pod_challenge_leaderboard` RPC
+4. Members are ranked by score descending; ties share the same rank (RANK, not DENSE_RANK)
+
+**Feature flag:** `NEXT_PUBLIC_ENABLE_POD_CHALLENGES=true`
+
+**API (server-side):**
+```ts
+import { getPodChallengeLeaderboard, createPodChallenge } from '@/lib/challenges';
+
+// Create a 7-day volume challenge
+const challenge = await createPodChallenge(podId, {
+  name: 'Beast Week',
+  challenge_type: 'volume',
+  start_date: '2026-03-03',
+  end_date:   '2026-03-09',
+  target_value: 10000, // kg
+});
+
+// Fetch leaderboard
+const { entries, score_unit, is_active } = await getPodChallengeLeaderboard(challenge.id);
+```
+
+**Database objects:**
+- Table: `pod_challenges` – challenge definitions
+- RPC: `get_pod_challenge_leaderboard(p_challenge_id UUID)` – aggregation
+- Indexes: `idx_workout_sessions_leaderboard`, `idx_run_sessions_leaderboard` (partial, completed rows only)
+
+---
+
+### 🛒 Community Template Marketplace
+
+Browse, save, and import workout templates published by other users.
+
+**Capabilities:**
+- Publish any personal template to the marketplace (`is_public = true`)
+- Fuzzy search by name/description
+- Filter by muscle group
+- Sort by popularity (`save_count`), trending (popularity + recency), or newest
+- Paginated results (default 20, max 50 per page)
+- `is_saved` decoration on each result for the calling user
+
+**Feature flag:** `NEXT_PUBLIC_ENABLE_MARKETPLACE=true`
+
+**Discovery API:**
+```
+GET /api/templates/discover
+  ?search=push+day
+  &muscle_groups=chest,triceps
+  &sort=trending
+  &page=1
+  &page_size=20
+```
+
+Response:
+```json
+{
+  "templates": [ { "id": "...", "name": "...", "save_count": 42, "is_saved": false, ... } ],
+  "total": 150,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+**Import API (atomic, idempotent):**
+```
+POST /api/templates/:id/import
+```
+Response:
+```json
+{ "templateId": "<new-uuid>", "isNew": true }
+```
+
+Re-importing the same template returns `isNew: false` and the existing copy's ID — no duplicates created.
+
+**Server-side helpers:**
+```ts
+import { saveTemplate, unsaveTemplate, setTemplateVisibility } from '@/lib/challenges';
+import { importPublicTemplate, stripImportFingerprint }         from '@/lib/template-import';
+```
+
+**Database objects:**
+- Column: `workout_templates.is_public` (boolean, default false)
+- Column: `workout_templates.save_count` (integer, trigger-maintained)
+- Table: `template_saves` – saves ledger; triggers `trg_template_save_count`
+- RPC: `import_public_template(p_template_id UUID)` – atomic copy
+- Index: `idx_workout_templates_marketplace` (partial, public templates)
+
+**Indexing for scale:**
+For deployments with >10k public templates, add a `pg_trgm` GIN index for fuzzy name search:
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX idx_templates_name_trgm
+  ON workout_templates USING GIN (name gin_trgm_ops)
+  WHERE is_public = true;
+```
+
+---
+
+## Architecture Notes
+
+### Feature Flags
+
+All advanced features are behind environment-variable flags in `src/lib/features.ts`:
+
+| Flag | Feature |
+|------|---------|
+| `NEXT_PUBLIC_ENABLE_RUN_FEATURE` | Run/GPS tracking |
+| `NEXT_PUBLIC_ENABLE_MARKETPLACE` | Template Marketplace |
+| `NEXT_PUBLIC_ENABLE_POD_CHALLENGES` | Pod Challenges & Leaderboards |
+
+Set in `.env.local` for local development or your deployment environment variables for staged rollout.
+
+### Database Migrations
+
+| Migration | Description |
+|-----------|-------------|
+| `041_advanced_features_phase1.sql` | Schema enhancements, RLS, leaderboard RPC |
+| `042_template_import_rpc.sql` | Atomic template import function |
+
+### Security Model
+
+All new tables use Row Level Security:
+- `template_saves`: users read/write only their own rows; inserts restricted to public templates they don't own
+- `pod_challenges`: read/write restricted to active pod members; mutations to creator only
+- `get_pod_challenge_leaderboard` RPC is `SECURITY DEFINER` with an internal `auth.uid()` membership check
+
+---
+
 **Built with:**
 Next.js 16 • Supabase • TypeScript • Tailwind CSS • shadcn/ui
 

@@ -7,6 +7,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { ChevronDown, Clock3, NotebookPen, Plus, Save, X, LayoutList, Dumbbell, Layers, CircleCheck, Activity, Zap, Send, Pencil, Copy, Trash2, Heart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
 import { fireConfetti } from "@/lib/celebrations";
 import {
   logRetentionEvent,
@@ -51,6 +52,7 @@ type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 type WorkoutTemplate = {
   id: string;
   name: string;
+  primary_muscle_group: string | null;
 };
 
 type WorkoutPresetId =
@@ -66,86 +68,93 @@ const POPULAR_WORKOUTS: Array<{
   id: Exclude<WorkoutPresetId, "custom">;
   label: string;
   defaultName: string;
+  category: string;
   liftNames: string[];
 }> = [
-  {
-    id: "upper-body-strength",
-    label: "Upper Body Strength",
-    defaultName: "Upper Body Strength",
-    liftNames: [
-      "Barbell Bench Press",
-      "Barbell Bent-Over Row",
-      "Seated Dumbbell Press",
-      "Lat Pulldown (Wide Grip)",
-      "Close-Grip Bench Press",
-      "EZ-Bar Curl",
-    ],
-  },
-  {
-    id: "push-day",
-    label: "Push Day (Chest/Shoulders/Triceps)",
-    defaultName: "Push Day",
-    liftNames: [
-      "Incline Barbell Bench Press",
-      "Seated Chest Press Machine",
-      "Arnold Press",
-      "Dumbbell Lateral Raise",
-      "Rope Pushdown",
-      "Overhead Dumbbell Extension",
-    ],
-  },
-  {
-    id: "pull-day",
-    label: "Pull Day (Back/Biceps)",
-    defaultName: "Pull Day",
-    liftNames: [
-      "Conventional Deadlift",
-      "Weighted Pull-Ups",
-      "Seated Cable Row",
-      "Face Pulls",
-      "Hammer Curl",
-      "Cable Curl",
-    ],
-  },
-  {
-    id: "leg-day",
-    label: "Leg Day (Quads/Glutes/Hams)",
-    defaultName: "Leg Day",
-    liftNames: [
-      "Barbell Back Squat",
-      "Leg Press",
-      "Romanian Deadlift",
-      "Bulgarian Split Squat",
-      "Leg Extension",
-      "Seated Leg Curl",
-    ],
-  },
-  {
-    id: "full-body",
-    label: "Full Body Compound",
-    defaultName: "Full Body",
-    liftNames: [
-      "Trap Bar Deadlift",
-      "Barbell Bench Press",
-      "Barbell Bent-Over Row",
-      "Barbell Overhead Press",
-      "Farmer's Carry",
-    ],
-  },
-  {
-    id: "arms-shoulders",
-    label: "Arms + Delts",
-    defaultName: "Arms & Delts",
-    liftNames: [
-      "EZ-Bar Curl",
-      "Incline Dumbbell Curl",
-      "Rope Pushdown",
-      "Skull Crushers",
-      "Dumbbell Lateral Raise",
-      "Rear Delt Fly",
-    ],
-  },
-];
+    {
+      id: "upper-body-strength",
+      label: "Upper Body Strength",
+      defaultName: "Upper Body Strength",
+      category: "chest",
+      liftNames: [
+        "Barbell Bench Press",
+        "Barbell Bent-Over Row",
+        "Seated Dumbbell Press",
+        "Lat Pulldown (Wide Grip)",
+        "Close-Grip Bench Press",
+        "EZ-Bar Curl",
+      ],
+    },
+    {
+      id: "push-day",
+      label: "Push Day (Chest/Shoulders/Triceps)",
+      defaultName: "Push Day",
+      category: "chest",
+      liftNames: [
+        "Incline Barbell Bench Press",
+        "Seated Chest Press Machine",
+        "Arnold Press",
+        "Dumbbell Lateral Raise",
+        "Rope Pushdown",
+        "Overhead Dumbbell Extension",
+      ],
+    },
+    {
+      id: "pull-day",
+      label: "Pull Day (Back/Biceps)",
+      defaultName: "Pull Day",
+      category: "back",
+      liftNames: [
+        "Conventional Deadlift",
+        "Weighted Pull-Ups",
+        "Seated Cable Row",
+        "Face Pulls",
+        "Hammer Curl",
+        "Cable Curl",
+      ],
+    },
+    {
+      id: "leg-day",
+      label: "Leg Day (Quads/Glutes/Hams)",
+      defaultName: "Leg Day",
+      category: "legs",
+      liftNames: [
+        "Barbell Back Squat",
+        "Leg Press",
+        "Romanian Deadlift",
+        "Bulgarian Split Squat",
+        "Leg Extension",
+        "Seated Leg Curl",
+      ],
+    },
+    {
+      id: "full-body",
+      label: "Full Body Compound",
+      defaultName: "Full Body",
+      category: "full body",
+      liftNames: [
+        "Trap Bar Deadlift",
+        "Barbell Bench Press",
+        "Barbell Bent-Over Row",
+        "Barbell Overhead Press",
+        "Farmer's Carry",
+      ],
+    },
+    {
+      id: "arms-shoulders",
+      label: "Arms + Delts",
+      defaultName: "Arms & Delts",
+      category: "arms",
+      liftNames: [
+        "EZ-Bar Curl",
+        "Incline Dumbbell Curl",
+        "Rope Pushdown",
+        "Skull Crushers",
+        "Dumbbell Lateral Raise",
+        "Rear Delt Fly",
+      ],
+    },
+  ];
 
 const DB_ALLOWED_EQUIPMENT = new Set([
   "barbell",
@@ -277,8 +286,10 @@ export default function WorkoutPage() {
 
   const [presetId, setPresetId] = useState<WorkoutPresetId>("upper-body-strength");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("none");
+  const [pendingCategory, setPendingCategory] = useState<string | null>(null);
   const [workoutName, setWorkoutName] = useState("Upper Body Strength");
   const [setupTab, setSetupTab] = useState<"templates" | "quick">("templates");
+  const [quickFilter, setQuickFilter] = useState<string>("All");
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [templateActionBusyId, setTemplateActionBusyId] = useState<string | null>(null);
   const [likedTemplateIds, setLikedTemplateIds] = useState<Set<string>>(new Set());
@@ -461,7 +472,7 @@ export default function WorkoutPage() {
     setLoadingTemplates(true);
     const { data, error } = await supabase
       .from("workout_templates")
-      .select("id,name")
+      .select("id,name,primary_muscle_group")
       .eq("user_id", currentUserId)
       .order("updated_at", { ascending: false });
 
@@ -1277,6 +1288,34 @@ export default function WorkoutPage() {
     const name = workoutName.trim() || "Workout";
     const activeTemplateId = selectedTemplateId === "none" ? undefined : selectedTemplateId;
 
+    // Require workout type when starting from the Templates tab
+    if (setupTab === "templates") {
+      if (activeTemplateId) {
+        const tpl = templates.find((t) => t.id === activeTemplateId);
+        const categoryToUse = tpl?.primary_muscle_group ?? pendingCategory;
+        if (!categoryToUse) {
+          toast.error("Please select a workout type before starting.");
+          return;
+        }
+        // Persist the pending category to DB if it wasn't already saved on the template
+        if (!tpl?.primary_muscle_group && pendingCategory) {
+          await supabase
+            .from("workout_templates")
+            .update({ primary_muscle_group: pendingCategory })
+            .eq("id", activeTemplateId);
+          setTemplates((prev) =>
+            prev.map((t) => t.id === activeTemplateId ? { ...t, primary_muscle_group: pendingCategory } : t)
+          );
+        }
+      } else {
+        // Start Fresh — require a category too
+        if (!pendingCategory) {
+          toast.error("Please select a workout type before starting.");
+          return;
+        }
+      }
+    }
+
     await startWorkout(name, activeTemplateId);
     if (userId) {
       void trackSessionIntentSet(supabase, userId, {
@@ -1861,549 +1900,527 @@ export default function WorkoutPage() {
       </div>
 
       <div className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-6 md:px-6 lg:px-10">
-      {!isWorkoutActive ? (
-        <PageHeader
-          title="Workout"
-          subtitle="Save templates, reuse them in future sessions, and compare to previous performance."
-        />
-      ) : null}
+        {!isWorkoutActive ? (
+          <PageHeader
+            title="Workout"
+            subtitle="Save templates, reuse them in future sessions, and compare to previous performance."
+          />
+        ) : null}
 
-      {!isWorkoutActive ? (
-        <Card className="mx-auto w-full max-w-3xl overflow-hidden border-primary/25 bg-card/95 shadow-xl transition-all duration-300">
-          <div className="border-b border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-5 py-4 sm:px-6">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/30 bg-primary/15">
-                <Dumbbell className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">New Session</p>
-                <p className="text-xl font-black tracking-tight">Start a Workout</p>
-              </div>
-            </div>
-          </div>
-          <CardContent className="space-y-4 p-5 sm:p-6">
-            {!dbFeaturesAvailable ? (
-              <p className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-                Supabase workout tables were not found. You can still add exercises and train now,
-                but templates/history sync will be limited until migrations are applied.
-              </p>
-            ) : null}
-
-            <div className="rounded-xl border border-border/70 bg-secondary/20 p-1">
-              <div className="grid grid-cols-2 gap-1">
-                <button
-                  type="button"
-                  onClick={() => setSetupTab("templates")}
-                  className={`h-9 rounded-lg text-xs font-semibold transition ${
-                    setupTab === "templates"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-card/70"
-                  }`}
-                >
-                  My Templates
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSetupTab("quick");
-                    setSelectedTemplateId("none");
-                  }}
-                  className={`h-9 rounded-lg text-xs font-semibold transition ${
-                    setupTab === "quick"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-card/70"
-                  }`}
-                >
-                  Quick Start
-                </button>
+        {!isWorkoutActive ? (
+          <Card className="mx-auto w-full max-w-3xl overflow-hidden border-primary/25 bg-card/95 shadow-xl transition-all duration-300">
+            <div className="border-b border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-5 py-4 sm:px-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/30 bg-primary/15">
+                  <Dumbbell className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">New Session</p>
+                  <p className="text-xl font-black tracking-tight">Start a Workout</p>
+                </div>
               </div>
             </div>
+            <CardContent className="space-y-4 p-5 sm:p-6">
+              {!dbFeaturesAvailable ? (
+                <p className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+                  Supabase workout tables were not found. You can still add exercises and train now,
+                  but templates/history sync will be limited until migrations are applied.
+                </p>
+              ) : null}
 
-            {setupTab === "templates" ? (
-              <div className="space-y-3 rounded-xl border border-border/70 bg-secondary/20 p-3">
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="saved-template"
-                    className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
-                  >
-                    Template Selection
-                  </Label>
+              <div className="rounded-xl border border-border/70 bg-secondary/20 p-1">
+                <div className="grid grid-cols-2 gap-1">
                   <button
                     type="button"
-                    onClick={() => setShowTemplateManager((prev) => !prev)}
-                    className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                    onClick={() => { setSetupTab("templates"); setQuickFilter("All"); }}
+                    className={`h-9 rounded-lg text-xs font-semibold transition ${setupTab === "templates"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-card/70"
+                      }`}
                   >
-                    <LayoutList className="size-3" />
-                    {showTemplateManager ? "Hide Manager" : "Template Manager"}
+                    My Templates
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSetupTab("quick");
+                      setSelectedTemplateId("none");
+                      setPendingCategory(null);
+                      setQuickFilter("All");
+                    }}
+                    className={`h-9 rounded-lg text-xs font-semibold transition ${setupTab === "quick"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-card/70"
+                      }`}
+                  >
+                    Quick Start
                   </button>
                 </div>
-                {showTemplateManager ? (
-                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              </div>
+
+              {setupTab === "templates" ? (
+                <div className="space-y-3 rounded-xl border border-border/70 bg-secondary/20 p-3">
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor="saved-template"
+                      className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
+                    >
+                      Template Selection
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplateManager((prev) => !prev)}
+                      className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <LayoutList className="size-3" />
+                      {showTemplateManager ? "Hide Manager" : "Template Manager"}
+                    </button>
+                  </div>
+                  {showTemplateManager ? (
+                    <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                      {loadingTemplates ? (
+                        <div className="rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-sm text-muted-foreground">
+                          Loading templates...
+                        </div>
+                      ) : templates.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border/70 bg-card/60 px-3 py-2 text-sm text-muted-foreground">
+                          No templates yet.
+                        </div>
+                      ) : (
+                        templates.map((template) => (
+                          <div
+                            key={template.id}
+                            className={`rounded-xl border px-3 py-2 transition ${selectedTemplateId === template.id
+                                ? "border-primary/40 bg-primary/10"
+                                : "border-border/70 bg-card/70"
+                              }`}
+                          >
+                            <p className="truncate text-sm font-semibold">{template.name}</p>
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleSendTemplate(template)}
+                                disabled={templateActionBusyId === template.id}
+                                className="h-7 px-2 text-xs"
+                              >
+                                <Send className="mr-1 h-3 w-3" />
+                                Send
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleEditTemplate(template)}
+                                disabled={templateActionBusyId === template.id}
+                                className="h-7 px-2 text-xs"
+                              >
+                                <Pencil className="mr-1 h-3 w-3" />
+                                Edit
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleCopyTemplate(template)}
+                                disabled={templateActionBusyId === template.id}
+                                className="h-7 px-2 text-xs"
+                              >
+                                <Copy className="mr-1 h-3 w-3" />
+                                Copy
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDeleteTemplate(template)}
+                                disabled={templateActionBusyId === template.id}
+                                className="h-7 px-2 text-xs"
+                              >
+                                <Trash2 className="mr-1 h-3 w-3" />
+                                Delete
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={likedTemplateIds.has(template.id) ? "default" : "secondary"}
+                                onClick={() => handleToggleTemplateLike(template.id)}
+                                className="h-7 px-2 text-xs"
+                              >
+                                <Heart className="mr-1 h-3 w-3" />
+                                {likedTemplateIds.has(template.id) ? "Liked" : "Like"}
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : null}
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTemplateId("none")}
+                      className={`rounded-xl border px-3 py-2 text-left transition ${selectedTemplateId === "none"
+                          ? "border-primary/40 bg-primary/10"
+                          : "border-border/70 bg-card/70 hover:bg-card"
+                        }`}
+                    >
+                      <p className="text-sm font-semibold">Start Fresh</p>
+                      <p className="text-xs text-muted-foreground">No template preloaded</p>
+                    </button>
                     {loadingTemplates ? (
                       <div className="rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-sm text-muted-foreground">
                         Loading templates...
                       </div>
                     ) : templates.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-border/70 bg-card/60 px-3 py-2 text-sm text-muted-foreground">
-                        No templates yet.
+                        No templates yet. Use Template Manager above to create one here.
                       </div>
                     ) : (
                       templates.map((template) => (
                         <div
                           key={template.id}
-                          className={`rounded-xl border px-3 py-2 transition ${
-                            selectedTemplateId === template.id
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setSelectedTemplateId(template.id);
+                            setWorkoutName(template.name);
+                            setPendingCategory(null);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault();
+                            setSelectedTemplateId(template.id);
+                            setWorkoutName(template.name);
+                            setPendingCategory(null);
+                          }}
+                          className={`rounded-xl border px-3 py-2 text-left transition ${selectedTemplateId === template.id
                               ? "border-primary/40 bg-primary/10"
-                              : "border-border/70 bg-card/70"
-                          }`}
+                              : "border-border/70 bg-card/70 hover:bg-card"
+                            }`}
                         >
-                          <p className="truncate text-sm font-semibold">{template.name}</p>
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleSendTemplate(template)}
-                              disabled={templateActionBusyId === template.id}
-                              className="h-7 px-2 text-xs"
+                          <div className="flex items-start justify-between gap-1 mb-0.5">
+                            <p className="truncate text-sm font-semibold">{template.name}</p>
+                            <div className="flex shrink-0 items-center gap-1">
+                              {likedTemplateIds.has(template.id) ? (
+                                <Heart className="h-3.5 w-3.5 text-rose-400" />
+                              ) : null}
+                              {template.primary_muscle_group && (() => {
+                                const tgc = getMuscleColor(template.primary_muscle_group);
+                                return (
+                                  <span
+                                    className="rounded-full px-1.5 py-0.5 text-[8px] font-bold capitalize"
+                                    style={{ background: tgc.bgAlpha, color: tgc.labelColor, border: `1px solid ${tgc.borderAlpha}` }}
+                                  >
+                                    {template.primary_muscle_group}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Tap to preload</p>
+                          <div className="mt-1.5 flex gap-1.5">
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleToggleTemplateLike(template.id);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key !== "Enter" && event.key !== " ") return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                handleToggleTemplateLike(template.id);
+                              }}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${likedTemplateIds.has(template.id)
+                                  ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+                                  : "border-border/70 text-muted-foreground"
+                                }`}
                             >
-                              <Send className="mr-1 h-3 w-3" />
-                              Send
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleEditTemplate(template)}
-                              disabled={templateActionBusyId === template.id}
-                              className="h-7 px-2 text-xs"
-                            >
-                              <Pencil className="mr-1 h-3 w-3" />
-                              Edit
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleCopyTemplate(template)}
-                              disabled={templateActionBusyId === template.id}
-                              className="h-7 px-2 text-xs"
-                            >
-                              <Copy className="mr-1 h-3 w-3" />
-                              Copy
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDeleteTemplate(template)}
-                              disabled={templateActionBusyId === template.id}
-                              className="h-7 px-2 text-xs"
-                            >
-                              <Trash2 className="mr-1 h-3 w-3" />
-                              Delete
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={likedTemplateIds.has(template.id) ? "default" : "secondary"}
-                              onClick={() => handleToggleTemplateLike(template.id)}
-                              className="h-7 px-2 text-xs"
-                            >
-                              <Heart className="mr-1 h-3 w-3" />
-                              {likedTemplateIds.has(template.id) ? "Liked" : "Like"}
-                            </Button>
+                              <Heart className="h-3 w-3" />
+                              Like
+                            </span>
                           </div>
                         </div>
                       ))
                     )}
                   </div>
-                ) : null}
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTemplateId("none")}
-                    className={`rounded-xl border px-3 py-2 text-left transition ${
-                      selectedTemplateId === "none"
-                        ? "border-primary/40 bg-primary/10"
-                        : "border-border/70 bg-card/70 hover:bg-card"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold">Start Fresh</p>
-                    <p className="text-xs text-muted-foreground">No template preloaded</p>
-                  </button>
-                  {loadingTemplates ? (
-                    <div className="rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-sm text-muted-foreground">
-                      Loading templates...
-                    </div>
-                  ) : templates.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border/70 bg-card/60 px-3 py-2 text-sm text-muted-foreground">
-                      No templates yet. Use Template Manager above to create one here.
-                    </div>
-                  ) : (
-                    templates.map((template) => (
-                      <div
-                        key={template.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => {
-                          setSelectedTemplateId(template.id);
-                          setWorkoutName(template.name);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key !== "Enter" && event.key !== " ") return;
-                          event.preventDefault();
-                          setSelectedTemplateId(template.id);
-                          setWorkoutName(template.name);
-                        }}
-                        className={`rounded-xl border px-3 py-2 text-left transition ${
-                          selectedTemplateId === template.id
-                            ? "border-primary/40 bg-primary/10"
-                            : "border-border/70 bg-card/70 hover:bg-card"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-sm font-semibold">{template.name}</p>
-                          <div className="flex items-center gap-1">
-                            {likedTemplateIds.has(template.id) ? (
-                              <Heart className="h-3.5 w-3.5 text-rose-400" />
-                            ) : null}
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Tap to preload</p>
-                        <div className="mt-1.5 flex gap-1.5">
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleToggleTemplateLike(template.id);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key !== "Enter" && event.key !== " ") return;
-                              event.preventDefault();
-                              event.stopPropagation();
-                              handleToggleTemplateLike(template.id);
-                            }}
-                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${
-                              likedTemplateIds.has(template.id)
-                                ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
-                                : "border-border/70 text-muted-foreground"
-                            }`}
-                          >
-                            <Heart className="h-3 w-3" />
-                            Like
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/20 p-3">
-                <Label
-                  htmlFor="preset"
-                  className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
-                >
-                  Choose a Preset
-                </Label>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {POPULAR_WORKOUTS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => handlePresetChange(preset.id)}
-                      className={`rounded-xl border px-3 py-2 text-left transition ${
-                        presetId === preset.id
-                          ? "border-primary/40 bg-primary/10"
-                          : "border-border/70 bg-card/70 hover:bg-card"
-                      }`}
-                    >
-                      <p className="text-xs font-semibold leading-snug">{preset.defaultName}</p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        {preset.liftNames.length} exercises
-                      </p>
-                      <div className="mt-1.5 space-y-0.5">
-                        {preset.liftNames.slice(0, 2).map((lift) => (
-                          <p key={lift} className="truncate text-[10px] text-muted-foreground/90">
-                            • {lift}
-                          </p>
-                        ))}
-                        {preset.liftNames.length > 2 ? (
-                          <p className="text-[10px] text-muted-foreground/80">
-                            +{preset.liftNames.length - 2} more
-                          </p>
-                        ) : null}
-                      </div>
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => handlePresetChange("custom")}
-                    className={`rounded-xl border px-3 py-2 text-left transition ${
-                      presetId === "custom"
-                        ? "border-primary/40 bg-primary/10"
-                        : "border-border/70 bg-card/70 hover:bg-card"
-                    }`}
-                  >
-                    <p className="text-xs font-semibold">Custom</p>
-                    <p className="text-[10px] text-muted-foreground">Start empty workout</p>
-                  </button>
-                </div>
-                <Select
-                  value={presetId}
-                  onValueChange={(value) => handlePresetChange(value as WorkoutPresetId)}
-                >
-                  <SelectTrigger id="preset" className="w-full">
-                    <SelectValue placeholder="Select a popular workout" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {POPULAR_WORKOUTS.map((preset) => (
-                      <SelectItem key={preset.id} value={preset.id}>
-                        {preset.label}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="custom">Custom (empty workout)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="workout-name" className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Session Name</Label>
-              <Input
-                id="workout-name"
-                value={workoutName}
-                onChange={(event) => setWorkoutName(event.target.value)}
-                placeholder="Workout name"
-              />
-            </div>
-
-            <Button className="h-11 w-full text-base font-semibold" onClick={handleStartWorkout}>
-              Start Workout
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {isWorkoutActive && activeWorkout ? (
-        <>
-          <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/10 p-5 sm:p-6">
-            <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
-            <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-accent/20 blur-3xl" />
-            <div className="relative space-y-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Active Session</p>
-                  <h2 className="mt-1 text-[28px] font-black leading-tight tracking-tight sm:text-[32px]">
-                    {activeWorkout.name}
-                  </h2>
-                </div>
-                <div className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
-                  <Clock3 className="size-4" />
-                  <ElapsedTime startedAt={activeWorkout.started_at} />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Badge className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-cyan-300">
-                  <Activity className="mr-1 h-3.5 w-3.5" />
-                  {Math.round(plannerStats.totalVolumeKg).toLocaleString()} kg
-                </Badge>
-                <Badge className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-emerald-300">
-                  <CircleCheck className="mr-1 h-3.5 w-3.5" />
-                  {plannerStats.completedSets} done
-                </Badge>
-                <Badge className="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-violet-300">
-                  <Layers className="mr-1 h-3.5 w-3.5" />
-                  {plannerStats.totalSets} total sets
-                </Badge>
-                <Badge className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-amber-300">
-                  <Dumbbell className="mr-1 h-3.5 w-3.5" />
-                  {plannerStats.exercises} exercises
-                </Badge>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[12px] uppercase tracking-[0.12em] text-muted-foreground">
-                  <span>Session Progress</span>
-                  <span>{completionProgressPct}%</span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/80">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                    style={{ width: `${completionProgressPct}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
-
-        <div className="grid gap-6 lg:grid-cols-[21.25rem_minmax(0,1fr)]">
-          <Card className="h-fit border-border/70 bg-card/95 shadow-sm transition-all duration-300 lg:sticky lg:top-20">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <Input
-                  value={activeWorkout.name}
-                  onChange={(e) => updateWorkoutName(e.target.value)}
-                  className="h-9 flex-1 border-transparent bg-transparent px-0 text-[22px] font-semibold leading-tight tracking-tight focus:border-border focus:bg-background"
-                  placeholder="Workout name"
-                />
-                <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
-                  <Clock3 className="size-4" />
-                  <ElapsedTime startedAt={activeWorkout.started_at} />
-                </span>
-              </div>
-              {activeWorkout.template_id ? (
-                <p className="text-xs text-muted-foreground">Template session</p>
-              ) : null}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Target muscle group</Label>
-                  <Select
-                    value={selectedMuscleGroup}
-                    onValueChange={(value) => {
-                      setSelectedMuscleGroup(value as MuscleGroup);
-                      setSelectedExerciseId("");
-                      setLiftSearch("");
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Choose muscle group" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MUSCLE_GROUPS.map((group) => (
-                        <SelectItem key={group} value={group}>
-                          {MUSCLE_GROUP_LABELS[group]} ({groupCounts[group] ?? 0})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Available lifts</Label>
-                  {isSmallScreen ? (
-                    /* Mobile: bottom Sheet avoids virtual keyboard overlap */
-                    <Sheet open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between"
-                        onClick={() => setLiftPickerOpen(true)}
-                      >
-                        <span className="truncate">
-                          {selectedExercise ? selectedExercise.name : "Search and choose a lift"}
-                        </span>
-                        <ChevronDown className="ml-2 size-4 shrink-0 opacity-70" />
-                      </Button>
-                      <SheetContent side="bottom" className="h-[72dvh] flex flex-col">
-                        <SheetHeader>
-                          <SheetTitle>Choose a lift</SheetTitle>
-                        </SheetHeader>
-                        <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-0">
-                          {liftPickerExerciseList}
-                        </div>
-                      </SheetContent>
-                    </Sheet>
-                  ) : (
-                    /* Desktop: Popover anchored to trigger */
-                    <Popover open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" role="combobox" className="w-full justify-between">
-                          <span className="truncate">
-                            {selectedExercise ? selectedExercise.name : "Search and choose a lift"}
-                          </span>
-                          <ChevronDown className="ml-2 size-4 shrink-0 opacity-70" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[min(28rem,calc(100vw-2rem))] p-2" align="start">
-                        {liftPickerExerciseList}
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                </div>
-              </div>
-
-              {selectedExercise ? (
-                <div className="rounded-xl border border-border/70 bg-card/80 p-3">
-                  <div className="flex items-center gap-3">
-                    {selectedExerciseMediaUrl ? (
-                      <Image
-                        src={selectedExerciseMediaUrl}
-                        alt={selectedExercise.name}
-                        width={64}
-                        height={64}
-                        unoptimized
-                        className="size-16 rounded-md object-cover bg-muted shrink-0"
-                      />
-                    ) : (
-                      <div className="flex size-16 items-center justify-center rounded-md bg-muted">
-                        <Dumbbell className="size-5 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{selectedExercise.name}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {MUSCLE_GROUP_LABELS[selectedExercise.muscle_group as MuscleGroup] ?? selectedExercise.muscle_group}
-                        {selectedExercise.equipment
-                          ? ` · ${EQUIPMENT_LABELS[selectedExercise.equipment] ?? selectedExercise.equipment}`
-                          : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    className="mt-3 w-full"
-                    onClick={handleAddSelectedExercise}
-                  >
-                    <Plus className="mr-2 size-4" />
-                    Add Selected Lift
-                  </Button>
                 </div>
               ) : (
-                <Button
-                  type="button"
-                  className="w-full"
-                  onClick={handleAddSelectedExercise}
-                  disabled
-                >
-                  <Plus className="mr-2 size-4" />
-                  Add Selected Lift
-                </Button>
+                <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/20 p-3">
+                  <Label
+                    htmlFor="preset"
+                    className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
+                  >
+                    Choose a Preset
+                  </Label>
+
+                  {/* Marketplace-style filter pills */}
+                  <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+                    {MUSCLE_FILTERS.map((f) => {
+                      const on = quickFilter === f;
+                      const mgc = f !== "All" ? getMuscleColor(f) : null;
+                      return (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setQuickFilter(f)}
+                          className="shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition-all duration-150"
+                          style={{
+                            background: on
+                              ? (mgc ? mgc.bgAlpha : "rgba(200,255,0,0.15)")
+                              : "rgba(255,255,255,0.04)",
+                            border: `1px solid ${on
+                              ? (mgc ? mgc.borderAlpha : "rgba(200,255,0,0.4)")
+                              : "rgba(255,255,255,0.08)"}`,
+                            color: on
+                              ? (mgc ? mgc.labelColor : "hsl(var(--primary))")
+                              : "hsl(var(--muted-foreground))",
+                            fontWeight: on ? 700 : 500,
+                          }}
+                        >
+                          {f}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Filtered preset grid */}
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {POPULAR_WORKOUTS
+                      .filter((preset) => quickFilter === "All" || preset.category.toLowerCase() === quickFilter.toLowerCase())
+                      .map((preset) => {
+                        const gc = getMuscleColor(preset.category);
+                        const active = presetId === preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => handlePresetChange(preset.id)}
+                            className={`rounded-xl border px-3 py-2 text-left transition ${active
+                                ? "border-primary/40 bg-primary/10"
+                                : "border-border/70 bg-card/70 hover:bg-card"
+                              }`}
+                          >
+                            <div className="flex items-start justify-between gap-1 mb-0.5">
+                              <p className="text-xs font-semibold leading-snug">{preset.defaultName}</p>
+                              <span
+                                className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold capitalize"
+                                style={{
+                                  background: gc.bgAlpha,
+                                  color: gc.labelColor,
+                                  border: `1px solid ${gc.borderAlpha}`,
+                                }}
+                              >
+                                {preset.category}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                              {preset.liftNames.length} exercises
+                            </p>
+                            <div className="mt-1.5 space-y-0.5">
+                              {preset.liftNames.slice(0, 2).map((lift) => (
+                                <p key={lift} className="truncate text-[10px] text-muted-foreground/90">
+                                  • {lift}
+                                </p>
+                              ))}
+                              {preset.liftNames.length > 2 ? (
+                                <p className="text-[10px] text-muted-foreground/80">
+                                  +{preset.liftNames.length - 2} more
+                                </p>
+                              ) : null}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    <button
+                      type="button"
+                      onClick={() => handlePresetChange("custom")}
+                      className={`rounded-xl border px-3 py-2 text-left transition ${presetId === "custom"
+                          ? "border-primary/40 bg-primary/10"
+                          : "border-border/70 bg-card/70 hover:bg-card"
+                        }`}
+                    >
+                      <p className="text-xs font-semibold">Custom</p>
+                      <p className="text-[10px] text-muted-foreground">Start empty workout</p>
+                    </button>
+                  </div>
+                </div>
               )}
 
-              <Card className="border-dashed">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Create custom lift</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="custom-lift-name">Lift name</Label>
-                    <Input
-                      id="custom-lift-name"
-                      value={customName}
-                      onChange={(event) => setCustomName(event.target.value)}
-                      placeholder="Ex: Cable Y Raise"
+              <div className="space-y-2">
+                <Label htmlFor="workout-name" className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Session Name</Label>
+                <Input
+                  id="workout-name"
+                  value={workoutName}
+                  onChange={(event) => setWorkoutName(event.target.value)}
+                  placeholder="Workout name"
+                />
+              </div>
+
+              {/* Category picker — required when a saved template has no workout type OR Start Fresh */}
+              {setupTab === "templates" && (() => {
+                // Show for Start Fresh OR for templates missing a category
+                if (selectedTemplateId !== "none") {
+                  const tpl = templates.find((t) => t.id === selectedTemplateId);
+                  if (tpl?.primary_muscle_group) return null;
+                }
+                const categoryOptions = MUSCLE_FILTERS.filter((f) => f !== "All");
+                const isStartFresh = selectedTemplateId === "none";
+                return (
+                  <div className={`space-y-2 rounded-xl border p-3 ${isStartFresh
+                      ? "border-border/70 bg-secondary/20"
+                      : "border-amber-500/40 bg-amber-500/5"
+                    }`}>
+                    <p className={`text-[11px] font-semibold uppercase tracking-[0.1em] ${isStartFresh ? "text-muted-foreground" : "text-amber-400"
+                      }`}>
+                      {isStartFresh ? "Workout Type" : "Workout Type Required"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {isStartFresh
+                        ? "Choose a category for your session."
+                        : "Select a category to continue. This will be saved to your template."}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {categoryOptions.map((cat) => {
+                        const lc = cat.toLowerCase();
+                        const cgc = getMuscleColor(lc);
+                        const active = (pendingCategory ?? "") === lc;
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setPendingCategory(lc)}
+                            className="rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize transition-all"
+                            style={active ? {
+                              background: cgc.bgAlpha,
+                              color: cgc.labelColor,
+                              border: `1.5px solid ${cgc.borderAlpha}`,
+                              boxShadow: `0 0 8px ${cgc.from}33`,
+                            } : {
+                              background: "transparent",
+                              color: "var(--muted-foreground)",
+                              border: "1px solid var(--border)",
+                            }}
+                          >
+                            {cat}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <Button
+                className="h-11 w-full text-base font-semibold"
+                onClick={handleStartWorkout}
+                disabled={
+                  setupTab === "templates" &&
+                  !pendingCategory &&
+                  (selectedTemplateId === "none" ||
+                    !templates.find((t) => t.id === selectedTemplateId)?.primary_muscle_group)
+                }
+              >
+                Start Workout
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {isWorkoutActive && activeWorkout ? (
+          <>
+            <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/10 p-5 sm:p-6">
+              <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
+              <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-accent/20 blur-3xl" />
+              <div className="relative space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Active Session</p>
+                    <h2 className="mt-1 text-[28px] font-black leading-tight tracking-tight sm:text-[32px]">
+                      {activeWorkout.name}
+                    </h2>
+                  </div>
+                  <div className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
+                    <Clock3 className="size-4" />
+                    <ElapsedTime startedAt={activeWorkout.started_at} />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-cyan-300">
+                    <Activity className="mr-1 h-3.5 w-3.5" />
+                    {Math.round(plannerStats.totalVolumeKg).toLocaleString()} kg
+                  </Badge>
+                  <Badge className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-emerald-300">
+                    <CircleCheck className="mr-1 h-3.5 w-3.5" />
+                    {plannerStats.completedSets} done
+                  </Badge>
+                  <Badge className="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-violet-300">
+                    <Layers className="mr-1 h-3.5 w-3.5" />
+                    {plannerStats.totalSets} total sets
+                  </Badge>
+                  <Badge className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-amber-300">
+                    <Dumbbell className="mr-1 h-3.5 w-3.5" />
+                    {plannerStats.exercises} exercises
+                  </Badge>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[12px] uppercase tracking-[0.12em] text-muted-foreground">
+                    <span>Session Progress</span>
+                    <span>{completionProgressPct}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/80">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                      style={{ width: `${completionProgressPct}%` }}
                     />
                   </div>
+                </div>
+              </div>
+            </section>
+
+            <div className="grid gap-6 lg:grid-cols-[21.25rem_minmax(0,1fr)]">
+              <Card className="h-fit border-border/70 bg-card/95 shadow-sm transition-all duration-300 lg:sticky lg:top-20">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Input
+                      value={activeWorkout.name}
+                      onChange={(e) => updateWorkoutName(e.target.value)}
+                      className="h-9 flex-1 border-transparent bg-transparent px-0 text-[22px] font-semibold leading-tight tracking-tight focus:border-border focus:bg-background"
+                      placeholder="Workout name"
+                    />
+                    <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                      <Clock3 className="size-4" />
+                      <ElapsedTime startedAt={activeWorkout.started_at} />
+                    </span>
+                  </div>
+                  {activeWorkout.template_id ? (
+                    <p className="text-xs text-muted-foreground">Template session</p>
+                  ) : null}
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <Label>Muscle group</Label>
+                      <Label>Target muscle group</Label>
                       <Select
-                        value={customMuscleGroup}
-                        onValueChange={(value) => setCustomMuscleGroup(value as MuscleGroup)}
+                        value={selectedMuscleGroup}
+                        onValueChange={(value) => {
+                          setSelectedMuscleGroup(value as MuscleGroup);
+                          setSelectedExerciseId("");
+                          setLiftSearch("");
+                        }}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select muscle group" />
+                          <SelectValue placeholder="Choose muscle group" />
                         </SelectTrigger>
                         <SelectContent>
                           {MUSCLE_GROUPS.map((group) => (
                             <SelectItem key={group} value={group}>
-                              {MUSCLE_GROUP_LABELS[group]}
+                              {MUSCLE_GROUP_LABELS[group]} ({groupCounts[group] ?? 0})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -2411,325 +2428,451 @@ export default function WorkoutPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Equipment</Label>
-                      <Select value={customEquipment} onValueChange={setCustomEquipment}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select equipment" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(EQUIPMENT_LABELS).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Available lifts</Label>
+                      {isSmallScreen ? (
+                        /* Mobile: bottom Sheet avoids virtual keyboard overlap */
+                        <Sheet open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between"
+                            onClick={() => setLiftPickerOpen(true)}
+                          >
+                            <span className="truncate">
+                              {selectedExercise ? selectedExercise.name : "Search and choose a lift"}
+                            </span>
+                            <ChevronDown className="ml-2 size-4 shrink-0 opacity-70" />
+                          </Button>
+                          <SheetContent side="bottom" className="h-[72dvh] flex flex-col">
+                            <SheetHeader>
+                              <SheetTitle>Choose a lift</SheetTitle>
+                            </SheetHeader>
+                            <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-0">
+                              {liftPickerExerciseList}
+                            </div>
+                          </SheetContent>
+                        </Sheet>
+                      ) : (
+                        /* Desktop: Popover anchored to trigger */
+                        <Popover open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" role="combobox" className="w-full justify-between">
+                              <span className="truncate">
+                                {selectedExercise ? selectedExercise.name : "Search and choose a lift"}
+                              </span>
+                              <ChevronDown className="ml-2 size-4 shrink-0 opacity-70" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[min(28rem,calc(100vw-2rem))] p-2" align="start">
+                            {liftPickerExerciseList}
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="w-full"
-                    onClick={handleCreateCustomExercise}
-                  >
-                    Create and Add Custom Lift
-                  </Button>
+
+                  {selectedExercise ? (
+                    <div className="rounded-xl border border-border/70 bg-card/80 p-3">
+                      <div className="flex items-center gap-3">
+                        {selectedExerciseMediaUrl ? (
+                          <Image
+                            src={selectedExerciseMediaUrl}
+                            alt={selectedExercise.name}
+                            width={64}
+                            height={64}
+                            unoptimized
+                            className="size-16 rounded-md object-cover bg-muted shrink-0"
+                          />
+                        ) : (
+                          <div className="flex size-16 items-center justify-center rounded-md bg-muted">
+                            <Dumbbell className="size-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{selectedExercise.name}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {MUSCLE_GROUP_LABELS[selectedExercise.muscle_group as MuscleGroup] ?? selectedExercise.muscle_group}
+                            {selectedExercise.equipment
+                              ? ` · ${EQUIPMENT_LABELS[selectedExercise.equipment] ?? selectedExercise.equipment}`
+                              : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        className="mt-3 w-full"
+                        onClick={handleAddSelectedExercise}
+                      >
+                        <Plus className="mr-2 size-4" />
+                        Add Selected Lift
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      className="w-full"
+                      onClick={handleAddSelectedExercise}
+                      disabled
+                    >
+                      <Plus className="mr-2 size-4" />
+                      Add Selected Lift
+                    </Button>
+                  )}
+
+                  <Card className="border-dashed">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Create custom lift</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="custom-lift-name">Lift name</Label>
+                        <Input
+                          id="custom-lift-name"
+                          value={customName}
+                          onChange={(event) => setCustomName(event.target.value)}
+                          placeholder="Ex: Cable Y Raise"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Muscle group</Label>
+                          <Select
+                            value={customMuscleGroup}
+                            onValueChange={(value) => setCustomMuscleGroup(value as MuscleGroup)}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select muscle group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MUSCLE_GROUPS.map((group) => (
+                                <SelectItem key={group} value={group}>
+                                  {MUSCLE_GROUP_LABELS[group]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Equipment</Label>
+                          <Select value={customEquipment} onValueChange={setCustomEquipment}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select equipment" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(EQUIPMENT_LABELS).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                  {label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full"
+                        onClick={handleCreateCustomExercise}
+                      >
+                        Create and Add Custom Lift
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </CardContent>
               </Card>
-            </CardContent>
-          </Card>
 
-          <div className="space-y-4">
-            <Card className="border-border/70 bg-card/90">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-[20px] font-bold tracking-tight">Exercises</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {activeWorkout.exercises.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-10 text-center">
-                    <p className="text-[20px] font-semibold tracking-tight text-foreground">
-                      Build the session that builds you.
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Choose your first exercise to enter training mode.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {ghostWorkoutData ? (
-                      <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-muted-foreground">
-                        Ghost workout active. You are training against your last matching session.
+              <div className="space-y-4">
+                <Card className="border-border/70 bg-card/90">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-[20px] font-bold tracking-tight">Exercises</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {activeWorkout.exercises.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-10 text-center">
+                        <p className="text-[20px] font-semibold tracking-tight text-foreground">
+                          Build the session that builds you.
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Choose your first exercise to enter training mode.
+                        </p>
                       </div>
-                    ) : null}
-                    {activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
-                      <Card
-                        key={exerciseBlock.exercise.id}
-                        className="overflow-hidden border-border/70 bg-card/90 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-primary/30 hover:shadow-lg"
-                      >
-                        <div className="h-1 w-full bg-gradient-to-r from-primary via-primary/60 to-accent" />
-                        <CardHeader className="pb-3">
-                          <CardTitle className="flex items-center justify-between text-[20px] font-semibold tracking-tight">
-                            <div>
-                              <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                                <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
-                                  {exerciseBlock.exercise.category}
-                                </Badge>
-                                {exerciseBlock.exercise.equipment ? (
-                                  <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
-                                    {EQUIPMENT_LABELS[exerciseBlock.exercise.equipment] ?? exerciseBlock.exercise.equipment}
-                                  </Badge>
-                                ) : null}
-                              </div>
-                              <p>{exerciseBlock.exercise.name}</p>
-                              {previousByExerciseId[exerciseBlock.exercise.id]?.length ? (
-                                <p className="mt-1 text-xs font-normal text-muted-foreground">
-                                  Ghost: last session sets loaded
-                                </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {ghostWorkoutData ? (
+                          <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-muted-foreground">
+                            Ghost workout active. You are training against your last matching session.
+                          </div>
+                        ) : null}
+                        {activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
+                          <Card
+                            key={exerciseBlock.exercise.id}
+                            className="overflow-hidden border-border/70 bg-card/90 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-primary/30 hover:shadow-lg"
+                          >
+                            <div className="h-1 w-full bg-gradient-to-r from-primary via-primary/60 to-accent" />
+                            <CardHeader className="pb-3">
+                              <CardTitle className="flex items-center justify-between text-[20px] font-semibold tracking-tight">
+                                <div>
+                                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                                    <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
+                                      {exerciseBlock.exercise.category}
+                                    </Badge>
+                                    {exerciseBlock.exercise.equipment ? (
+                                      <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
+                                        {EQUIPMENT_LABELS[exerciseBlock.exercise.equipment] ?? exerciseBlock.exercise.equipment}
+                                      </Badge>
+                                    ) : null}
+                                  </div>
+                                  <p>{exerciseBlock.exercise.name}</p>
+                                  {previousByExerciseId[exerciseBlock.exercise.id]?.length ? (
+                                    <p className="mt-1 text-xs font-normal text-muted-foreground">
+                                      Ghost: last session sets loaded
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="text-right">
+                                    <p className="text-lg font-bold leading-none text-primary">
+                                      {exerciseBlock.sets.filter((set) => set.completed).length}
+                                      <span className="text-sm font-medium text-muted-foreground">/{exerciseBlock.sets.length}</span>
+                                    </p>
+                                    <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">sets done</p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => removeExercise(exerciseIndex)}
+                                  >
+                                    <X className="size-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </CardTitle>
+                            </CardHeader>
+                            {/* Form Tips Panel */}
+                            {exerciseBlock.exercise.form_tips && exerciseBlock.exercise.form_tips.length > 0 && (
+                              <FormTipsPanel
+                                exerciseName={exerciseBlock.exercise.name}
+                                formTips={exerciseBlock.exercise.form_tips}
+                              />
+                            )}
+                            <CardContent className="space-y-3 px-5 pb-5">
+                              {ghostWorkoutData?.exercises[exerciseBlock.exercise.id]?.length ? (
+                                <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2">
+                                  <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-cyan-300/80">
+                                    Last Session Set Ladder
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {ghostWorkoutData.exercises[exerciseBlock.exercise.id]
+                                      .slice()
+                                      .sort((a, b) => a.setNumber - b.setNumber)
+                                      .map((ghostSet) => (
+                                        <span
+                                          key={`${exerciseBlock.exercise.id}-ghost-${ghostSet.setNumber}`}
+                                          className="inline-flex items-center gap-1 rounded-md border border-cyan-500/25 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200"
+                                        >
+                                          <span className="font-semibold">S{ghostSet.setNumber}</span>
+                                          <span className="text-cyan-100/90">
+                                            {ghostSet.weight ?? "—"} x {ghostSet.reps ?? "—"}
+                                          </span>
+                                        </span>
+                                      ))}
+                                  </div>
+                                </div>
                               ) : null}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="text-right">
-                                <p className="text-lg font-bold leading-none text-primary">
-                                  {exerciseBlock.sets.filter((set) => set.completed).length}
-                                  <span className="text-sm font-medium text-muted-foreground">/{exerciseBlock.sets.length}</span>
-                                </p>
-                                <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">sets done</p>
-                              </div>
+                              {exerciseBlock.sets.map((set, setIndex) => {
+                                const matchedGhostSet = ghostWorkoutData?.exercises[
+                                  exerciseBlock.exercise.id
+                                ]?.find((ghostSet) => ghostSet.setNumber === set.set_number);
+                                return (
+                                  <SetRow
+                                    key={set.id}
+                                    set={set}
+                                    previousSet={previousByExerciseId[exerciseBlock.exercise.id]?.[setIndex]}
+                                    ghostSet={
+                                      matchedGhostSet
+                                        ? {
+                                          reps: matchedGhostSet.reps,
+                                          weight: matchedGhostSet.weight,
+                                        }
+                                        : undefined
+                                    }
+                                    autoFocusWeight={setIndex === exerciseBlock.sets.length - 1 && !set.completed}
+                                    onUpdate={(updates) => updateSet(exerciseIndex, setIndex, updates)}
+                                    onComplete={() => completeSet(exerciseIndex, setIndex)}
+                                    onRemove={() => removeSet(exerciseIndex, setIndex)}
+                                    onStartRest={(seconds) => {
+                                      const activeTimers = getActiveTimers();
+                                      for (const timer of activeTimers) {
+                                        stopTimer(timer.id);
+                                      }
+                                      startTimer(
+                                        exerciseBlock.exercise.id,
+                                        exerciseBlock.exercise.name,
+                                        seconds
+                                      );
+                                    }}
+                                  />
+                                );
+                              })}
                               <Button
                                 type="button"
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => removeExercise(exerciseIndex)}
+                                variant="outline"
+                                className="w-full transition-all duration-200 hover:scale-[1.01]"
+                                onClick={() => addSet(exerciseIndex)}
                               >
-                                <X className="size-4 text-destructive" />
+                                Add Set
                               </Button>
-                            </div>
-                          </CardTitle>
-                        </CardHeader>
-                        {/* Form Tips Panel */}
-                        {exerciseBlock.exercise.form_tips && exerciseBlock.exercise.form_tips.length > 0 && (
-                          <FormTipsPanel
-                            exerciseName={exerciseBlock.exercise.name}
-                            formTips={exerciseBlock.exercise.form_tips}
-                          />
-                        )}
-                        <CardContent className="space-y-3 px-5 pb-5">
-                          {ghostWorkoutData?.exercises[exerciseBlock.exercise.id]?.length ? (
-                            <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2">
-                              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-cyan-300/80">
-                                Last Session Set Ladder
-                              </p>
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {ghostWorkoutData.exercises[exerciseBlock.exercise.id]
-                                  .slice()
-                                  .sort((a, b) => a.setNumber - b.setNumber)
-                                  .map((ghostSet) => (
-                                    <span
-                                      key={`${exerciseBlock.exercise.id}-ghost-${ghostSet.setNumber}`}
-                                      className="inline-flex items-center gap-1 rounded-md border border-cyan-500/25 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200"
-                                    >
-                                      <span className="font-semibold">S{ghostSet.setNumber}</span>
-                                      <span className="text-cyan-100/90">
-                                        {ghostSet.weight ?? "—"} x {ghostSet.reps ?? "—"}
-                                      </span>
-                                    </span>
-                                  ))}
+                              {/* Exercise Notes */}
+                              <div className="space-y-1.5 pt-1">
+                                <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <NotebookPen className="h-3 w-3" />
+                                  Exercise notes
+                                </Label>
+                                <Textarea
+                                  placeholder="Notes for this exercise (optional)..."
+                                  value={exerciseBlock.notes}
+                                  onChange={(e) => setExerciseNote(exerciseIndex, e.target.value)}
+                                  className="min-h-[60px] resize-none text-sm"
+                                  rows={2}
+                                />
                               </div>
-                            </div>
-                          ) : null}
-                          {exerciseBlock.sets.map((set, setIndex) => {
-                            const matchedGhostSet = ghostWorkoutData?.exercises[
-                              exerciseBlock.exercise.id
-                            ]?.find((ghostSet) => ghostSet.setNumber === set.set_number);
-                            return (
-                              <SetRow
-                                key={set.id}
-                                set={set}
-                                previousSet={previousByExerciseId[exerciseBlock.exercise.id]?.[setIndex]}
-                                ghostSet={
-                                  matchedGhostSet
-                                    ? {
-                                        reps: matchedGhostSet.reps,
-                                        weight: matchedGhostSet.weight,
-                                      }
-                                    : undefined
-                                }
-                                autoFocusWeight={setIndex === exerciseBlock.sets.length - 1 && !set.completed}
-                                onUpdate={(updates) => updateSet(exerciseIndex, setIndex, updates)}
-                                onComplete={() => completeSet(exerciseIndex, setIndex)}
-                                onRemove={() => removeSet(exerciseIndex, setIndex)}
-                                onStartRest={(seconds) => {
-                                  const activeTimers = getActiveTimers();
-                                  for (const timer of activeTimers) {
-                                    stopTimer(timer.id);
-                                  }
-                                  startTimer(
-                                    exerciseBlock.exercise.id,
-                                    exerciseBlock.exercise.name,
-                                    seconds
-                                  );
-                                }}
-                              />
-                            );
-                          })}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full transition-all duration-200 hover:scale-[1.01]"
-                            onClick={() => addSet(exerciseIndex)}
-                          >
-                            Add Set
-                          </Button>
-                          {/* Exercise Notes */}
-                          <div className="space-y-1.5 pt-1">
-                            <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <NotebookPen className="h-3 w-3" />
-                              Exercise notes
-                            </Label>
-                            <Textarea
-                              placeholder="Notes for this exercise (optional)..."
-                              value={exerciseBlock.notes}
-                              onChange={(e) => setExerciseNote(exerciseIndex, e.target.value)}
-                              className="min-h-[60px] resize-none text-sm"
-                              rows={2}
-                            />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-            <Card className="border-border/70 bg-card/95 shadow-sm lg:sticky lg:top-20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Session Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Workout Notes */}
-                <div className="space-y-1.5 pb-3 border-b border-border/40">
-                  <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <NotebookPen className="h-3 w-3" />
-                    Workout notes
-                  </Label>
-                  <Textarea
-                    placeholder="How did the session feel? Any PRs or observations..."
-                    value={activeWorkout.notes}
-                    onChange={(e) => setWorkoutNote(e.target.value)}
-                    className="min-h-[72px] resize-none text-sm"
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="transition-all duration-200 hover:scale-[1.01]"
-                  onClick={handleOpenSaveTemplate}
-                >
-                  <Save className="mr-2 size-4" />
-                  Save Template
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="transition-all duration-200 hover:scale-[1.01]"
-                  onClick={handleCancelWorkout}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  className="transition-all duration-200 hover:scale-[1.01]"
-                  onClick={handleFinishWorkout}
-                >
-                  Finish Workout
-                </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-        </>
-      ) : null}
+                <Card className="border-border/70 bg-card/95 shadow-sm lg:sticky lg:top-20">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Session Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Workout Notes */}
+                    <div className="space-y-1.5 pb-3 border-b border-border/40">
+                      <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <NotebookPen className="h-3 w-3" />
+                        Workout notes
+                      </Label>
+                      <Textarea
+                        placeholder="How did the session feel? Any PRs or observations..."
+                        value={activeWorkout.notes}
+                        onChange={(e) => setWorkoutNote(e.target.value)}
+                        className="min-h-[72px] resize-none text-sm"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="transition-all duration-200 hover:scale-[1.01]"
+                        onClick={handleOpenSaveTemplate}
+                      >
+                        <Save className="mr-2 size-4" />
+                        Save Template
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        className="transition-all duration-200 hover:scale-[1.01]"
+                        onClick={handleCancelWorkout}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        className="transition-all duration-200 hover:scale-[1.01]"
+                        onClick={handleFinishWorkout}
+                      >
+                        Finish Workout
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </>
+        ) : null}
 
-      <SaveTemplateDialog
-        open={saveTemplateDialogOpen}
-        defaultName={activeWorkout?.name || ""}
-        onClose={() => setSaveTemplateDialogOpen(false)}
-        onSave={handleSaveTemplate}
-      />
-
-      <SendTemplateDialog
-        open={sendDialogOpen}
-        currentUserId={userId}
-        template={sendingTemplate}
-        onClose={() => {
-          setSendDialogOpen(false);
-          setSendingTemplate(null);
-        }}
-        onSend={async (recipientId, template, message) => {
-          await sendTemplate(recipientId, template, message);
-          toast.success("Template sent to shared mailbox");
-        }}
-      />
-
-      {/* Workout Complete Celebration */}
-      {showCelebration && celebrationStats && (
-        <WorkoutCompleteCelebration
-          stats={celebrationStats}
-          confettiStyle="gold"
-          onClose={handleCloseWorkoutCelebration}
+        <SaveTemplateDialog
+          open={saveTemplateDialogOpen}
+          defaultName={activeWorkout?.name || ""}
+          onClose={() => setSaveTemplateDialogOpen(false)}
+          onSave={handleSaveTemplate}
         />
-      )}
 
-      <Dialog open={sessionRpePromptOpen} onOpenChange={setSessionRpePromptOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rate Session Effort</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Quick post-session rating. This improves your fatigue estimate.
-            </p>
-            <div className="rounded-md border border-border/60 bg-card/40 p-3 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground">What is sRPE?</p>
-              <p className="mt-1">
-                sRPE means <span className="font-semibold">Session Rate of Perceived Exertion</span>:
-                how hard the <span className="font-semibold">entire workout</span> felt on a 0-10
-                scale.
-              </p>
-              <p className="mt-1">
-                0-2 = very easy, 3-5 = moderate, 6-8 = hard, 9-10 = near max effort.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>Session RPE</span>
-                <span className="font-semibold tabular-nums">{sessionRpeValue.toFixed(1)}</span>
-              </div>
-              <Slider
-                min={0}
-                max={10}
-                step={0.5}
-                value={[sessionRpeValue]}
-                onValueChange={(value) => setSessionRpeValue(value[0] ?? 7)}
-              />
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Very easy</span>
-                <span>Max effort</span>
-              </div>
-            </div>
-            <Button onClick={handleSaveSessionRpe} disabled={savingSessionRpe} className="w-full">
-              {savingSessionRpe ? "Saving..." : "Save Effort"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        <SendTemplateDialog
+          open={sendDialogOpen}
+          currentUserId={userId}
+          template={sendingTemplate}
+          onClose={() => {
+            setSendDialogOpen(false);
+            setSendingTemplate(null);
+          }}
+          onSend={async (recipientId, template, message) => {
+            await sendTemplate(recipientId, template, message);
+            toast.success("Template sent to shared mailbox");
+          }}
+        />
 
-      {/* Floating Rest Timer Pill */}
-      <RestTimerPill />
+        {/* Workout Complete Celebration */}
+        {showCelebration && celebrationStats && (
+          <WorkoutCompleteCelebration
+            stats={celebrationStats}
+            confettiStyle="gold"
+            onClose={handleCloseWorkoutCelebration}
+          />
+        )}
+
+        <Dialog open={sessionRpePromptOpen} onOpenChange={setSessionRpePromptOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rate Session Effort</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Quick post-session rating. This improves your fatigue estimate.
+              </p>
+              <div className="rounded-md border border-border/60 bg-card/40 p-3 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground">What is sRPE?</p>
+                <p className="mt-1">
+                  sRPE means <span className="font-semibold">Session Rate of Perceived Exertion</span>:
+                  how hard the <span className="font-semibold">entire workout</span> felt on a 0-10
+                  scale.
+                </p>
+                <p className="mt-1">
+                  0-2 = very easy, 3-5 = moderate, 6-8 = hard, 9-10 = near max effort.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Session RPE</span>
+                  <span className="font-semibold tabular-nums">{sessionRpeValue.toFixed(1)}</span>
+                </div>
+                <Slider
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  value={[sessionRpeValue]}
+                  onValueChange={(value) => setSessionRpeValue(value[0] ?? 7)}
+                />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Very easy</span>
+                  <span>Max effort</span>
+                </div>
+              </div>
+              <Button onClick={handleSaveSessionRpe} disabled={savingSessionRpe} className="w-full">
+                {savingSessionRpe ? "Saving..." : "Save Effort"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Floating Rest Timer Pill */}
+        <RestTimerPill />
       </div>
     </div>
   );

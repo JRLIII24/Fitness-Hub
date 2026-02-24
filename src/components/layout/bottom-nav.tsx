@@ -11,6 +11,7 @@ import {
   Clapperboard,
   Plus,
   Settings,
+  Store,
 } from "lucide-react";
 import type { ElementType } from "react";
 import { cn } from "@/lib/utils";
@@ -105,6 +106,7 @@ export function BottomNav() {
     { href: "/sets", label: "Sets", icon: Clapperboard },
     { href: "/nutrition", label: "Nutrition", icon: Apple },
     { href: "/social", label: "Social", icon: Users, badge: unreadCount },
+    { href: "/marketplace", label: "Marketplace", icon: Store },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

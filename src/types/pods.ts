@@ -74,6 +74,88 @@ export interface PodDetail extends PodWithMembers {
   }>;
 }
 
+// ── Pod Challenges ────────────────────────────────────────────────────────────
+
+export type ChallengeType = 'volume' | 'consistency' | 'distance';
+
+export interface PodChallenge {
+  id: string;
+  pod_id: string;
+  name: string;
+  challenge_type: ChallengeType;
+  start_date: string; // ISO date (YYYY-MM-DD)
+  end_date: string;   // ISO date (YYYY-MM-DD), inclusive
+  target_value: number | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface LeaderboardEntry {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  /** Score in natural units: kg (volume), sessions (consistency), km (distance) */
+  score: number;
+  rank: number;
+  workouts_cnt: number;
+  runs_cnt: number;
+}
+
+export interface ChallengeLeaderboard {
+  challenge: PodChallenge;
+  entries: LeaderboardEntry[];
+  score_unit: 'kg' | 'sessions' | 'km';
+  is_active: boolean;
+}
+
+export interface CreateChallengeInput {
+  name: string;
+  challenge_type: ChallengeType;
+  start_date: string;
+  end_date: string;
+  target_value?: number;
+}
+
+// ── Template Marketplace ───────────────────────────────────────────────────────
+
+export interface PublicTemplate {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  estimated_duration_min: number | null;
+  is_public: boolean;
+  save_count: number;
+  primary_muscle_group: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Only present when querying with exercise join */
+  template_exercises?: Array<{
+    id: string;
+    exercise_id: string;
+    sort_order: number;
+    target_sets: number | null;
+    target_reps: string | null;
+    target_weight_kg: number | null;
+    rest_seconds: number;
+    notes: string | null;
+    exercises?: {
+      id: string;
+      name: string;
+      muscle_group: string;
+      equipment: string;
+      category: string;
+    };
+  }>;
+  /** Only present when joined with saves */
+  is_saved?: boolean;
+  creator?: {
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+}
+
 // Form types
 
 export interface CreatePodInput {

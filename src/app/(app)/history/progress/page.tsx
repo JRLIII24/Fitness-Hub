@@ -31,6 +31,9 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HistoryNav } from "@/components/history/history-nav";
+import { generatePDF } from "@/lib/pdf-export";
+import { ProgressReportPdf } from "@/components/pdf/progress-report-pdf";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -364,6 +367,7 @@ export default function ProgressPage() {
   const [recordsFilter, setRecordsFilter] = useState("All");
   const [recordsSearch, setRecordsSearch] = useState("");
   const [recordsShowAll, setRecordsShowAll] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // ── Data fetch ────────────────────────────────────────────────────────────
 
@@ -720,6 +724,21 @@ export default function ProgressPage() {
   const totalPRs = personalRecords.length;
   const totalSessions = sessions.length;
 
+  // ── PDF Export ────────────────────────────────────────────────────────────
+
+  const handleExportPDF = async () => {
+    try {
+      setIsExporting(true);
+      const dateStr = format(new Date(), "yyyy-MM-dd");
+      await generatePDF("pdf-report-container", `FitHub_Progress_${dateStr}.pdf`);
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      // Optional: show a toast here
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
@@ -727,19 +746,48 @@ export default function ProgressPage() {
       <div className="mx-auto w-full max-w-md pb-28">
         {/* Header */}
         <div className="px-5 pb-5 pt-5">
-          <div className="mb-4 flex items-center gap-3">
-            <Link
-              href="/history"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
-                Analytics
-              </p>
-              <h1 className="text-2xl font-extrabold tracking-tight">Progress</h1>
+          <div className="mb-4 flex items-start justify-between">
+            <div className="space-y-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
+                  Analytics
+                </p>
+                <h1 className="text-2xl font-extrabold tracking-tight">Progress</h1>
+              </div>
+              <HistoryNav />
             </div>
+            {sessions.length > 0 && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleExportPDF}
+                disabled={isExporting}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-xl border border-border/60 bg-card/50 px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary/20",
+                  isExporting ? "opacity-50 cursor-not-allowed" : ""
+                )}
+              >
+                {isExporting ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3.5 w-3.5"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" x2="12" y1="15" y2="3" />
+                  </svg>
+                )}
+                <span className="hidden sm:inline">Export PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </motion.button>
+            )}
           </div>
 
           {!loading && totalSessions > 0 && (
@@ -1222,6 +1270,30 @@ export default function ProgressPage() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Hidden PDF Template */}
+      {sessions.length > 0 && (
+        <ProgressReportPdf
+          userName="User" // In a real app we might fetch user's name
+          reportDate={new Date()}
+          summaryStats={{
+            totalSessions,
+            totalPRs,
+            avgVolume: volumeStats?.avg,
+          }}
+          strengthCharts={allExerciseSparklines.map((c) => ({
+            ...c,
+            unitLabel,
+          }))}
+          personalRecords={personalRecords.map((pr) => ({
+            name: pr.name,
+            muscleGroup: pr.muscleGroup,
+            bestWeight: pr.bestWeight,
+            bestReps: pr.bestReps,
+            date: pr.dateAchieved,
+          }))}
+        />
+      )}
     </div>
   );
 }

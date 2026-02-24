@@ -1934,8 +1934,8 @@ export default function WorkoutPage() {
                     type="button"
                     onClick={() => { setSetupTab("templates"); setQuickFilter("All"); }}
                     className={`h-9 rounded-lg text-xs font-semibold transition ${setupTab === "templates"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-card/70"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-card/70"
                       }`}
                   >
                     My Templates
@@ -1949,8 +1949,8 @@ export default function WorkoutPage() {
                       setQuickFilter("All");
                     }}
                     className={`h-9 rounded-lg text-xs font-semibold transition ${setupTab === "quick"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-card/70"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-card/70"
                       }`}
                   >
                     Quick Start
@@ -1991,8 +1991,8 @@ export default function WorkoutPage() {
                           <div
                             key={template.id}
                             className={`rounded-xl border px-3 py-2 transition ${selectedTemplateId === template.id
-                                ? "border-primary/40 bg-primary/10"
-                                : "border-border/70 bg-card/70"
+                              ? "border-primary/40 bg-primary/10"
+                              : "border-border/70 bg-card/70"
                               }`}
                           >
                             <p className="truncate text-sm font-semibold">{template.name}</p>
@@ -2062,8 +2062,8 @@ export default function WorkoutPage() {
                       type="button"
                       onClick={() => setSelectedTemplateId("none")}
                       className={`rounded-xl border px-3 py-2 text-left transition ${selectedTemplateId === "none"
-                          ? "border-primary/40 bg-primary/10"
-                          : "border-border/70 bg-card/70 hover:bg-card"
+                        ? "border-primary/40 bg-primary/10"
+                        : "border-border/70 bg-card/70 hover:bg-card"
                         }`}
                     >
                       <p className="text-sm font-semibold">Start Fresh</p>
@@ -2096,8 +2096,8 @@ export default function WorkoutPage() {
                             setPendingCategory(null);
                           }}
                           className={`rounded-xl border px-3 py-2 text-left transition ${selectedTemplateId === template.id
-                              ? "border-primary/40 bg-primary/10"
-                              : "border-border/70 bg-card/70 hover:bg-card"
+                            ? "border-primary/40 bg-primary/10"
+                            : "border-border/70 bg-card/70 hover:bg-card"
                             }`}
                         >
                           <div className="flex items-start justify-between gap-1 mb-0.5">
@@ -2135,8 +2135,8 @@ export default function WorkoutPage() {
                                 handleToggleTemplateLike(template.id);
                               }}
                               className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${likedTemplateIds.has(template.id)
-                                  ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
-                                  : "border-border/70 text-muted-foreground"
+                                ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+                                : "border-border/70 text-muted-foreground"
                                 }`}
                             >
                               <Heart className="h-3 w-3" />
@@ -2200,8 +2200,8 @@ export default function WorkoutPage() {
                             type="button"
                             onClick={() => handlePresetChange(preset.id)}
                             className={`rounded-xl border px-3 py-2 text-left transition ${active
-                                ? "border-primary/40 bg-primary/10"
-                                : "border-border/70 bg-card/70 hover:bg-card"
+                              ? "border-primary/40 bg-primary/10"
+                              : "border-border/70 bg-card/70 hover:bg-card"
                               }`}
                           >
                             <div className="flex items-start justify-between gap-1 mb-0.5">
@@ -2239,8 +2239,8 @@ export default function WorkoutPage() {
                       type="button"
                       onClick={() => handlePresetChange("custom")}
                       className={`rounded-xl border px-3 py-2 text-left transition ${presetId === "custom"
-                          ? "border-primary/40 bg-primary/10"
-                          : "border-border/70 bg-card/70 hover:bg-card"
+                        ? "border-primary/40 bg-primary/10"
+                        : "border-border/70 bg-card/70 hover:bg-card"
                         }`}
                     >
                       <p className="text-xs font-semibold">Custom</p>
@@ -2271,8 +2271,8 @@ export default function WorkoutPage() {
                 const isStartFresh = selectedTemplateId === "none";
                 return (
                   <div className={`space-y-2 rounded-xl border p-3 ${isStartFresh
-                      ? "border-border/70 bg-secondary/20"
-                      : "border-amber-500/40 bg-amber-500/5"
+                    ? "border-border/70 bg-secondary/20"
+                    : "border-amber-500/40 bg-amber-500/5"
                     }`}>
                     <p className={`text-[11px] font-semibold uppercase tracking-[0.1em] ${isStartFresh ? "text-muted-foreground" : "text-amber-400"
                       }`}>
@@ -2474,20 +2474,6 @@ export default function WorkoutPage() {
                   {selectedExercise ? (
                     <div className="rounded-xl border border-border/70 bg-card/80 p-3">
                       <div className="flex items-center gap-3">
-                        {selectedExerciseMediaUrl ? (
-                          <Image
-                            src={selectedExerciseMediaUrl}
-                            alt={selectedExercise.name}
-                            width={64}
-                            height={64}
-                            unoptimized
-                            className="size-16 rounded-md object-cover bg-muted shrink-0"
-                          />
-                        ) : (
-                          <div className="flex size-16 items-center justify-center rounded-md bg-muted">
-                            <Dumbbell className="size-5 text-muted-foreground" />
-                          </div>
-                        )}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold">{selectedExercise.name}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">

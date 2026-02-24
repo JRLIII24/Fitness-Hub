@@ -36,6 +36,16 @@ interface ProgressReportPdfProps {
     }[];
 }
 
+/**
+ * PDF report template.
+ *
+ * ALL colours are expressed as inline hex/rgb values so that html2canvas
+ * can parse every computed style. Tailwind v4 resolves utilities such as
+ * `text-gray-900` to oklch() / lab() internally, and html2canvas 1.x
+ * cannot parse those colour functions — resulting in the
+ * "Attempting to parse an unsupported color function 'lab'" console error
+ * and a blank or broken PDF.
+ */
 export function ProgressReportPdf({
     id = "pdf-report-container",
     userName,
@@ -47,51 +57,122 @@ export function ProgressReportPdf({
     return (
         <div
             id={id}
-            className="bg-white text-black p-10 font-sans"
             style={{
-                width: "794px", // A4 width
-                minHeight: "1123px", // A4 height
+                width: "794px",
+                minHeight: "1123px",
                 position: "absolute",
-                left: "-9999px", // Hide from view
+                left: "-9999px",
                 top: "-9999px",
+                backgroundColor: "#ffffff",
+                color: "#111827",
+                padding: "40px",
+                fontFamily:
+                    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
             }}
         >
             {/* Header */}
-            <div className="flex items-center justify-between border-b-2 border-gray-200 pb-6 mb-8">
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderBottom: "2px solid #e5e7eb",
+                    paddingBottom: "24px",
+                    marginBottom: "32px",
+                }}
+            >
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+                    <h1
+                        style={{
+                            fontSize: "30px",
+                            fontWeight: 800,
+                            letterSpacing: "-0.025em",
+                            color: "#111827",
+                            margin: 0,
+                        }}
+                    >
                         Fit-Hub Progress Report
                     </h1>
-                    <p className="text-gray-500 mt-1 text-lg">{userName}</p>
+                    <p style={{ color: "#6b7280", marginTop: "4px", fontSize: "18px" }}>
+                        {userName}
+                    </p>
                 </div>
-                <div className="text-right">
-                    <p className="text-sm text-gray-400 font-semibold uppercase tracking-wider">
+                <div style={{ textAlign: "right" }}>
+                    <p
+                        style={{
+                            fontSize: "12px",
+                            color: "#9ca3af",
+                            fontWeight: 600,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                        }}
+                    >
                         Report Generated
                     </p>
-                    <p className="text-gray-900 font-medium">
+                    <p style={{ color: "#111827", fontWeight: 500 }}>
                         {format(reportDate, "MMMM d, yyyy")}
                     </p>
                 </div>
             </div>
 
             {/* Summary Stats */}
-            <div className="mb-10">
-                <h2 className="text-xl font-bold mb-4 text-gray-800 border-b border-gray-100 pb-2">
+            <div style={{ marginBottom: "40px" }}>
+                <h2
+                    style={{
+                        fontSize: "20px",
+                        fontWeight: 700,
+                        marginBottom: "16px",
+                        color: "#1f2937",
+                        borderBottom: "1px solid #f3f4f6",
+                        paddingBottom: "8px",
+                    }}
+                >
                     Summary Overview
                 </h2>
-                <div className="grid grid-cols-3 gap-6">
-                    <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
-                        <p className="text-sm font-medium text-gray-500 mb-1">Total Sessions</p>
-                        <p className="text-3xl font-bold text-gray-900">{summaryStats.totalSessions}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "24px" }}>
+                    <div
+                        style={{
+                            backgroundColor: "#f9fafb",
+                            padding: "20px",
+                            borderRadius: "16px",
+                            border: "1px solid #f3f4f6",
+                        }}
+                    >
+                        <p style={{ fontSize: "14px", fontWeight: 500, color: "#6b7280", marginBottom: "4px" }}>
+                            Total Sessions
+                        </p>
+                        <p style={{ fontSize: "30px", fontWeight: 700, color: "#111827", margin: 0 }}>
+                            {summaryStats.totalSessions}
+                        </p>
                     </div>
-                    <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
-                        <p className="text-sm font-medium text-gray-500 mb-1">Personal Records</p>
-                        <p className="text-3xl font-bold text-emerald-600">{summaryStats.totalPRs}</p>
+                    <div
+                        style={{
+                            backgroundColor: "#f9fafb",
+                            padding: "20px",
+                            borderRadius: "16px",
+                            border: "1px solid #f3f4f6",
+                        }}
+                    >
+                        <p style={{ fontSize: "14px", fontWeight: 500, color: "#6b7280", marginBottom: "4px" }}>
+                            Personal Records
+                        </p>
+                        <p style={{ fontSize: "30px", fontWeight: 700, color: "#059669", margin: 0 }}>
+                            {summaryStats.totalPRs}
+                        </p>
                     </div>
                     {summaryStats.avgVolume !== undefined && (
-                        <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
-                            <p className="text-sm font-medium text-gray-500 mb-1">Avg Vol per Session</p>
-                            <p className="text-3xl font-bold text-gray-900">
+                        <div
+                            style={{
+                                backgroundColor: "#f9fafb",
+                                padding: "20px",
+                                borderRadius: "16px",
+                                border: "1px solid #f3f4f6",
+                            }}
+                        >
+                            <p style={{ fontSize: "14px", fontWeight: 500, color: "#6b7280", marginBottom: "4px" }}>
+                                Avg Vol per Session
+                            </p>
+                            <p style={{ fontSize: "30px", fontWeight: 700, color: "#111827", margin: 0 }}>
                                 {(summaryStats.avgVolume / 1000).toFixed(1)}k
                             </p>
                         </div>
@@ -101,49 +182,87 @@ export function ProgressReportPdf({
 
             {/* Strength Trends */}
             {strengthCharts.length > 0 && (
-                <div className="mb-12" style={{ pageBreakInside: "avoid" }}>
-                    <h2 className="text-xl font-bold mb-4 text-gray-800 border-b border-gray-100 pb-2">
+                <div style={{ marginBottom: "48px", pageBreakInside: "avoid" }}>
+                    <h2
+                        style={{
+                            fontSize: "20px",
+                            fontWeight: 700,
+                            marginBottom: "16px",
+                            color: "#1f2937",
+                            borderBottom: "1px solid #f3f4f6",
+                            paddingBottom: "8px",
+                        }}
+                    >
                         Top Strength Trends
                     </h2>
-                    <div className="grid grid-cols-2 gap-6">
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
                         {strengthCharts.slice(0, 6).map((chart, i) => (
                             <div
                                 key={i}
-                                className="border border-gray-200 rounded-2xl p-4 bg-white shadow-sm"
+                                style={{
+                                    border: "1px solid #e5e7eb",
+                                    borderRadius: "16px",
+                                    padding: "16px",
+                                    backgroundColor: "#ffffff",
+                                    boxShadow: "0 1px 2px 0 rgba(0,0,0,0.05)",
+                                }}
                             >
-                                <div className="flex justify-between items-start mb-3">
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "flex-start",
+                                        marginBottom: "12px",
+                                    }}
+                                >
                                     <div>
-                                        <h3 className="font-bold text-gray-900">{chart.name}</h3>
-                                        <p className="text-xs text-gray-500 uppercase tracking-wider mt-0.5">
+                                        <h3 style={{ fontWeight: 700, color: "#111827", margin: 0 }}>
+                                            {chart.name}
+                                        </h3>
+                                        <p
+                                            style={{
+                                                fontSize: "12px",
+                                                color: "#6b7280",
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.05em",
+                                                marginTop: "2px",
+                                            }}
+                                        >
                                             {chart.muscleGroup.replace("_", " ")}
                                         </p>
                                     </div>
                                     <span
-                                        className={`text-xs font-bold px-2 py-1 rounded-full ${chart.trend > 0
-                                                ? "bg-emerald-100 text-emerald-700"
-                                                : chart.trend < 0
-                                                    ? "bg-red-100 text-red-700"
-                                                    : "bg-gray-100 text-gray-600"
-                                            }`}
+                                        style={{
+                                            fontSize: "12px",
+                                            fontWeight: 700,
+                                            padding: "4px 8px",
+                                            borderRadius: "9999px",
+                                            backgroundColor:
+                                                chart.trend > 0
+                                                    ? "#d1fae5"
+                                                    : chart.trend < 0
+                                                        ? "#fee2e2"
+                                                        : "#f3f4f6",
+                                            color:
+                                                chart.trend > 0
+                                                    ? "#047857"
+                                                    : chart.trend < 0
+                                                        ? "#b91c1c"
+                                                        : "#4b5563",
+                                        }}
                                     >
                                         {chart.trend > 0 ? "+" : ""}
                                         {Math.round(chart.trend)}%
                                     </span>
                                 </div>
-                                <div className="h-32 w-full">
+                                <div style={{ height: "128px", width: "100%" }}>
                                     <ResponsiveContainer width="100%" height="100%">
                                         <AreaChart
                                             data={chart.dataPoints}
                                             margin={{ top: 5, right: 0, bottom: 5, left: 0 }}
                                         >
-                                            <XAxis
-                                                dataKey="date"
-                                                hide
-                                            />
-                                            <YAxis
-                                                domain={['dataMin', 'dataMax']}
-                                                hide
-                                            />
+                                            <XAxis dataKey="date" hide />
+                                            <YAxis domain={["dataMin", "dataMax"]} hide />
                                             <CartesianGrid
                                                 strokeDasharray="3 3"
                                                 vertical={false}
@@ -155,7 +274,7 @@ export function ProgressReportPdf({
                                                 stroke="#0f172a"
                                                 strokeWidth={2}
                                                 fill="#f1f5f9"
-                                                isAnimationActive={false} // CRITICAL for PDF export
+                                                isAnimationActive={false}
                                             />
                                         </AreaChart>
                                     </ResponsiveContainer>
@@ -169,40 +288,146 @@ export function ProgressReportPdf({
             {/* Personal Records */}
             {personalRecords.length > 0 && (
                 <div style={{ pageBreakInside: "avoid" }}>
-                    <h2 className="text-xl font-bold mb-4 text-gray-800 border-b border-gray-100 pb-2">
+                    <h2
+                        style={{
+                            fontSize: "20px",
+                            fontWeight: 700,
+                            marginBottom: "16px",
+                            color: "#1f2937",
+                            borderBottom: "1px solid #f3f4f6",
+                            paddingBottom: "8px",
+                        }}
+                    >
                         All-Time Personal Records
                     </h2>
-                    <div className="overflow-hidden rounded-xl border border-gray-200">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div
+                        style={{
+                            overflow: "hidden",
+                            borderRadius: "12px",
+                            border: "1px solid #e5e7eb",
+                        }}
+                    >
+                        <table
+                            style={{
+                                minWidth: "100%",
+                                borderCollapse: "collapse",
+                            }}
+                        >
+                            <thead>
+                                <tr style={{ backgroundColor: "#f9fafb" }}>
+                                    <th
+                                        style={{
+                                            padding: "12px 24px",
+                                            textAlign: "left",
+                                            fontSize: "12px",
+                                            fontWeight: 500,
+                                            color: "#6b7280",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.05em",
+                                            borderBottom: "1px solid #e5e7eb",
+                                        }}
+                                    >
                                         Exercise
                                     </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th
+                                        style={{
+                                            padding: "12px 24px",
+                                            textAlign: "left",
+                                            fontSize: "12px",
+                                            fontWeight: 500,
+                                            color: "#6b7280",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.05em",
+                                            borderBottom: "1px solid #e5e7eb",
+                                        }}
+                                    >
                                         Muscle Group
                                     </th>
-                                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th
+                                        style={{
+                                            padding: "12px 24px",
+                                            textAlign: "right",
+                                            fontSize: "12px",
+                                            fontWeight: 500,
+                                            color: "#6b7280",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.05em",
+                                            borderBottom: "1px solid #e5e7eb",
+                                        }}
+                                    >
                                         Best Weight
                                     </th>
-                                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th
+                                        style={{
+                                            padding: "12px 24px",
+                                            textAlign: "right",
+                                            fontSize: "12px",
+                                            fontWeight: 500,
+                                            color: "#6b7280",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.05em",
+                                            borderBottom: "1px solid #e5e7eb",
+                                        }}
+                                    >
                                         Date Achieved
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody>
                                 {personalRecords.slice(0, 15).map((pr, i) => (
-                                    <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                                        <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    <tr
+                                        key={i}
+                                        style={{
+                                            backgroundColor: i % 2 === 0 ? "#ffffff" : "#f9fafb",
+                                            borderBottom: "1px solid #e5e7eb",
+                                        }}
+                                    >
+                                        <td
+                                            style={{
+                                                padding: "12px 24px",
+                                                whiteSpace: "nowrap",
+                                                fontSize: "14px",
+                                                fontWeight: 500,
+                                                color: "#111827",
+                                            }}
+                                        >
                                             {pr.name}
                                         </td>
-                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 capitalize">
+                                        <td
+                                            style={{
+                                                padding: "12px 24px",
+                                                whiteSpace: "nowrap",
+                                                fontSize: "14px",
+                                                color: "#6b7280",
+                                                textTransform: "capitalize",
+                                            }}
+                                        >
                                             {pr.muscleGroup.replace("_", " ")}
                                         </td>
-                                        <td className="px-6 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                                            {pr.bestWeight} <span className="text-gray-500 font-normal">x {pr.bestReps}</span>
+                                        <td
+                                            style={{
+                                                padding: "12px 24px",
+                                                whiteSpace: "nowrap",
+                                                fontSize: "14px",
+                                                fontWeight: 700,
+                                                color: "#111827",
+                                                textAlign: "right",
+                                            }}
+                                        >
+                                            {pr.bestWeight}{" "}
+                                            <span style={{ color: "#6b7280", fontWeight: 400 }}>
+                                                x {pr.bestReps}
+                                            </span>
                                         </td>
-                                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
+                                        <td
+                                            style={{
+                                                padding: "12px 24px",
+                                                whiteSpace: "nowrap",
+                                                fontSize: "14px",
+                                                color: "#6b7280",
+                                                textAlign: "right",
+                                            }}
+                                        >
                                             {pr.date}
                                         </td>
                                     </tr>
@@ -214,7 +439,19 @@ export function ProgressReportPdf({
             )}
 
             {/* Footer */}
-            <div className="absolute bottom-10 left-10 right-10 text-center text-xs text-gray-400 border-t border-gray-100 pt-4">
+            <div
+                style={{
+                    position: "absolute",
+                    bottom: "40px",
+                    left: "40px",
+                    right: "40px",
+                    textAlign: "center",
+                    fontSize: "12px",
+                    color: "#9ca3af",
+                    borderTop: "1px solid #f3f4f6",
+                    paddingTop: "16px",
+                }}
+            >
                 Powered by Fit-Hub • Your personal fitness companion
             </div>
         </div>

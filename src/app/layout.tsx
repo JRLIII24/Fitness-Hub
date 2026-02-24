@@ -3,7 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
-import "./globals.css";
+import "./global.css";
 
 export const metadata: Metadata = {
   title: "FitHub — Workout & Nutrition Tracker",

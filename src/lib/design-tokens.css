@@ -53,18 +53,29 @@
   --accent-l: 0.70;
   /* Lightness (0-1) */
 
-  /* Accent scales */
-  --accent-50: oklch(0.95 calc(var(--accent-c) * 0.3) var(--accent-h));
-  --accent-100: oklch(0.90 calc(var(--accent-c) * 0.5) var(--accent-h));
-  --accent-200: oklch(0.85 calc(var(--accent-c) * 0.7) var(--accent-h));
-  --accent-300: oklch(0.80 calc(var(--accent-c) * 0.85) var(--accent-h));
+  /* Accent scales — chroma pre-computed to avoid calc() inside oklch() */
+  --accent-c-30: 0.06;
+  /* accent-c * 0.3  (0.20 * 0.3)  */
+  --accent-c-50: 0.10;
+  /* accent-c * 0.5  (0.20 * 0.5)  */
+  --accent-c-70: 0.14;
+  /* accent-c * 0.7  (0.20 * 0.7)  */
+  --accent-c-85: 0.17;
+  /* accent-c * 0.85 (0.20 * 0.85) */
+  --accent-c-90: 0.18;
+  /* accent-c * 0.9  (0.20 * 0.9)  */
+
+  --accent-50: oklch(0.95 var(--accent-c-30) var(--accent-h));
+  --accent-100: oklch(0.90 var(--accent-c-50) var(--accent-h));
+  --accent-200: oklch(0.85 var(--accent-c-70) var(--accent-h));
+  --accent-300: oklch(0.80 var(--accent-c-85) var(--accent-h));
   --accent-400: oklch(0.75 var(--accent-c) var(--accent-h));
   --accent-500: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
   /* Base */
   --accent-600: oklch(0.65 var(--accent-c) var(--accent-h));
-  --accent-700: oklch(0.55 calc(var(--accent-c) * 0.9) var(--accent-h));
-  --accent-800: oklch(0.45 calc(var(--accent-c) * 0.7) var(--accent-h));
-  --accent-900: oklch(0.35 calc(var(--accent-c) * 0.5) var(--accent-h));
+  --accent-700: oklch(0.55 var(--accent-c-90) var(--accent-h));
+  --accent-800: oklch(0.45 var(--accent-c-70) var(--accent-h));
+  --accent-900: oklch(0.35 var(--accent-c-50) var(--accent-h));
 
   /* ==================== SPACING SCALE (4px base grid) ==================== */
   --space-0: 0;

@@ -21,6 +21,15 @@ export interface PDFReportData {
         bestReps: number;
         date: string;
     }[];
+    /** Optional: session-by-session summaries for the workout log section */
+    sessionSummaries?: {
+        name: string;
+        date: string;
+        time: string;
+        duration: string;
+        volume: string | null;
+        exercises: string[];
+    }[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -138,10 +147,71 @@ export async function generateProgressPDF(data: PDFReportData): Promise<void> {
     }
     y += 22;
 
+    // ── Session log ───────────────────────────────────────────────────────────
+
+    if (data.sessionSummaries?.length) {
+        checkPageBreak(20);
+        sectionTitle("Recent Workout Log");
+
+        for (const session of data.sessionSummaries) {
+            const exLines = session.exercises.slice(0, 6);
+            const cardH = 8 + exLines.length * 5 + 6;
+            checkPageBreak(cardH + 3);
+
+            // Card background
+            setFill(doc, "#f9fafb");
+            setDraw(doc, "#e5e7eb");
+            doc.setLineWidth(0.3);
+            doc.roundedRect(margin, y, contentW, cardH, 3, 3, "FD");
+
+            // Left accent bar
+            setFill(doc, "#111827");
+            doc.rect(margin, y, 2.5, cardH, "F");
+
+            // Workout name
+            setTextColor(doc, "#111827");
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "bold");
+            const name = session.name.length > 55 ? session.name.slice(0, 53) + "…" : session.name;
+            doc.text(name, margin + 7, y + 6);
+
+            // Date · Time · Duration · Volume — right-aligned meta
+            const meta = [session.date, session.time, session.duration, session.volume]
+                .filter(Boolean)
+                .join("  ·  ");
+            setTextColor(doc, "#6b7280");
+            doc.setFontSize(6.5);
+            doc.setFont("helvetica", "normal");
+            doc.text(meta, margin + contentW - 3, y + 6, { align: "right" });
+
+            // Exercise bullets
+            let ey = y + 11;
+            for (const ex of exLines) {
+                setTextColor(doc, "#374151");
+                doc.setFontSize(7);
+                doc.setFont("helvetica", "normal");
+                // Bullet dot
+                setFill(doc, "#9ca3af");
+                doc.circle(margin + 9.5, ey - 1.5, 0.8, "F");
+                doc.text(ex, margin + 12, ey);
+                ey += 5;
+            }
+            if (session.exercises.length > 6) {
+                setTextColor(doc, "#9ca3af");
+                doc.setFontSize(6.5);
+                doc.text(`+ ${session.exercises.length - 6} more exercise${session.exercises.length - 6 !== 1 ? "s" : ""}`, margin + 12, ey);
+            }
+
+            y += cardH + 3;
+        }
+        y += 4;
+    }
+
     // ── Strength trends ───────────────────────────────────────────────────────
 
     if (data.strengthCharts.length > 0) {
         sectionTitle("Top Strength Trends");
+
 
         const charts = data.strengthCharts.slice(0, 6);
         const colW = (contentW - 4) / 2;

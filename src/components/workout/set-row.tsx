@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Check, Play, Trash2, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 
 interface SetRowProps {
   set: WorkoutSet;
@@ -26,6 +28,8 @@ interface SetRowProps {
     reps: number | null;
     weight: number | null;
   };
+  /** Display-only suggested weight in kg (never written to store) */
+  suggestedWeight?: number | null;
   autoFocusWeight?: boolean;
   onUpdate: (updates: Partial<WorkoutSet>) => void;
   onComplete: () => void;
@@ -40,18 +44,31 @@ const setTypeColors: Record<string, string> = {
   failure: "bg-destructive/20 text-destructive border-destructive/30",
 };
 
-export function SetRow({
+export const SetRow = memo(function SetRow({
   set,
   previousSet,
   ghostSet,
+  suggestedWeight = null,
   autoFocusWeight = false,
   onUpdate,
   onComplete,
   onRemove,
   onStartRest,
 }: SetRowProps) {
+  const { preference, unitLabel } = useUnitPreferenceStore();
+
+  // Conversion helpers — all DB values are true kg
+  const KG_TO_LBS = 2.20462;
+  const toDisplay = (kg: number) =>
+    preference === "imperial"
+      ? Math.round(kg * KG_TO_LBS * 10) / 10
+      : Math.round(kg * 100) / 100;
+  const fromDisplay = (val: number) =>
+    preference === "imperial" ? val / KG_TO_LBS : val;
+
   const restSeconds = set.rest_seconds ?? 90;
-  const weightValue = set.weight_kg === null ? "" : String(set.weight_kg);
+  const weightValue =
+    set.weight_kg === null ? "" : String(toDisplay(set.weight_kg));
   const repsValue = set.reps === null ? "" : String(set.reps);
   const rirValue = set.rir === null ? "" : String(set.rir);
 
@@ -80,7 +97,7 @@ export function SetRow({
 
     const parsed = Number(value);
     if (Number.isFinite(parsed)) {
-      onUpdate({ weight_kg: parsed });
+      onUpdate({ weight_kg: fromDisplay(parsed) });
     }
   };
 
@@ -150,11 +167,11 @@ export function SetRow({
     ghostScore != null && currentScore != null && ghostScore > 0
       ? Math.round((currentScore / ghostScore) * 100)
       : null;
-  const ghostWeightText = ghostSet?.weight != null ? `${ghostSet.weight}` : "—";
+  const ghostWeightText = ghostSet?.weight != null ? `${toDisplay(ghostSet.weight)}` : "—";
   const ghostRepsText = ghostSet?.reps != null ? `${ghostSet.reps}` : "—";
-  const previousWeightText = previousSet?.weight != null ? `${previousSet.weight}` : "—";
+  const previousWeightText = previousSet?.weight != null ? `${toDisplay(previousSet.weight)}` : "—";
   const previousRepsText = previousSet?.reps != null ? `${previousSet.reps}` : "—";
-  const currentWeightText = set.weight_kg != null ? `${set.weight_kg}` : "—";
+  const currentWeightText = set.weight_kg != null ? `${toDisplay(set.weight_kg)}` : "—";
   const currentRepsText = set.reps != null ? `${set.reps}` : "—";
 
   return (
@@ -251,18 +268,29 @@ export function SetRow({
 
       {/* Ghost workout indicator */}
       {ghostSet && !set.completed && (ghostSet.weight != null || ghostSet.reps != null) && (
-        <div className="flex items-center justify-between rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1.5 text-xs">
-          <span className="flex items-center gap-1.5 text-cyan-400/70">
-            <span className="text-[10px]">👻</span>
-            <span className="font-medium">LAST TIME:</span>
-            <span className="font-semibold tabular-nums">
-              {ghostWeightText} × {ghostRepsText}
+        <div className="space-y-1 rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1.5 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-cyan-400/70">
+              <span className="text-[10px]">👻</span>
+              <span className="font-medium">Previous:</span>
+              <span className="font-semibold tabular-nums">
+                {ghostWeightText} × {ghostRepsText}
+              </span>
             </span>
-          </span>
-          {ghostPercentage != null && ghostPercentage < 100 && (
-            <span className="text-muted-foreground">
-              {ghostPercentage}% of ghost
-            </span>
+            {ghostPercentage != null && ghostPercentage < 100 && (
+              <span className="text-muted-foreground">
+                {ghostPercentage}% of ghost
+              </span>
+            )}
+          </div>
+          {suggestedWeight != null && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px]">🔥</span>
+              <span className="font-medium text-amber-400/80">Suggested:</span>
+              <span className="font-bold tabular-nums text-amber-400">
+                {toDisplay(suggestedWeight)} {unitLabel}
+              </span>
+            </div>
           )}
         </div>
       )}
@@ -273,14 +301,14 @@ export function SetRow({
             htmlFor={`weight-${set.id}`}
             className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
           >
-            Weight (lbs)
+            Weight ({unitLabel})
           </label>
           <Input
             id={`weight-${set.id}`}
             autoFocus={autoFocusWeight}
             type="number"
             inputMode="decimal"
-            placeholder="0"
+            placeholder={suggestedWeight != null ? String(toDisplay(suggestedWeight)) : "0"}
             value={weightValue}
             onChange={(e) => handleWeightChange(e.target.value)}
             className="h-10 w-full text-center text-[18px] font-semibold tabular-nums text-foreground"
@@ -394,4 +422,4 @@ export function SetRow({
       ) : null}
     </div>
   );
-}
+});

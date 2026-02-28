@@ -1,4 +1,3 @@
-```sql
 -- ============================================================================
 -- Fit-Hub Complete Test Data Seed
 -- Creates 2 test users with full data across all features
@@ -30,6 +29,10 @@ INSERT INTO auth.users (
   email,
   encrypted_password,
   email_confirmed_at,
+  confirmation_token,
+  email_change,
+  email_change_token_new,
+  recovery_token,
   raw_app_meta_data,
   created_at,
   updated_at,
@@ -43,6 +46,10 @@ INSERT INTO auth.users (
   'mason@fithub.demo',
   crypt('Test123!', gen_salt('bf')), -- Password: Test123!
   now(),
+  '',
+  '',
+  '',
+  '',
   '{"provider":"email","providers":["email"]}'::jsonb,
   now(),
   now(),
@@ -52,6 +59,10 @@ INSERT INTO auth.users (
   email = EXCLUDED.email,
   encrypted_password = EXCLUDED.encrypted_password,
   email_confirmed_at = EXCLUDED.email_confirmed_at,
+  confirmation_token = EXCLUDED.confirmation_token,
+  email_change = EXCLUDED.email_change,
+  email_change_token_new = EXCLUDED.email_change_token_new,
+  recovery_token = EXCLUDED.recovery_token,
   raw_app_meta_data = EXCLUDED.raw_app_meta_data,
   raw_user_meta_data = EXCLUDED.raw_user_meta_data,
   updated_at = now();
@@ -78,7 +89,7 @@ INSERT INTO auth.identities (
     'mason@fithub.demo'
   )::jsonb,
   'email',
-  '00000000-0000-0000-0000-000000000001',
+  'mason@fithub.demo',
   now(),
   now(),
   now()
@@ -99,6 +110,10 @@ INSERT INTO auth.users (
   email,
   encrypted_password,
   email_confirmed_at,
+  confirmation_token,
+  email_change,
+  email_change_token_new,
+  recovery_token,
   raw_app_meta_data,
   created_at,
   updated_at,
@@ -112,6 +127,10 @@ INSERT INTO auth.users (
   'riley@fithub.demo',
   crypt('Test123!', gen_salt('bf')), -- Password: Test123!
   now(),
+  '',
+  '',
+  '',
+  '',
   '{"provider":"email","providers":["email"]}'::jsonb,
   now(),
   now(),
@@ -121,6 +140,10 @@ INSERT INTO auth.users (
   email = EXCLUDED.email,
   encrypted_password = EXCLUDED.encrypted_password,
   email_confirmed_at = EXCLUDED.email_confirmed_at,
+  confirmation_token = EXCLUDED.confirmation_token,
+  email_change = EXCLUDED.email_change,
+  email_change_token_new = EXCLUDED.email_change_token_new,
+  recovery_token = EXCLUDED.recovery_token,
   raw_app_meta_data = EXCLUDED.raw_app_meta_data,
   raw_user_meta_data = EXCLUDED.raw_user_meta_data,
   updated_at = now();
@@ -147,7 +170,7 @@ INSERT INTO auth.identities (
     'riley@fithub.demo'
   )::jsonb,
   'email',
-  '00000000-0000-0000-0000-000000000002',
+  'riley@fithub.demo',
   now(),
   now(),
   now()
@@ -882,4 +905,3 @@ COMMIT;
 --   Email: riley@fithub.demo
 --   Password: Test123!
 -- ============================================================================
-```

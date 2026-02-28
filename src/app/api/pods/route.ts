@@ -6,6 +6,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireAuth } from "@/lib/auth-utils";
+import { rateLimit } from "@/lib/rate-limit";
+import { parsePayload } from "@/lib/validation/parse";
+import { createPodSchema } from "@/lib/validation/pods.schemas";
 
 /**
  * GET /api/pods
@@ -16,10 +20,8 @@ export async function GET() {
     const supabase = await createClient();
 
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     // Get pod IDs where user is an active member
     const { data: membershipData, error: membershipError } = await supabase
@@ -106,28 +108,23 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
 
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
+
+    // Rate limit: 5 pod creations per user per minute
+    if (!rateLimit(`pods:${user.id}`, 5, 60_000)) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
-    const body = await request.json();
-    const { name, description } = body;
-
-    // Validate input
-    if (!name || typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 50) {
-      return NextResponse.json(
-        { error: 'Pod name must be between 2-50 characters' },
-        { status: 400 }
-      );
+    let body;
+    try { body = await request.json(); } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
-
-    if (description && (typeof description !== 'string' || description.length > 200)) {
-      return NextResponse.json(
-        { error: 'Description must be 200 characters or less' },
-        { status: 400 }
-      );
+    const parsed = parsePayload(createPodSchema, body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error }, { status: 400 });
     }
+    const { name, description } = parsed.data;
 
     // Create pod
     const { data: pod, error: createError } = await supabase

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth-utils";
 
 interface OpenFoodFactsNutriments {
   "energy-kcal_100g"?: number;
@@ -211,10 +212,8 @@ export async function GET(
     const supabase = await createClient();
 
     // Auth check — must be logged in to look up barcodes
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     // 1. Check local database first
     const { data: existingItem, error: dbError } = await supabase

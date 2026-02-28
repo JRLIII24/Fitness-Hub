@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireAuth } from "@/lib/auth-utils";
 import { generateAdaptiveWorkout } from '@/lib/adaptive/workout-generator';
 
 /**
@@ -16,13 +17,8 @@ export async function GET() {
     const supabase = await createClient();
 
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     // Generate adaptive workout
     const adaptiveWorkout = await generateAdaptiveWorkout(user.id);
@@ -60,13 +56,8 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
 
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     const body = await request.json();
     const { accepted, template_id, adaptation_type } = body;

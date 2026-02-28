@@ -69,11 +69,6 @@ export async function importPublicTemplate(
   return { templateId: data as string, isNew: true };
 }
 
-/**
- * Strip the import fingerprint suffix from a description for display purposes.
- * The fingerprint is never shown in the UI.
- */
-export function stripImportFingerprint(description: string | null): string | null {
-  if (!description) return null;
-  return description.replace(/\s*\[imported:[0-9a-f-]{36}\]$/i, '').trim() || null;
-}
+// Re-exported from the shared utility so server-side code can still import it
+// from this module without breaking.
+export { stripImportFingerprint } from '@/lib/template-utils';

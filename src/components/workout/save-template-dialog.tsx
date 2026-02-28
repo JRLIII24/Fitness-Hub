@@ -8,16 +8,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { DIFFICULTY_LEVELS, type DifficultyLevel } from "@/lib/template-utils";
 
 interface Props {
   open: boolean;
   defaultName?: string;
   onClose: () => void;
-  onSave: (name: string) => Promise<void>;
+  onSave: (name: string, isPublic: boolean, difficulty: DifficultyLevel) => Promise<void>;
 }
 
 export function SaveTemplateDialog({ open, defaultName = "", onClose, onSave }: Props) {
   const [loading, setLoading] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>("grind");
   const {
     register,
     handleSubmit,
@@ -32,8 +36,10 @@ export function SaveTemplateDialog({ open, defaultName = "", onClose, onSave }: 
   const onSubmit = async (data: SaveTemplateFormData) => {
     setLoading(true);
     try {
-      await onSave(data.name.trim());
+      await onSave(data.name.trim(), isPublic, difficulty);
       reset();
+      setIsPublic(true);
+      setDifficulty("grind");
       onClose();
     } catch (err) {
       setError("name", {
@@ -45,9 +51,11 @@ export function SaveTemplateDialog({ open, defaultName = "", onClose, onSave }: 
     }
   };
 
-  const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen) {
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
       reset();
+      setIsPublic(true);
+      setDifficulty("grind");
       onClose();
     }
   };
@@ -72,9 +80,44 @@ export function SaveTemplateDialog({ open, defaultName = "", onClose, onSave }: 
               <p className="text-destructive text-xs">{errors.name.message}</p>
             )}
           </div>
+
+          {/* Difficulty picker */}
+          <div className="space-y-2">
+            <Label>Difficulty Level</Label>
+            <div className="grid gap-2">
+              {DIFFICULTY_LEVELS.map((level) => (
+                <button
+                  key={level.value}
+                  type="button"
+                  onClick={() => setDifficulty(level.value)}
+                  className={`rounded-lg border-2 p-2.5 text-left transition-all ${
+                    difficulty === level.value
+                      ? "border-primary bg-primary/10"
+                      : "border-border/40 bg-card/20 hover:border-border/60"
+                  }`}
+                >
+                  <p className="font-semibold text-sm">{level.label}</p>
+                  <p className="text-xs text-muted-foreground">{level.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between rounded-xl border border-border/50 bg-card/40 px-3 py-2.5">
+            <div>
+              <p className="text-sm font-medium">Share to Marketplace</p>
+              <p className="text-xs text-muted-foreground">Let others discover and save this workout</p>
+            </div>
+            <Switch
+              id="tpl-public"
+              checked={isPublic}
+              onCheckedChange={setIsPublic}
+            />
+          </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => {
               reset();
+              setIsPublic(true);
               onClose();
             }}>
               Cancel

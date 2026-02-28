@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { importPublicTemplate }       from '@/lib/template-import';
+import { isValidUUID } from "@/lib/utils";
 
 export async function POST(
   _request: NextRequest,
@@ -24,7 +25,7 @@ export async function POST(
 ) {
   const { id } = await params;
 
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+  if (!isValidUUID(id)) {
     return NextResponse.json({ error: 'Invalid template ID' }, { status: 400 });
   }
 

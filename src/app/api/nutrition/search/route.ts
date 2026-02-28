@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth-utils";
 
 interface OFFSearchProduct {
   product_name?: string;
@@ -217,10 +218,8 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
 
     // Auth check — must be logged in to search food
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     // 1) Search local food_items table first (fast path)
     const { data: localResults, error: localError } = await supabase

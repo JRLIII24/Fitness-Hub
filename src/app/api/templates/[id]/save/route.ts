@@ -7,19 +7,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient }              from '@/lib/supabase/server';
+import { requireAuth } from "@/lib/auth-utils";
+import { isValidUUID } from "@/lib/utils";
 
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+  if (!isValidUUID(id)) {
     return NextResponse.json({ error: 'Invalid template ID' }, { status: 400 });
   }
 
   const supabase = await createClient();
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { user, response: authErr } = await requireAuth(supabase);
+  if (authErr) return authErr;
 
   // Guard: users cannot save their own templates
   const { data: tmpl } = await supabase
@@ -49,13 +51,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+  if (!isValidUUID(id)) {
     return NextResponse.json({ error: 'Invalid template ID' }, { status: 400 });
   }
 
   const supabase = await createClient();
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  if (authErr || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { user, response: authErr } = await requireAuth(supabase);
+  if (authErr) return authErr;
 
   const { error } = await supabase
     .from('template_saves')

@@ -128,6 +128,7 @@ export interface PublicTemplate {
   is_public: boolean;
   save_count: number;
   primary_muscle_group: string | null;
+  difficulty_level?: string; // 'warm_up' | 'grind' | 'beast_mode'
   created_at: string;
   updated_at: string;
   /** Only present when querying with exercise join */
@@ -154,6 +155,25 @@ export interface PublicTemplate {
     display_name: string | null;
     avatar_url: string | null;
   };
+  /** Aggregate rating data joined from template_rating_stats */
+  avg_rating?: number | null;
+  review_count?: number;
+}
+
+/** A single review row returned from the API */
+export interface TemplateReview {
+  id: string;
+  template_id: string;
+  reviewer_id: string;
+  rating: number;       // 1–5
+  comment: string | null;
+  created_at: string;
+  reviewer?: {
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+  /** True if this review belongs to the currently logged-in user */
+  is_own?: boolean;
 }
 
 // Form types

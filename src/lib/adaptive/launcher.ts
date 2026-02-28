@@ -37,6 +37,21 @@ interface TemplateExerciseQueryRow {
 }
 
 /**
+ * Estimate workout duration from template exercises.
+ * Formula: warmup + (total sets × seconds per set) + (exercises × transition time)
+ * Rounds to nearest minute.
+ */
+function estimateDurationMins(exercises: Array<{ target_sets?: number | null }>): number {
+  const SECS_PER_SET = 135;    // ~45s work + 90s rest
+  const WARMUP_SECS = 300;     // 5 min flat warmup
+  const TRANSITION_SECS = 60;  // 1 min per exercise
+  const totalSets = exercises.reduce((s, e) => s + (e.target_sets ?? 3), 0);
+  return Math.round(
+    (WARMUP_SECS + totalSets * SECS_PER_SET + exercises.length * TRANSITION_SECS) / 60
+  );
+}
+
+/**
  * Compute "usual workout" for today based on user patterns
  */
 export async function computeLauncherWorkout(userId: string): Promise<LauncherPrediction> {
@@ -186,7 +201,7 @@ async function getPresetWorkout(): Promise<LauncherPrediction> {
     template_id: null,
     template_name: 'Full Body Workout',
     exercises: launcherExercises,
-    estimated_duration_mins: 45,
+    estimated_duration_mins: estimateDurationMins(launcherExercises),
     confidence: 'low',
     reason: 'Recommended for you'
   };

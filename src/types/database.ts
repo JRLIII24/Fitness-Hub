@@ -116,6 +116,7 @@ export interface Database {
           is_public: boolean;
           save_count: number;
           primary_muscle_group: string | null;
+          training_block: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -129,6 +130,7 @@ export interface Database {
           is_public?: boolean;
           save_count?: number;
           primary_muscle_group?: string | null;
+          training_block?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -139,6 +141,7 @@ export interface Database {
           estimated_duration_min?: number | null;
           is_public?: boolean;
           primary_muscle_group?: string | null;
+          training_block?: string | null;
           updated_at?: string;
         };
       };
@@ -721,7 +724,14 @@ export interface Database {
           computed_at?: string;
         };
       };
-    Views: Record<string, never>;
+    Views: {
+      template_last_performed: {
+        Row: {
+          template_id: string;
+          last_performed_at: string | null;
+        };
+      };
+    };
     Functions: {
       get_pod_challenge_leaderboard: {
         Args: { p_challenge_id: string };
@@ -733,6 +743,14 @@ export interface Database {
           rank: number;
           workouts_cnt: number;
           runs_cnt: number;
+        }>;
+      };
+      get_exercise_trendlines: {
+        Args: { p_user_id: string; p_exercise_ids: string[] };
+        Returns: Array<{
+          exercise_id: string;
+          session_rank: number;
+          top_set_weight_kg: number;
         }>;
       };
     };

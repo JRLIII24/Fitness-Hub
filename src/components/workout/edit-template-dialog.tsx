@@ -16,13 +16,14 @@ interface WorkoutTemplate {
   name: string;
   description: string | null;
   primary_muscle_group?: string | null;
+  training_block?: string | null;
 }
 
 interface Props {
   open: boolean;
   template: WorkoutTemplate | null;
   onClose: () => void;
-  onSave: (updates: { name: string; description: string | null; primary_muscle_group: string | null }) => Promise<void>;
+  onSave: (updates: { name: string; description: string | null; primary_muscle_group: string | null; training_block: string | null }) => Promise<void>;
 }
 
 export function EditTemplateDialog({ open, template, onClose, onSave }: Props) {
@@ -30,12 +31,14 @@ export function EditTemplateDialog({ open, template, onClose, onSave }: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [primaryMuscleGroup, setPrimaryMuscleGroup] = useState<string | null>(null);
+  const [trainingBlock, setTrainingBlock] = useState("");
 
   useEffect(() => {
     if (template) {
       setName(template.name);
       setDescription(template.description || "");
       setPrimaryMuscleGroup(template.primary_muscle_group ?? null);
+      setTrainingBlock(template.training_block ?? "");
     }
   }, [template, open]);
 
@@ -50,6 +53,7 @@ export function EditTemplateDialog({ open, template, onClose, onSave }: Props) {
         name: name.trim(),
         description: description.trim() || null,
         primary_muscle_group: primaryMuscleGroup,
+        training_block: trainingBlock.trim() || null,
       });
     } finally {
       setSaving(false);
@@ -84,6 +88,16 @@ export function EditTemplateDialog({ open, template, onClose, onSave }: Props) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Notes about this workout..."
               rows={2}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="training-block">Training Block (optional)</Label>
+            <Input
+              id="training-block"
+              value={trainingBlock}
+              onChange={(e) => setTrainingBlock(e.target.value)}
+              placeholder="e.g. 6-Week Powerbuilding"
             />
           </div>
 

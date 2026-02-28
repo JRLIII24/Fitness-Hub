@@ -32,8 +32,10 @@ export function getMuscleColor(group: string): MuscleColor {
   return PALETTE[group.toLowerCase().trim()] ?? DEFAULT;
 }
 
-/** All filter categories shown in the marketplace pill row */
+/** All filter categories shown in the marketplace pill row.
+ *  Full Body is listed first (after All) as it is the most beginner-friendly.
+ */
 export const MUSCLE_FILTERS = [
-  'All', 'Chest', 'Back', 'Legs', 'Arms', 'Shoulders', 'Core', 'HIIT', 'Full Body', 'Cardio',
+  'All', 'Full Body', 'Chest', 'Back', 'Legs', 'Arms', 'Shoulders', 'Core', 'Glutes', 'HIIT', 'Cardio',
 ] as const;
 export type MuscleFilter = typeof MUSCLE_FILTERS[number];

@@ -5,7 +5,7 @@ import { useShallow } from "zustand/shallow";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
-import { ChevronDown, Clock3, NotebookPen, Plus, Save, X, LayoutList, Dumbbell, Layers, CircleCheck, Activity, Zap, Send, Pencil, Copy, Trash2, Heart } from "lucide-react";
+import { ChevronDown, Clock3, NotebookPen, Plus, Save, X, LayoutList, Dumbbell, Layers, CircleCheck, Activity, Zap, Send, Pencil, Copy, Trash2, Heart, ArrowLeftRight, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
 import { fireConfetti } from "@/lib/celebrations";
@@ -16,7 +16,7 @@ import {
 } from "@/lib/retention-events";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
-import type { ActiveWorkout, Exercise } from "@/types/workout";
+import type { ActiveWorkout, Exercise, WorkoutSet } from "@/types/workout";
 import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS, MUSCLE_GROUPS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SetRow } from "@/components/workout/set-row";
+import { ExerciseSwapSheet } from "@/components/workout/exercise-swap-sheet";
+import { ExerciseSparkline } from "@/components/workout/exercise-sparkline";
+import { useExerciseTrendlines } from "@/hooks/use-exercise-trendlines";
+import { calcSuggestedWeight } from "@/lib/progressive-overload";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { RestTimerPill } from "@/components/workout/rest-timer-pill";
 import { FormTipsPanel } from "@/components/workout/form-tips-panel";
 import { SaveTemplateDialog } from "@/components/workout/save-template-dialog";
@@ -341,6 +346,12 @@ export default function WorkoutPage() {
   const [sessionRpeValue, setSessionRpeValue] = useState(7);
   const [savingSessionRpe, setSavingSessionRpe] = useState(false);
 
+  // Race-condition guard: disable "Start Workout" while ghost data is fetching
+  const [ghostIsLoading, setGhostIsLoading] = useState(false);
+
+  // Exercise swap sheet
+  const [swapSheetIndex, setSwapSheetIndex] = useState<number | null>(null);
+
   // DEV: Uncomment to verify WorkoutPage render frequency.
   // Should NOT increment every second — only on user interactions.
   // if (process.env.NODE_ENV === 'development') console.count('[WorkoutPage] render');
@@ -358,6 +369,7 @@ export default function WorkoutPage() {
     finishWorkout,
     addExercise,
     removeExercise,
+    swapExercise,
     addSet,
     updateSet,
     removeSet,
@@ -375,6 +387,7 @@ export default function WorkoutPage() {
       finishWorkout: s.finishWorkout,
       addExercise: s.addExercise,
       removeExercise: s.removeExercise,
+      swapExercise: s.swapExercise,
       addSet: s.addSet,
       updateSet: s.updateSet,
       removeSet: s.removeSet,
@@ -389,6 +402,7 @@ export default function WorkoutPage() {
   const getActiveTimers = useTimerStore((state) => state.getActiveTimers);
   const stopTimer = useTimerStore((state) => state.stopTimer);
   const { sendTemplate } = useSharedItems(userId);
+  const { preference } = useUnitPreferenceStore();
 
   const allExercises = useMemo(
     () => [...customExercises, ...apiExercises],
@@ -467,6 +481,30 @@ export default function WorkoutPage() {
     plannerStats.totalSets > 0
       ? Math.min(100, Math.round((plannerStats.completedSets / plannerStats.totalSets) * 100))
       : 0;
+
+  // Derived: suggested weights from ghost data — always in kg; SetRow converts for display
+  const suggestedWeightsByKey = useMemo(() => {
+    const map: Record<string, Record<number, number>> = {}; // exerciseId → setIndex → kg
+    if (!ghostWorkoutData) return map;
+    for (const [exId, sets] of Object.entries(ghostWorkoutData.exercises)) {
+      map[exId] = {};
+      sets.forEach((s, idx) => {
+        if (s.weight != null) {
+          map[exId][idx] = calcSuggestedWeight(s.weight, preference);
+        }
+      });
+    }
+    return map;
+  }, [ghostWorkoutData, preference]);
+
+  // Stable list of active exercise IDs for sparklines
+  const activeExerciseIds = useMemo(
+    () => activeWorkout?.exercises.map((e) => e.exercise.id) ?? [],
+    [activeWorkout]
+  );
+
+  // Sparkline trendlines — only fetches when workout is active
+  const exerciseTrendlines = useExerciseTrendlines(activeExerciseIds, userId, isWorkoutActive);
 
   const loadTemplates = useCallback(async (currentUserId: string) => {
     setLoadingTemplates(true);
@@ -610,6 +648,7 @@ export default function WorkoutPage() {
         return;
       }
 
+      setGhostIsLoading(true);
       try {
         // Get the most recent completed session with this template
         const { data: ghostSession, error: sessionError } = await supabase
@@ -666,6 +705,8 @@ export default function WorkoutPage() {
       } catch (err) {
         console.error("Failed to load ghost workout:", err);
         setGhostWorkoutData(null);
+      } finally {
+        setGhostIsLoading(false);
       }
     }
 
@@ -895,6 +936,7 @@ export default function WorkoutPage() {
           }
 
           const source = fromAdaptive ? 'adaptive system' : 'launcher';
+          await applyAutofillFromHistory();
           toast.success(`Started ${template.name} from ${source} 🚀`);
         } catch (error) {
           console.error('Template load error:', error);
@@ -953,6 +995,7 @@ export default function WorkoutPage() {
           }
         }
 
+        await applyAutofillFromHistory();
         toast.success(`Started ${launcherData.template_name} from launcher 🚀`);
       } catch (error) {
         console.error('Preset load error:', error);
@@ -1284,6 +1327,91 @@ export default function WorkoutPage() {
     if (!options?.silent) toast.success(`Added ${source.name}`);
   }
 
+  /**
+   * Smart autofill: after all exercises are added to the active workout,
+   * pre-fill each set's reps from the user's last session and bump the weight
+   * by a standard plate increment. Only fires once per workout start.
+   */
+  async function applyAutofillFromHistory() {
+    if (!userId) return;
+    const snapshot = useWorkoutStore.getState().activeWorkout;
+    if (!snapshot || snapshot.exercises.length === 0) return;
+
+    const exIds = snapshot.exercises.map((e) => e.exercise.id);
+
+    type PrevRow = {
+      exercise_id: string;
+      set_number: number;
+      reps: number | null;
+      weight_kg: number | null;
+      session_id: string;
+      workout_sessions:
+        | { completed_at: string | null }
+        | { completed_at: string | null }[]
+        | null;
+    };
+
+    const { data: prevData } = await supabase
+      .from("workout_sets")
+      .select(
+        "exercise_id,set_number,reps,weight_kg,session_id,workout_sessions!inner(user_id,status,completed_at)"
+      )
+      .eq("workout_sessions.user_id", userId)
+      .eq("workout_sessions.status", "completed")
+      .not("workout_sessions.completed_at", "is", null)
+      .in("exercise_id", exIds);
+
+    if (!prevData || prevData.length === 0) return;
+
+    const rows = (prevData as PrevRow[])
+      .map((row) => {
+        const sess = Array.isArray(row.workout_sessions)
+          ? row.workout_sessions[0]
+          : row.workout_sessions;
+        return { ...row, completed_at: sess?.completed_at ?? null };
+      })
+      .filter((r) => r.completed_at != null)
+      .sort((a, b) => {
+        const ta = new Date(a.completed_at!).getTime();
+        const tb = new Date(b.completed_at!).getTime();
+        return ta !== tb
+          ? tb - ta
+          : String(b.session_id).localeCompare(String(a.session_id));
+      });
+
+    // Keep only the latest session per exercise
+    const latestSession = new Map<string, string>();
+    for (const r of rows) {
+      if (!latestSession.has(r.exercise_id)) latestSession.set(r.exercise_id, r.session_id);
+    }
+
+    const byEx: Record<string, Array<{ setNumber: number; reps: number | null; weight: number | null }>> = {};
+    for (const r of rows) {
+      if (latestSession.get(r.exercise_id) !== r.session_id) continue;
+      if (!byEx[r.exercise_id]) byEx[r.exercise_id] = [];
+      byEx[r.exercise_id].push({ setNumber: r.set_number, reps: r.reps, weight: r.weight_kg });
+    }
+    for (const sets of Object.values(byEx)) {
+      sets.sort((a, b) => a.setNumber - b.setNumber);
+    }
+
+    const { preference: pref } = useUnitPreferenceStore.getState();
+
+    snapshot.exercises.forEach((exBlock, exIdx) => {
+      const prevSets = byEx[exBlock.exercise.id];
+      if (!prevSets) return;
+      exBlock.sets.forEach((set, setIdx) => {
+        if (set.completed) return;
+        const prev = prevSets[setIdx];
+        if (!prev) return;
+        const updates: Partial<WorkoutSet> = {};
+        if (prev.reps != null) updates.reps = prev.reps;
+        if (prev.weight != null) updates.weight_kg = calcSuggestedWeight(prev.weight, pref);
+        if (Object.keys(updates).length > 0) updateSet(exIdx, setIdx, updates);
+      });
+    });
+  }
+
   async function handleStartWorkout() {
     const name = workoutName.trim() || "Workout";
     const activeTemplateId = selectedTemplateId === "none" ? undefined : selectedTemplateId;
@@ -1359,6 +1487,7 @@ export default function WorkoutPage() {
           });
         }
 
+        await applyAutofillFromHistory();
         toast.success(`Started ${name} from saved template`);
         return;
       }
@@ -1373,6 +1502,7 @@ export default function WorkoutPage() {
         }
       }
 
+      await applyAutofillFromHistory();
       toast.success(`Started ${name}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load workout source";
@@ -1428,6 +1558,47 @@ export default function WorkoutPage() {
     }
   }
 
+  async function handleSwapExercise(exerciseIndex: number, newExercise: Exercise) {
+    // 1. Swap in the store (resets weights, keeps set structure)
+    swapExercise(exerciseIndex, newExercise);
+
+    // 2. Targeted ghost re-fetch for the new exercise only
+    if (userId && ghostWorkoutData) {
+      const { data: ghostSets } = await supabase
+        .from("workout_sets")
+        .select("exercise_id, set_number, reps, weight_kg, session_id")
+        .eq("exercise_id", newExercise.id)
+        .order("set_number", { ascending: true });
+
+      if (ghostSets && ghostSets.length > 0) {
+        // Group into a partial ghost patch by setNumber
+        const patchSets = ghostSets.map((s) => ({
+          setNumber: s.set_number,
+          reps: s.reps,
+          weight: s.weight_kg,
+        }));
+        setGhostWorkoutData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            exercises: {
+              ...prev.exercises,
+              [newExercise.id]: patchSets,
+            },
+          };
+        });
+      } else {
+        // No ghost data for new exercise — clear its entry
+        setGhostWorkoutData((prev) => {
+          if (!prev) return prev;
+          const next = { ...prev, exercises: { ...prev.exercises } };
+          delete next.exercises[newExercise.id];
+          return next;
+        });
+      }
+    }
+  }
+
   function handleOpenSaveTemplate() {
     if (!activeWorkout || !userId) {
       toast.error("Start a workout first.");
@@ -1436,7 +1607,7 @@ export default function WorkoutPage() {
     setSaveTemplateDialogOpen(true);
   }
 
-  async function handleSaveTemplate(templateName: string) {
+  async function handleSaveTemplate(templateName: string, isPublic: boolean, difficulty: string = "grind") {
     if (!activeWorkout || !userId) {
       toast.error("Start a workout first.");
       return;
@@ -1459,6 +1630,8 @@ export default function WorkoutPage() {
         user_id: userId,
         name: templateName.trim(),
         description: `Saved from ${activeWorkout.name}`,
+        is_public: isPublic,
+        difficulty_level: difficulty,
       })
       .select("id")
       .single();
@@ -2318,12 +2491,16 @@ export default function WorkoutPage() {
                 className="h-11 w-full text-base font-semibold"
                 onClick={handleStartWorkout}
                 disabled={
-                  setupTab === "templates" &&
-                  !pendingCategory &&
-                  (selectedTemplateId === "none" ||
-                    !templates.find((t) => t.id === selectedTemplateId)?.primary_muscle_group)
+                  ghostIsLoading ||
+                  (setupTab === "templates" &&
+                    !pendingCategory &&
+                    (selectedTemplateId === "none" ||
+                      !templates.find((t) => t.id === selectedTemplateId)?.primary_muscle_group))
                 }
               >
+                {ghostIsLoading ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : null}
                 Start Workout
               </Button>
             </CardContent>
@@ -2609,7 +2786,15 @@ export default function WorkoutPage() {
                                       </Badge>
                                     ) : null}
                                   </div>
-                                  <p>{exerciseBlock.exercise.name}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p>{exerciseBlock.exercise.name}</p>
+                                    {exerciseTrendlines[exerciseBlock.exercise.id] && (
+                                      <ExerciseSparkline
+                                        weights={exerciseTrendlines[exerciseBlock.exercise.id].weights}
+                                        slope={exerciseTrendlines[exerciseBlock.exercise.id].slope}
+                                      />
+                                    )}
+                                  </div>
                                   {previousByExerciseId[exerciseBlock.exercise.id]?.length ? (
                                     <p className="mt-1 text-xs font-normal text-muted-foreground">
                                       Ghost: last session sets loaded
@@ -2624,6 +2809,15 @@ export default function WorkoutPage() {
                                     </p>
                                     <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">sets done</p>
                                   </div>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setSwapSheetIndex(exerciseIndex)}
+                                    title="Swap exercise"
+                                  >
+                                    <ArrowLeftRight className="size-4 text-muted-foreground" />
+                                  </Button>
                                   <Button
                                     type="button"
                                     size="icon"
@@ -2659,7 +2853,11 @@ export default function WorkoutPage() {
                                         >
                                           <span className="font-semibold">S{ghostSet.setNumber}</span>
                                           <span className="text-cyan-100/90">
-                                            {ghostSet.weight ?? "—"} x {ghostSet.reps ?? "—"}
+                                            {ghostSet.weight != null
+                                              ? preference === "imperial"
+                                                ? Math.round(ghostSet.weight * 2.20462 * 10) / 10
+                                                : ghostSet.weight
+                                              : "—"} x {ghostSet.reps ?? "—"}
                                           </span>
                                         </span>
                                       ))}
@@ -2682,6 +2880,9 @@ export default function WorkoutPage() {
                                           weight: matchedGhostSet.weight,
                                         }
                                         : undefined
+                                    }
+                                    suggestedWeight={
+                                      suggestedWeightsByKey[exerciseBlock.exercise.id]?.[setIndex] ?? null
                                     }
                                     autoFocusWeight={setIndex === exerciseBlock.sets.length - 1 && !set.completed}
                                     onUpdate={(updates) => updateSet(exerciseIndex, setIndex, updates)}
@@ -2859,6 +3060,19 @@ export default function WorkoutPage() {
 
         {/* Floating Rest Timer Pill */}
         <RestTimerPill />
+
+        {/* Exercise Swap Sheet */}
+        <ExerciseSwapSheet
+          open={swapSheetIndex !== null}
+          exerciseIndex={swapSheetIndex}
+          currentExercise={
+            swapSheetIndex !== null
+              ? (activeWorkout?.exercises[swapSheetIndex]?.exercise ?? null)
+              : null
+          }
+          onSwap={handleSwapExercise}
+          onClose={() => setSwapSheetIndex(null)}
+        />
       </div>
     </div>
   );

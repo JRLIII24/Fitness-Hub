@@ -10,14 +10,19 @@ export interface CSVRow {
  * Escapes a CSV field value.
  * Values containing commas, double quotes, or newlines must be enclosed in double quotes.
  * Double quotes inside the value are doubled.
+ * Prefixes formula injection trigger characters with a single quote to prevent
+ * CSV formula injection attacks in Excel and Google Sheets.
  */
-const escapeCSVField = (field: string | number): string => {
-    const strField = String(field);
-    if (/[",\n]/.test(strField)) {
-        return `"${strField.replace(/"/g, '""')}"`;
-    }
-    return strField;
-};
+export function escapeCSVField(value: unknown): string {
+  const str = value == null ? "" : String(value);
+  // Prevent CSV formula injection (Excel, Google Sheets)
+  // Prefix with single quote to defuse any formula trigger characters
+  const safe = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+  if (safe.includes(",") || safe.includes("\n") || safe.includes('"')) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
+}
 
 /**
  * Generates and triggers a download of a CSV file from an array of data rows.

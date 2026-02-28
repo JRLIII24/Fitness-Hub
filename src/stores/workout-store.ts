@@ -26,6 +26,7 @@ interface WorkoutState {
   removeExercise: (exerciseIndex: number) => void;
   reorderExercise: (from: number, to: number) => void;
   toggleExerciseCollapse: (exerciseIndex: number) => void;
+  swapExercise: (exerciseIndex: number, newExercise: Exercise) => void;
 
   // Set actions
   addSet: (exerciseIndex: number) => void;
@@ -183,6 +184,32 @@ export const useWorkoutStore = create<WorkoutState>()(
             exercises: state.activeWorkout.exercises.filter(
               (_, i) => i !== exerciseIndex
             ),
+          },
+        });
+      },
+
+      swapExercise: (exerciseIndex: number, newExercise: Exercise) => {
+        const state = get();
+        if (!state.activeWorkout) return;
+
+        const exercises = [...state.activeWorkout.exercises];
+        const existing = exercises[exerciseIndex];
+
+        // Keep same set count and reps/rest structure; reset weight (movement-specific)
+        exercises[exerciseIndex] = {
+          ...existing,
+          exercise: newExercise,
+          sets: existing.sets.map((s) => ({
+            ...s,
+            exercise_id: newExercise.id,
+            weight_kg: null,
+          })),
+        };
+
+        set({
+          activeWorkout: {
+            ...state.activeWorkout,
+            exercises,
           },
         });
       },

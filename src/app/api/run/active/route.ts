@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth-utils";
 import { z } from "zod";
 import { parsePayload } from "@/lib/validation/parse";
 import { RUN_FEATURE_ENABLED } from "@/lib/features";
@@ -35,14 +36,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     const raw = await request.json();
     const parsed = parsePayload(createActiveRunSchema, raw);
@@ -117,14 +112,8 @@ export async function DELETE() {
 
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     const { error } = await supabase
       .from("active_workout_sessions")

@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Pencil, Trash2, Loader2, Send, Plus, Heart } from "lucide-react";
+import { Pencil, Trash2, Loader2, Send, Plus, Heart, Play, Settings2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { SendTemplateDialog } from "@/components/social/send-template-dialog";
 import { useSharedItems, type TemplateSnapshot } from "@/hooks/use-shared-items";
 import { useTemplateFavorites } from "@/hooks/use-template-favorites";
 import { getMuscleColor } from "@/components/marketplace/muscle-colors";
+import { stripImportFingerprint } from "@/lib/template-utils";
 
 interface WorkoutTemplate {
   id: string;
@@ -22,6 +23,7 @@ interface WorkoutTemplate {
   color: string | null;
   estimated_duration_min: number | null;
   primary_muscle_group: string | null;
+  training_block: string | null;
   save_count?: number;
   created_at?: string;
   updated_at?: string;
@@ -40,9 +42,29 @@ export default function TemplatesPage() {
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
   const [creating, setCreating] = useState(false);
+  const [lastPerformedMap, setLastPerformedMap] = useState<Record<string, string>>({});
 
   const { sendTemplate } = useSharedItems(currentUserId);
   const { favoriteIds, toggleFavorite } = useTemplateFavorites(currentUserId);
+
+  // Group templates by training_block; null block → "Other" pinned at the bottom
+  const groupedTemplates = useMemo(() => {
+    const map = new Map<string, WorkoutTemplate[]>();
+    for (const t of templates) {
+      const key = t.training_block ?? "__other__";
+      const arr = map.get(key) ?? [];
+      arr.push(t);
+      map.set(key, arr);
+    }
+    // Move "Other" to the end
+    const other = map.get("__other__");
+    map.delete("__other__");
+    const sorted = new Map(
+      [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
+    );
+    if (other) sorted.set("__other__", other);
+    return sorted;
+  }, [templates]);
 
   async function handleCreateNew() {
     if (!currentUserId) return;
@@ -89,7 +111,24 @@ export default function TemplatesPage() {
           return;
         }
 
-        setTemplates((data ?? []) as WorkoutTemplate[]);
+        const loaded = (data ?? []) as WorkoutTemplate[];
+        setTemplates(loaded);
+
+        // Load last-performed dates from the view (migration 053)
+        if (loaded.length > 0) {
+          const { data: lpData } = await supabase
+            .from("template_last_performed")
+            .select("template_id, last_performed_at")
+            .in("template_id", loaded.map((t) => t.id));
+
+          const lpMap: Record<string, string> = {};
+          for (const row of lpData ?? []) {
+            if (row.last_performed_at) {
+              lpMap[row.template_id] = row.last_performed_at;
+            }
+          }
+          setLastPerformedMap(lpMap);
+        }
       } finally {
         setLoading(false);
       }
@@ -127,7 +166,7 @@ export default function TemplatesPage() {
     setEditDialogOpen(true);
   }
 
-  async function handleEditSave(updates: { name: string; description: string | null; primary_muscle_group: string | null }) {
+  async function handleEditSave(updates: { name: string; description: string | null; primary_muscle_group: string | null; training_block: string | null }) {
     if (!editingTemplate) return;
 
     try {
@@ -137,6 +176,7 @@ export default function TemplatesPage() {
           name: updates.name,
           description: updates.description,
           primary_muscle_group: updates.primary_muscle_group,
+          training_block: updates.training_block,
         })
         .eq("id", editingTemplate.id);
 
@@ -145,7 +185,7 @@ export default function TemplatesPage() {
       setTemplates((prev) =>
         prev.map((t) =>
           t.id === editingTemplate.id
-            ? { ...t, name: updates.name, description: updates.description, primary_muscle_group: updates.primary_muscle_group }
+            ? { ...t, name: updates.name, description: updates.description, primary_muscle_group: updates.primary_muscle_group, training_block: updates.training_block }
             : t
         )
       );
@@ -241,100 +281,141 @@ export default function TemplatesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {templates.map((template) => {
-            const gc = template.primary_muscle_group
-              ? getMuscleColor(template.primary_muscle_group)
-              : null;
+        <div className="space-y-6">
+          {Array.from(groupedTemplates.entries()).map(([blockKey, blockTemplates]) => {
+            const blockLabel = blockKey === "__other__" ? "Other" : blockKey;
             return (
-            <Card key={template.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                      <CardTitle className="text-base">{template.name}</CardTitle>
-                      {gc && template.primary_muscle_group && (
-                        <span
-                          className="rounded-full px-2 py-0.5 text-[10px] font-bold capitalize"
-                          style={{
-                            background: gc.bgAlpha,
-                            color:      gc.labelColor,
-                            border:     `1px solid ${gc.borderAlpha}`,
-                          }}
-                        >
-                          {template.primary_muscle_group.replace(/_/g, " ")}
-                        </span>
-                      )}
-                    </div>
-                    {template.description && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {template.description}
-                      </p>
-                    )}
-                    {template.estimated_duration_min && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Est. {template.estimated_duration_min} min
-                      </p>
-                    )}
-                    {(template.save_count ?? 0) > 0 && (
-                      <Badge variant="secondary" className="mt-1.5 text-xs px-1.5 py-0">
-                        {template.save_count} {template.save_count === 1 ? "athlete" : "athletes"} running this
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap justify-end gap-2 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => toggleFavorite(template.id)}
-                      title={favoriteIds.has(template.id) ? "Remove from favorites" : "Add to favorites"}
-                      aria-label={favoriteIds.has(template.id) ? "Remove from favorites" : "Add to favorites"}
-                    >
-                      <Heart
-                        className={`size-4 ${favoriteIds.has(template.id) ? "fill-rose-500 text-rose-500" : "text-muted-foreground"}`}
-                      />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleSendOpen(template)}
-                      title="Send to a friend"
-                    >
-                      <Send className="size-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => router.push(`/templates/${template.id}/edit`)}
-                      title="Edit exercises"
-                    >
-                      <Pencil className="size-3.5" />
-                      <span className="hidden sm:inline ml-1">Edit Exercises</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditOpen(template)}
-                      title="Edit template name and description"
-                    >
-                      <Pencil className="size-3.5 text-muted-foreground" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDelete(template.id)}
-                      disabled={deletingId === template.id}
-                    >
-                      {deletingId === template.id ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="size-4 text-destructive" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-            </Card>
+              <div key={blockKey} className="space-y-3">
+                {groupedTemplates.size > 1 && (
+                  <h2 className="text-[13px] font-bold text-foreground uppercase tracking-widest">
+                    {blockLabel}
+                  </h2>
+                )}
+                {blockTemplates.map((template) => {
+                  const gc = template.primary_muscle_group
+                    ? getMuscleColor(template.primary_muscle_group)
+                    : null;
+                  const lastPerformedAt = lastPerformedMap[template.id] ?? null;
+                  const daysSince = lastPerformedAt
+                    ? Math.floor((Date.now() - new Date(lastPerformedAt).getTime()) / 86_400_000)
+                    : null;
+                  return (
+                  <Card key={template.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                            <CardTitle className="text-base">{template.name}</CardTitle>
+                            {gc && template.primary_muscle_group && (
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[10px] font-bold capitalize"
+                                style={{
+                                  background: gc.bgAlpha,
+                                  color:      gc.labelColor,
+                                  border:     `1px solid ${gc.borderAlpha}`,
+                                }}
+                              >
+                                {template.primary_muscle_group.replace(/_/g, " ")}
+                              </span>
+                            )}
+                            {/* Last-performed badge */}
+                            <Badge
+                              variant="outline"
+                              className={
+                                daysSince != null && daysSince > 14
+                                  ? "border-amber-500 text-amber-500"
+                                  : ""
+                              }
+                            >
+                              {daysSince == null
+                                ? "Never done"
+                                : daysSince === 0
+                                ? "Done today"
+                                : `Last done: ${daysSince}d ago`}
+                              {daysSince != null && daysSince > 14 ? " ⚠️" : ""}
+                            </Badge>
+                          </div>
+                          {stripImportFingerprint(template.description) && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {stripImportFingerprint(template.description)}
+                            </p>
+                          )}
+                          {template.estimated_duration_min && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Est. {template.estimated_duration_min} min
+                            </p>
+                          )}
+                          {(template.save_count ?? 0) > 0 && (
+                            <Badge variant="secondary" className="mt-1.5 text-xs px-1.5 py-0">
+                              {template.save_count} {template.save_count === 1 ? "athlete" : "athletes"} running this
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => toggleFavorite(template.id)}
+                            title={favoriteIds.has(template.id) ? "Remove from favorites" : "Add to favorites"}
+                            aria-label={favoriteIds.has(template.id) ? "Remove from favorites" : "Add to favorites"}
+                          >
+                            <Heart
+                              className={`size-4 ${favoriteIds.has(template.id) ? "fill-rose-500 text-rose-500" : "text-muted-foreground"}`}
+                            />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSendOpen(template)}
+                            title="Send to a friend"
+                          >
+                            <Send className="size-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => router.push(`/workout?from_launcher=1&template_id=${template.id}`)}
+                            title="Start workout with this template"
+                          >
+                            <Play className="size-3.5" />
+                            <span className="hidden sm:inline ml-1">Start</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => router.push(`/templates/${template.id}/edit`)}
+                            title="Edit exercises"
+                          >
+                            <Pencil className="size-3.5" />
+                            <span className="hidden sm:inline ml-1">Edit Exercises</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEditOpen(template)}
+                            title="Edit name & details"
+                          >
+                            <Settings2 className="size-3.5 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(template.id)}
+                            disabled={deletingId === template.id}
+                          >
+                            {deletingId === template.id ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-4 text-destructive" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                  );
+                })}
+              </div>
             );
           })}
         </div>
@@ -342,7 +423,7 @@ export default function TemplatesPage() {
 
       <EditTemplateDialog
         open={editDialogOpen}
-        template={editingTemplate}
+        template={editingTemplate ? { ...editingTemplate, training_block: editingTemplate.training_block ?? null } : null}
         onClose={() => {
           setEditDialogOpen(false);
           setEditingTemplate(null);

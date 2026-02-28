@@ -40,10 +40,7 @@ export async function GET(request: Request) {
     const category = searchParams.get("category") || "";
     const source = searchParams.get("source") || "";
     const rawLimit = searchParams.get("limit");
-    const parsedLimit = rawLimit ? parseInt(rawLimit, 10) : NaN;
-    const limit = Number.isFinite(parsedLimit)
-      ? Math.max(1, Math.min(parsedLimit, 10000))
-      : null;
+    const limit = Math.min(10000, Math.max(1, parseInt(rawLimit ?? '100', 10)));
 
     // Create Supabase client
     const supabase = await createClient();
@@ -81,10 +78,7 @@ export async function GET(request: Request) {
     }
 
     // Apply limit and ordering
-    supabaseQuery = supabaseQuery.order("name", { ascending: true });
-    if (limit !== null) {
-      supabaseQuery = supabaseQuery.limit(limit);
-    }
+    supabaseQuery = supabaseQuery.order("name", { ascending: true }).limit(limit);
 
     // Execute query
     const { data: exercises, error } = await supabaseQuery;
@@ -104,17 +98,20 @@ export async function GET(request: Request) {
     }));
 
     // Return results with metadata
-    return NextResponse.json({
-      exercises: normalizedExercises,
-      count: normalizedExercises.length,
-      filters: {
-        query,
-        muscle_group: muscleGroup,
-        equipment,
-        category,
-        source,
+    return NextResponse.json(
+      {
+        exercises: normalizedExercises,
+        count: normalizedExercises.length,
+        filters: {
+          query,
+          muscle_group: muscleGroup,
+          equipment,
+          category,
+          source,
+        },
       },
-    });
+      { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } }
+    );
   } catch (error) {
     console.error("Exercise search error:", error);
     return NextResponse.json(

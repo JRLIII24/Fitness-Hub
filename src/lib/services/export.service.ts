@@ -1,6 +1,33 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 
+type RawSession = {
+    id: string;
+    name: string;
+    status: string;
+    started_at: string;
+    completed_at: string | null;
+    duration_seconds: number | null;
+    session_rpe: number | null;
+    notes: string | null;
+    total_volume_kg: number | null;
+};
+type RawSet = {
+    id: string;
+    session_id: string;
+    exercise_id: string;
+    set_number: number;
+    set_type: string | null;
+    reps: number | null;
+    weight_kg: number | null;
+    duration_seconds: number | null;
+    rpe: number | null;
+    rir: number | null;
+    rest_seconds: number | null;
+    completed_at: string | null;
+    notes: string | null;
+};
+
 export type ExportRow = {
     // Session details
     session_id: string;
@@ -62,7 +89,7 @@ export async function* streamUserWorkoutData(
             throw new Error(`Failed to fetch workout sessions: ${sessionError.message}`);
         }
 
-        const sessions = sessionsData as any[] | null;
+        const sessions = sessionsData as RawSession[] | null;
 
         if (!sessions || sessions.length === 0) {
             hasMoreSessions = false;
@@ -85,9 +112,9 @@ export async function* streamUserWorkoutData(
             throw new Error(`Failed to fetch workout sets: ${setsError.message}`);
         }
 
-        const sets = setsData as any[] | null;
+        const sets = setsData as RawSet[] | null;
 
-        const setsBySessionId = new Map<string, any[]>();
+        const setsBySessionId = new Map<string, RawSet[]>();
         if (sets) {
             for (const set of sets) {
                 const sessionSets = setsBySessionId.get(set.session_id) || [];

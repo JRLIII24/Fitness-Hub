@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth-utils";
 import { RUN_FEATURE_ENABLED } from "@/lib/features";
 
 export async function GET(request: NextRequest) {
@@ -12,14 +13,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     const weeks = parseInt(
       request.nextUrl.searchParams.get("weeks") ?? "12",
@@ -41,7 +36,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ metrics: data ?? [] });
+    return NextResponse.json(
+      { metrics: data ?? [] },
+      { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } }
+    );
   } catch (error) {
     console.error("Run metrics GET error:", error);
     return NextResponse.json(

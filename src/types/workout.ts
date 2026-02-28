@@ -63,6 +63,7 @@ export interface WorkoutTemplate {
   description: string | null;
   color: string | null;
   estimated_duration_min: number | null;
+  training_block: string | null;
   exercises: TemplateExercise[];
 }
 

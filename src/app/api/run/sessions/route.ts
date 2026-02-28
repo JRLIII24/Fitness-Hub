@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/auth-utils";
 import { parsePayload } from "@/lib/validation/parse";
 import { saveRunSchema } from "@/lib/validation/run.schemas";
 import { computeRunSessionLoad } from "@/lib/run/fatigue-integration";
@@ -51,14 +52,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     const limit = parseInt(
       request.nextUrl.searchParams.get("limit") ?? "20",
@@ -105,14 +100,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, response: authErr } = await requireAuth(supabase);
+    if (authErr) return authErr;
 
     const raw = await request.json();
     const parsed = parsePayload(saveRunSchema, raw);

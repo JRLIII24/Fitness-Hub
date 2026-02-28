@@ -24,21 +24,42 @@ export async function generateAdaptiveWorkout(userId: string): Promise<AdaptiveW
   const snapshot = await getCachedOrComputeFatigueSnapshot(userId);
   const fatigueScore = snapshot.fatigueScore;
 
-  let recommendation: 'REST' | 'VOLUME' | 'INTENSITY' = 'VOLUME';
+  // Dynamic volume adjustment using Acute:Chronic Ratio (ACR)
+  // Based on Foster et al. — ACR > 1.5 is high injury risk zone
+  const { avgLoad7d, avgLoad28d } = snapshot.metadata;
   let volumeAdjustment = 0;
+  let recommendation: 'REST' | 'VOLUME' | 'INTENSITY' = 'VOLUME';
 
-  if (snapshot.recommendation.label === 'Very high fatigue') {
-    recommendation = 'REST';
-    volumeAdjustment = -35;
-  } else if (snapshot.recommendation.label === 'High fatigue') {
-    recommendation = 'REST';
-    volumeAdjustment = -25;
-  } else if (snapshot.recommendation.label === 'Building fatigue') {
-    recommendation = 'VOLUME';
-    volumeAdjustment = -15;
-  } else if (snapshot.recommendation.label === 'Fresh') {
-    recommendation = 'INTENSITY';
-    volumeAdjustment = 10;
+  if (avgLoad7d !== null && avgLoad28d !== null && avgLoad28d > 0) {
+    const acr = avgLoad7d / avgLoad28d;
+    if (acr > 1.5) {
+      recommendation = 'REST';
+      volumeAdjustment = -30;   // Very high injury risk — significantly reduce
+    } else if (acr > 1.3) {
+      recommendation = 'REST';
+      volumeAdjustment = -20;   // High load zone — reduce
+    } else if (acr > 1.1) {
+      recommendation = 'VOLUME';
+      volumeAdjustment = -5;    // Slightly elevated — minor reduction
+    } else if (acr < 0.8) {
+      recommendation = 'VOLUME';
+      volumeAdjustment = 10;    // Underloaded — can push harder
+    } else {
+      recommendation = 'VOLUME';
+      volumeAdjustment = 0;     // Optimal range (0.8–1.1)
+    }
+  } else {
+    // Fallback to score-based when no load history available
+    if (snapshot.fatigueScore > 70) {
+      recommendation = 'REST';
+      volumeAdjustment = -25;
+    } else if (snapshot.fatigueScore > 50) {
+      recommendation = 'VOLUME';
+      volumeAdjustment = -10;
+    } else {
+      recommendation = 'VOLUME';
+      volumeAdjustment = 0;
+    }
   }
 
   const reason = snapshot.recommendation.guidance;

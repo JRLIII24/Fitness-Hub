@@ -1,39 +1,45 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { motion, AnimatePresence }                  from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, ChevronDown, TrendingUp, Star, Zap, Dumbbell } from "lucide-react";
-import { toast }                                    from "sonner";
-import { cn }                                       from "@/lib/utils";
-import { TemplateCard, TemplateCardSkeleton }       from "./template-card";
-import { TemplatePreviewDialog }                    from "./template-preview-dialog";
-import { getMuscleColor, MUSCLE_FILTERS }           from "./muscle-colors";
-import type { PublicTemplate }                      from "@/types/pods";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { TemplateCard, TemplateCardSkeleton } from "./template-card";
+import { TemplatePreviewDialog } from "./template-preview-dialog";
+import { getMuscleColor, MUSCLE_FILTERS } from "./muscle-colors";
+import type { PublicTemplate } from "@/types/pods";
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
-type SortKey = "save_count" | "trending" | "newest";
+type SortKey = "save_count" | "trending" | "newest" | "rating";
+type TabKey = "community" | "mine";
+
 const SORT_OPTIONS: { key: SortKey; label: string; icon: React.ReactNode }[] = [
-  { key: "trending",   label: "Trending",   icon: <TrendingUp className="h-3.5 w-3.5" /> },
-  { key: "save_count", label: "Most Saved", icon: <Star       className="h-3.5 w-3.5" /> },
-  { key: "newest",     label: "New",        icon: <Zap        className="h-3.5 w-3.5" /> },
+  { key: "trending", label: "Trending", icon: <TrendingUp className="h-3.5 w-3.5" /> },
+  { key: "save_count", label: "Most Saved", icon: <Star className="h-3.5 w-3.5" /> },
+  { key: "newest", label: "New", icon: <Zap className="h-3.5 w-3.5" /> },
+  { key: "rating", label: "Top Rated", icon: <Star className="h-3.5 w-3.5" fill="currentColor" /> },
 ];
 
 // ── fetcher ───────────────────────────────────────────────────────────────────
 
 async function fetchTemplates(params: {
-  search?:       string;
+  search?: string;
   muscle_groups?: string;
-  sort:          SortKey;
-  page:          number;
+  sort: SortKey;
+  page: number;
+  tab: TabKey;
 }): Promise<{ templates: PublicTemplate[]; total: number }> {
   const sp = new URLSearchParams();
-  if (params.search)        sp.set("search",        params.search);
+  if (params.search) sp.set("search", params.search);
   if (params.muscle_groups) sp.set("muscle_groups", params.muscle_groups);
-  sp.set("sort",      params.sort);
-  sp.set("page",      String(params.page));
+  sp.set("sort", params.sort);
+  sp.set("page", String(params.page));
   sp.set("page_size", "20");
+  if (params.tab === "mine") sp.set("tab", "mine");
 
   const res = await fetch(`/api/templates/discover?${sp}`);
   if (!res.ok) throw new Error("Failed to load templates");
@@ -43,22 +49,26 @@ async function fetchTemplates(params: {
 // ── main component ────────────────────────────────────────────────────────────
 
 export function MarketplaceContent() {
-  const [templates,   setTemplates]   = useState<PublicTemplate[]>([]);
-  const [total,       setTotal]       = useState(0);
-  const [loading,     setLoading]     = useState(true);
+  const router = useRouter();
+
+  const [templates, setTemplates] = useState<PublicTemplate[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page,        setPage]        = useState(1);
+  const [page, setPage] = useState(1);
 
-  const [search,     setSearch]     = useState("");
+  const [activeTab, setActiveTab] = useState<TabKey>("community");
+  const [search, setSearch] = useState("");
   const [deferSearch, setDeferSearch] = useState("");
-  const [filter,     setFilter]     = useState<string>("All");
-  const [sort,       setSort]       = useState<SortKey>("trending");
-  const [showSort,   setShowSort]   = useState(false);
-  const sortRef                     = useRef<HTMLDivElement>(null);
+  const [filter, setFilter] = useState<string>("All");
+  const [sort, setSort] = useState<SortKey>("trending");
+  const [showSort, setShowSort] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
 
-  const [savedIds,     setSavedIds]     = useState<Set<string>>(new Set());
-  const [preview,      setPreview]      = useState<PublicTemplate | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [preview, setPreview] = useState<PublicTemplate | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+  const [importedId, setImportedId] = useState<string | null>(null);
 
   // Fetch current user ID once for own-template detection
   useEffect(() => {
@@ -84,25 +94,61 @@ export function MarketplaceContent() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // ── Real-time sync: listen for template changes (edit/delete) ───────────────
+  // When a template is edited or deleted, refresh the list to keep UI in sync.
+  // This ensures changes made elsewhere in the app immediately reflect in the marketplace.
+  useEffect(() => {
+    const supabase = createClient();
+
+    const subscription = supabase
+      .channel('workout_templates_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'workout_templates' },
+        (payload) => {
+          // On UPDATE or DELETE, refresh the marketplace list
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+            setPage(1);
+            setLoading(true);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, []);
+
   // ── load templates ──────────────────────────────────────────────────────────
   const load = useCallback(async (pg: number, append = false) => {
     try {
       const muscleParam = filter !== "All" ? filter.toLowerCase() : undefined;
       const result = await fetchTemplates({
-        search:        deferSearch || undefined,
+        search: deferSearch || undefined,
         muscle_groups: muscleParam,
         sort,
-        page:          pg,
+        page: pg,
+        tab: activeTab,
       });
 
       setTemplates(prev => append ? [...prev, ...result.templates] : result.templates);
       setTotal(result.total);
+
+      // Seed savedIds: reset on fresh loads, merge on append
+      const freshSaved = new Set(result.templates.filter(t => t.is_saved).map(t => t.id));
+      setSavedIds(prev => {
+        if (!append) return freshSaved;
+        const next = new Set(prev);
+        freshSaved.forEach(id => next.add(id));
+        return next;
+      });
     } catch {
       toast.error("Failed to load marketplace");
     }
-  }, [deferSearch, filter, sort]);
+  }, [deferSearch, filter, sort, activeTab]);
 
-  // reset + reload when filters/sort change
+  // reset + reload when filters/sort/tab change
   useEffect(() => {
     setPage(1);
     setLoading(true);
@@ -140,12 +186,17 @@ export function MarketplaceContent() {
   const handleImport = useCallback(async (templateId: string) => {
     const res = await fetch(`/api/templates/${templateId}/import`, { method: "POST" });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Import failed");
+    if (!res.ok) {
+      toast.error(data.error ?? "Failed to import. Please try again.");
+      throw new Error(data.error ?? "Import failed");
+    }
+
+    setImportedId(data.templateId ?? null);
 
     if (data.isNew) {
-      toast.success("Template added to your library!");
+      toast.success("Workout added to your library!");
     } else {
-      toast.info("You've already imported this template.");
+      toast.info("You already have this workout — here it is.");
     }
   }, []);
 
@@ -159,18 +210,6 @@ export function MarketplaceContent() {
   }
 
   const hasMore = templates.length < total;
-
-  // ── seed savedIds from is_saved decorator ───────────────────────────────────
-  useEffect(() => {
-    const saved = templates.filter(t => t.is_saved).map(t => t.id);
-    if (saved.length > 0) {
-      setSavedIds(prev => {
-        const next = new Set(prev);
-        saved.forEach(id => next.add(id));
-        return next;
-      });
-    }
-  }, [templates]);
 
   const currentSort = SORT_OPTIONS.find(s => s.key === sort)!;
 
@@ -206,6 +245,25 @@ export function MarketplaceContent() {
 
       {/* ── Controls ─────────────────────────────────────────────────────── */}
       <div className="mb-4 space-y-3">
+
+        {/* Tab bar */}
+        <div className="flex gap-1 rounded-xl border border-border/50 bg-card/40 p-1">
+          {(["community", "mine"] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => { setActiveTab(t); setPage(1); }}
+              className={cn(
+                "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all duration-150",
+                activeTab === t
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t === "community" ? "Community" : "My Templates"}
+            </button>
+          ))}
+        </div>
+
         {/* Search */}
         <div className="flex h-11 items-center gap-3 rounded-xl border border-border/60 bg-card/40 px-4 transition-colors focus-within:border-primary/50">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -220,7 +278,7 @@ export function MarketplaceContent() {
               <motion.button
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{   opacity: 0, scale: 0.8 }}
+                exit={{ opacity: 0, scale: 0.8 }}
                 whileTap={{ scale: 0.85 }}
                 onClick={() => setSearch("")}
                 className="text-muted-foreground"
@@ -234,7 +292,7 @@ export function MarketplaceContent() {
         {/* Filter pills */}
         <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
           {MUSCLE_FILTERS.map(f => {
-            const on  = filter === f;
+            const on = filter === f;
             const mgc = f !== "All" ? getMuscleColor(f) : null;
             return (
               <motion.button
@@ -244,13 +302,13 @@ export function MarketplaceContent() {
                 className="shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition-all duration-150"
                 style={{
                   background: on
-                    ? (mgc ? mgc.bgAlpha      : "rgba(200,255,0,0.15)")
+                    ? (mgc ? mgc.bgAlpha : "rgba(200,255,0,0.15)")
                     : "rgba(255,255,255,0.04)",
                   border: `1px solid ${on
                     ? (mgc ? mgc.borderAlpha : "rgba(200,255,0,0.4)")
                     : "rgba(255,255,255,0.08)"}`,
                   color: on
-                    ? (mgc ? mgc.labelColor  : "hsl(var(--primary))")
+                    ? (mgc ? mgc.labelColor : "hsl(var(--primary))")
                     : "hsl(var(--muted-foreground))",
                   fontWeight: on ? 700 : 500,
                 }}
@@ -282,8 +340,8 @@ export function MarketplaceContent() {
               {showSort && (
                 <motion.div
                   initial={{ opacity: 0, y: -6, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0,  scale: 1 }}
-                  exit={{   opacity: 0, y: -6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.95 }}
                   transition={{ duration: 0.15 }}
                   className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[148px] overflow-hidden rounded-xl border border-border/60 bg-card/95 shadow-xl backdrop-blur-sm"
                 >
@@ -326,17 +384,23 @@ export function MarketplaceContent() {
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-border/60 bg-card/40">
             <Dumbbell className="h-7 w-7 text-muted-foreground/50" />
           </div>
-          <h3 className="mb-1.5 text-[18px] font-black text-foreground">No templates found</h3>
+          <h3 className="mb-1.5 text-[18px] font-black text-foreground">
+            {activeTab === "mine" ? "No public templates yet" : "No templates found"}
+          </h3>
           <p className="mb-4 max-w-xs text-[13px] leading-relaxed text-muted-foreground">
-            Try adjusting your filters or search term.
+            {activeTab === "mine"
+              ? "Save a workout as a template and share it to the marketplace."
+              : "Try adjusting your filters or search term."}
           </p>
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            onClick={() => { setFilter("All"); setSearch(""); }}
-            className="rounded-xl border border-primary/30 bg-primary/15 px-5 py-2.5 text-[13px] font-bold text-primary"
-          >
-            Clear filters
-          </motion.button>
+          {activeTab === "community" && (
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={() => { setFilter("All"); setSearch(""); }}
+              className="rounded-xl border border-primary/30 bg-primary/15 px-5 py-2.5 text-[13px] font-bold text-primary"
+            >
+              Clear filters
+            </motion.button>
+          )}
         </motion.div>
       ) : (
         <>
@@ -385,7 +449,11 @@ export function MarketplaceContent() {
         isSaved={preview ? savedIds.has(preview.id) : false}
         onSave={() => preview && toggleSave(preview.id)}
         onImport={() => preview ? handleImport(preview.id) : Promise.resolve()}
-        onClose={() => setPreview(null)}
+        onClose={() => { setPreview(null); setImportedId(null); }}
+        currentUserId={currentUserId}
+        importedTemplateId={importedId}
+        onStartWorkout={(id) => { setPreview(null); setImportedId(null); router.push(`/workout?from_launcher=1&template_id=${id}`); }}
+        onViewLibrary={() => { setPreview(null); setImportedId(null); router.push("/templates"); }}
       />
     </div>
   );

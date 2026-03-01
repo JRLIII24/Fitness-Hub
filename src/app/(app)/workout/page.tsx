@@ -402,7 +402,17 @@ export default function WorkoutPage() {
   const getActiveTimers = useTimerStore((state) => state.getActiveTimers);
   const stopTimer = useTimerStore((state) => state.stopTimer);
   const { sendTemplate } = useSharedItems(userId);
-  const { preference } = useUnitPreferenceStore();
+  const { preference, unitLabel } = useUnitPreferenceStore();
+
+  const toDisplayWeight = (kg: number) =>
+    preference === "imperial"
+      ? Math.round(kg * 2.20462 * 10) / 10
+      : Math.round(kg * 10) / 10;
+
+  const toDisplayVolume = (kgVolume: number) =>
+    preference === "imperial"
+      ? Math.round(kgVolume * 2.20462)
+      : Math.round(kgVolume);
 
   const allExercises = useMemo(
     () => [...customExercises, ...apiExercises],
@@ -1751,7 +1761,7 @@ export default function WorkoutPage() {
 
         return {
           reps: set.reps,
-          weight: set.weight_kg ? Math.round(set.weight_kg * 2.20462) : null, // Convert kg to lbs
+          weight: set.weight_kg != null ? toDisplayWeight(set.weight_kg) : null,
           completed: set.completed,
           isPR,
         };
@@ -1937,7 +1947,8 @@ export default function WorkoutPage() {
     setCelebrationStats({
       duration: durationString,
       exerciseCount: workout.exercises.length,
-      totalVolume: Math.round(totalVolume * 2.20462), // Convert kg to lbs for display
+      totalVolume: toDisplayVolume(totalVolume),
+      unitLabel,
       prCount,
       totalSets: allSets.length,
       beatGhostCount: ghostWorkoutData ? beatGhostCount : undefined,
@@ -2529,7 +2540,7 @@ export default function WorkoutPage() {
                 <div className="flex flex-wrap gap-2">
                   <Badge className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-cyan-300">
                     <Activity className="mr-1 h-3.5 w-3.5" />
-                    {Math.round(plannerStats.totalVolumeKg).toLocaleString()} kg
+                    {toDisplayVolume(plannerStats.totalVolumeKg).toLocaleString()} {unitLabel}
                   </Badge>
                   <Badge className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-emerald-300">
                     <CircleCheck className="mr-1 h-3.5 w-3.5" />

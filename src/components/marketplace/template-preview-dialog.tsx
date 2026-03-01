@@ -12,6 +12,7 @@ import { stripImportFingerprint, getDifficultyInfo } from "@/lib/template-utils"
 import { StarRatingInput } from "./star-rating-input";
 import { ReviewsSection } from "./reviews-section";
 import type { PublicTemplate } from "@/types/pods";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -101,6 +102,7 @@ function PreviewSheet({
   const totalSets = exercises.reduce((s, e) => s + (e.target_sets ?? 0), 0);
   const creatorName = template.creator?.display_name ?? "Unknown";
   const description = stripImportFingerprint(template.description);
+  const { preference, unitLabel } = useUnitPreferenceStore();
 
   const muscleGroups = [
     ...new Set(exercises.map(te => te.exercises?.muscle_group).filter(Boolean) as string[]),
@@ -265,7 +267,12 @@ function PreviewSheet({
                         {te.target_reps ?? "—"}
                       </span>
                       <span className="text-right text-[11px] text-muted-foreground">
-                        {te.target_weight_kg ? `${te.target_weight_kg}kg` : "BW"}
+                        {te.target_weight_kg != null
+                          ? `${preference === "imperial"
+                            ? Math.round(te.target_weight_kg * 2.20462 * 10) / 10
+                            : Math.round(te.target_weight_kg * 10) / 10
+                         } ${unitLabel}`
+                          : "BW"}
                       </span>
                     </motion.div>
                   ))}

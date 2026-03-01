@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateCustomExerciseDialog } from "./create-custom-exercise-dialog";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 
 interface Exercise {
   id: string;
@@ -60,6 +61,7 @@ function resolveExerciseMediaUrl(
 
 export function AddExerciseToTemplateDialog({ open, onClose, onAdd }: Props) {
   const supabase = useMemo(() => createClient(), []);
+  const { preference, unitLabel } = useUnitPreferenceStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [searching, setSearching] = useState(false);
@@ -133,6 +135,14 @@ export function AddExerciseToTemplateDialog({ open, onClose, onAdd }: Props) {
     setSelectedExercise(exercise);
     setShowCreateDialog(false);
   }
+
+  const toDisplayWeight = (kg: number) =>
+    preference === "imperial"
+      ? Math.round(kg * 2.20462 * 10) / 10
+      : Math.round(kg * 10) / 10;
+
+  const fromDisplayWeight = (value: number) =>
+    preference === "imperial" ? value / 2.20462 : value;
 
   return (
     <>
@@ -266,16 +276,22 @@ export function AddExerciseToTemplateDialog({ open, onClose, onAdd }: Props) {
                     </div>
                     <div className="flex-1 space-y-1">
                       <Label htmlFor={`weight-${idx}`} className="text-xs">
-                        Weight (kg)
+                        Weight ({unitLabel})
                       </Label>
                       <Input
                         id={`weight-${idx}`}
                         type="number"
-                        step="0.5"
+                        step={preference === "imperial" ? "1" : "0.5"}
                         placeholder="Weight"
-                        value={set.weight_kg ?? ""}
+                        value={set.weight_kg == null ? "" : toDisplayWeight(set.weight_kg)}
                         onChange={(e) =>
-                          updateSet(idx, "weight_kg", e.target.value ? parseFloat(e.target.value) : null)
+                          updateSet(
+                            idx,
+                            "weight_kg",
+                            e.target.value
+                              ? fromDisplayWeight(parseFloat(e.target.value))
+                              : null
+                          )
                         }
                       />
                     </div>

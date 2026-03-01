@@ -544,7 +544,7 @@ function PreRunReadiness({ onStart, onBack }: { onStart: () => void; onBack: () 
       ? {
           type: "Recovery Run",
           reason:
-            "Your legs moved ~24,000 lbs yesterday. An easy run flushes lactate and maintains aerobic base without adding strain.",
+            "Your legs handled a high training load yesterday. An easy run flushes lactate and maintains aerobic base without adding strain.",
           color: "#60a5fa",
           icon: <Heart size={18} color="#60a5fa" />,
         }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS } from "@/lib/constants";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 
 interface PreviousPerformance {
   reps: number | null;
@@ -36,6 +37,7 @@ export function ExerciseSelectionCard({
   onQuickAdd,
 }: ExerciseSelectionCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const { preference, unitLabel } = useUnitPreferenceStore();
 
   const muscleLabel =
     MUSCLE_GROUP_LABELS[exercise.muscle_group as keyof typeof MUSCLE_GROUP_LABELS] ??
@@ -52,7 +54,12 @@ export function ExerciseSelectionCard({
     const hasWeight = previousPerformance.weight != null;
     const hasReps = previousPerformance.reps != null;
     if (!hasWeight && !hasReps) return null;
-    const weight = hasWeight ? `${previousPerformance.weight}kg` : "BW";
+    const weight = hasWeight
+      ? `${preference === "imperial"
+        ? Math.round((previousPerformance.weight ?? 0) * 2.20462 * 10) / 10
+        : Math.round((previousPerformance.weight ?? 0) * 10) / 10
+      } ${unitLabel}`
+      : "BW";
     const reps = hasReps ? `${previousPerformance.reps}` : "—";
     return `${weight} × ${reps}`;
   }

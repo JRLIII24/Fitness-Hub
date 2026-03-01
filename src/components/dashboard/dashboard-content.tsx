@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StreakSection } from "@/components/dashboard/streak-section";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 
 import { SmartLauncherWidget } from "@/components/workout/smart-launcher-widget";
 import { FatigueLevelCard } from "@/components/dashboard/fatigue-level-card";
@@ -318,6 +319,11 @@ export function DashboardContent({
   quickAddFoods,
   fatigueSnapshot,
 }: DashboardContentProps) {
+  const { preference, unitLabel } = useUnitPreferenceStore();
+  const toDisplayVolume = (kgVolume: number) =>
+    preference === "imperial"
+      ? Math.round(kgVolume * 2.20462)
+      : Math.round(kgVolume);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 pb-28 pt-5 md:px-6">
@@ -507,9 +513,9 @@ export function DashboardContent({
                   </p>
                   <div className="flex items-baseline gap-0.5">
                     <span className="tabular-nums text-[18px] font-black leading-none text-foreground">
-                      {projectedVolumeKg.toLocaleString()}
+                      {toDisplayVolume(projectedVolumeKg).toLocaleString()}
                     </span>
-                    <span className="text-[11px] font-medium text-muted-foreground">kg</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">{unitLabel}</span>
                   </div>
                 </div>
               </div>
@@ -696,8 +702,8 @@ export function DashboardContent({
                           </span>
                         </div>
                         <span className="tabular-nums text-[20px] font-black leading-none text-foreground">
-                          {Math.round(lastWorkout.total_volume_kg).toLocaleString()}
-                          <span className="text-[12px] font-normal text-muted-foreground"> kg</span>
+                          {toDisplayVolume(lastWorkout.total_volume_kg).toLocaleString()}
+                          <span className="text-[12px] font-normal text-muted-foreground"> {unitLabel}</span>
                         </span>
                       </div>
                     )}

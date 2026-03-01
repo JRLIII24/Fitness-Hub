@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { generateProgressPDF, type PDFReportData } from "@/lib/pdf-export";
 import { createClient } from "@/lib/supabase/client";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { cn } from "@/lib/utils";
 
 type Status = { type: "success" | "error"; text: string } | null;
@@ -47,6 +48,11 @@ export function ExportDataCard() {
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [loading, setLoading] = useState<"csv" | "pdf" | null>(null);
     const [status, setStatus] = useState<Status>(null);
+    const { preference, unitLabel } = useUnitPreferenceStore();
+
+    const volumeFactor = preference === "imperial" ? 2.20462 : 1;
+    const toDisplayWeight = (kg: number) => Math.round(kg * volumeFactor * 10) / 10;
+    const toDisplayVolumeValue = (kgVolume: number) => kgVolume * volumeFactor;
 
     const rangeLabel = dateRange?.from
         ? dateRange.to
@@ -131,7 +137,7 @@ export function ExportDataCard() {
         for (const set of sets ?? []) {
             const exName = (set.exercises as any)?.name;
             if (!exName || set.weight_kg == null) continue;
-            const score = set.weight_kg * (set.reps ?? 1);
+            const score = (set.weight_kg * volumeFactor) * (set.reps ?? 1);
             if (!prMap.has(exName)) {
                 prMap.set(exName, {
                     name: exName,
@@ -150,11 +156,11 @@ export function ExportDataCard() {
                 // Order by session date using the sessions array
                 const ordered = sessions
                     .filter((s) => ex.sessionData.has(s.id))
-                    .map((s, i) => ({ date: format(new Date(s.started_at), "MMM d"), value: Math.round(ex.sessionData.get(s.id)!) }));
+                    .map((s) => ({ date: format(new Date(s.started_at), "MMM d"), value: Math.round(ex.sessionData.get(s.id)!) }));
                 const first = ordered[0]?.value ?? 0;
                 const last = ordered[ordered.length - 1]?.value ?? 0;
                 const trend = first > 0 ? ((last - first) / first) * 100 : 0;
-                return { name: ex.name, muscleGroup: ex.group, dataPoints: ordered, trend, unitLabel: "kg" };
+                return { name: ex.name, muscleGroup: ex.group, dataPoints: ordered, trend, unitLabel };
             })
             .filter((c) => c.dataPoints.length >= 2)
             .sort((a, b) => Math.abs(b.trend) - Math.abs(a.trend))
@@ -168,10 +174,10 @@ export function ExportDataCard() {
                 let bestDate = "";
                 for (const set of sets ?? []) {
                     if ((set.exercises as any)?.name !== ex.name || set.weight_kg == null) continue;
-                    const score = set.weight_kg * (set.reps ?? 1);
+                    const score = (set.weight_kg * volumeFactor) * (set.reps ?? 1);
                     if (score > bestScore) {
                         bestScore = score;
-                        bestW = set.weight_kg;
+                        bestW = toDisplayWeight(set.weight_kg);
                         bestR = set.reps ?? 0;
                         // find session date
                         const sess = sessions.find((s) => s.id === set.session_id);
@@ -190,7 +196,7 @@ export function ExportDataCard() {
             const exercises = exMap
                 ? [...exMap.values()].map((ex) => {
                     const maxW = Math.max(...ex.sets.map((st) => st.w));
-                    return `${ex.name}: ${ex.sets.length} set${ex.sets.length !== 1 ? "s" : ""} · up to ${maxW} kg`;
+                    return `${ex.name}: ${ex.sets.length} set${ex.sets.length !== 1 ? "s" : ""} · up to ${toDisplayWeight(maxW)} ${unitLabel}`;
                 })
                 : [];
 
@@ -205,7 +211,9 @@ export function ExportDataCard() {
                 date: format(new Date(s.started_at), "EEEE, MMM d, yyyy"),
                 time: format(new Date(s.started_at), "h:mm a"),
                 duration: durationStr,
-                volume: s.total_volume_kg ? `${Math.round(s.total_volume_kg).toLocaleString()} kg total` : null,
+                volume: s.total_volume_kg
+                    ? `${Math.round(toDisplayVolumeValue(s.total_volume_kg)).toLocaleString()} ${unitLabel} total`
+                    : null,
                 exercises,
             };
         });
@@ -215,7 +223,9 @@ export function ExportDataCard() {
             reportDate: new Date(),
             totalSessions: sessions.length,
             totalPRs: personalRecords.length,
-            avgVolume: sessions.reduce((s, r) => s + (r.total_volume_kg ?? 0), 0) / sessions.length,
+            avgVolume: toDisplayVolumeValue(
+                sessions.reduce((s, r) => s + (r.total_volume_kg ?? 0), 0) / sessions.length
+            ),
             strengthCharts,
             personalRecords,
             sessionSummaries,

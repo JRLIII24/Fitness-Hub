@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -14,6 +15,8 @@ import {
 interface StepHeightProps {
   heightFeet: number | null;
   heightInches: number | null;
+  unitPreference: "metric" | "imperial";
+  onUnitChange: (preference: "metric" | "imperial") => void;
   onUpdate: (feet: number | null, inches: number | null) => void;
   onNext: () => void;
 }
@@ -21,9 +24,12 @@ interface StepHeightProps {
 export function StepHeight({
   heightFeet,
   heightInches,
+  unitPreference,
+  onUnitChange,
   onUpdate,
   onNext,
 }: StepHeightProps) {
+  const unit = unitPreference === "imperial" ? "imperial" : "metric";
   const feet = Array.from({ length: 6 }, (_, i) => i + 3); // 3-8 feet
   const inches = Array.from({ length: 12 }, (_, i) => i); // 0-11 inches
 
@@ -34,6 +40,30 @@ export function StepHeight({
     heightInches !== null &&
     heightInches >= 0 &&
     heightInches < 12;
+
+  const heightCm =
+    heightFeet !== null && heightInches !== null
+      ? Math.round((heightFeet * 12 + heightInches) * 2.54 * 10) / 10
+      : null;
+
+  const handleHeightCmChange = (value: string) => {
+    const parsed = Number.parseFloat(value);
+    if (!value || Number.isNaN(parsed) || parsed <= 0) {
+      onUpdate(null, null);
+      return;
+    }
+
+    const totalInches = parsed / 2.54;
+    let nextFeet = Math.floor(totalInches / 12);
+    let nextInches = Math.round(totalInches - nextFeet * 12);
+
+    if (nextInches === 12) {
+      nextFeet += 1;
+      nextInches = 0;
+    }
+
+    onUpdate(nextFeet, nextInches);
+  };
 
   return (
     <motion.div
@@ -69,59 +99,104 @@ export function StepHeight({
           transition={{ delay: 0.3 }}
           className="p-8 rounded-[var(--radius-xl)] backdrop-blur-lg bg-white/5 border border-white/10"
         >
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="feet" className="text-left block">
-                Feet
-              </Label>
-              <Select
-                value={heightFeet?.toString() || ""}
-                onValueChange={(value) =>
-                  onUpdate(parseInt(value), heightInches)
-                }
-              >
-                <SelectTrigger
-                  id="feet"
-                  className="h-14 text-lg font-semibold"
-                >
-                  <SelectValue placeholder="0" />
-                </SelectTrigger>
-                <SelectContent>
-                  {feet.map((f) => (
-                    <SelectItem key={f} value={f.toString()}>
-                      {f} ft
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="inches" className="text-left block">
-                Inches
-              </Label>
-              <Select
-                value={heightInches?.toString() || ""}
-                onValueChange={(value) =>
-                  onUpdate(heightFeet, parseInt(value))
-                }
-              >
-                <SelectTrigger
-                  id="inches"
-                  className="h-14 text-lg font-semibold"
-                >
-                  <SelectValue placeholder="0" />
-                </SelectTrigger>
-                <SelectContent>
-                  {inches.map((i) => (
-                    <SelectItem key={i} value={i.toString()}>
-                      {i} in
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="mb-6 flex items-center justify-center gap-2 border-b border-white/10 pb-4">
+            <button
+              type="button"
+              onClick={() => onUnitChange("metric")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                unit === "metric"
+                  ? "bg-[var(--accent-500)] text-white"
+                  : "bg-white/5 text-muted-foreground hover:bg-white/10"
+              }`}
+            >
+              cm
+            </button>
+            <button
+              type="button"
+              onClick={() => onUnitChange("imperial")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                unit === "imperial"
+                  ? "bg-[var(--accent-500)] text-white"
+                  : "bg-white/5 text-muted-foreground hover:bg-white/10"
+              }`}
+            >
+              ft/in
+            </button>
           </div>
+
+          {unit === "imperial" ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="feet" className="text-left block">
+                  Feet
+                </Label>
+                <Select
+                  value={heightFeet?.toString() || ""}
+                  onValueChange={(value) =>
+                    onUpdate(Number.parseInt(value, 10), heightInches)
+                  }
+                >
+                  <SelectTrigger
+                    id="feet"
+                    className="h-14 text-lg font-semibold"
+                  >
+                    <SelectValue placeholder="0" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {feet.map((f) => (
+                      <SelectItem key={f} value={f.toString()}>
+                        {f} ft
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="inches" className="text-left block">
+                  Inches
+                </Label>
+                <Select
+                  value={heightInches?.toString() || ""}
+                  onValueChange={(value) =>
+                    onUpdate(heightFeet, Number.parseInt(value, 10))
+                  }
+                >
+                  <SelectTrigger
+                    id="inches"
+                    className="h-14 text-lg font-semibold"
+                  >
+                    <SelectValue placeholder="0" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inches.map((i) => (
+                      <SelectItem key={i} value={i.toString()}>
+                        {i} in
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="height-cm" className="text-left block">
+                Height (cm)
+              </Label>
+              <Input
+                id="height-cm"
+                type="number"
+                inputMode="decimal"
+                min={90}
+                max={280}
+                step={0.1}
+                value={heightCm ?? ""}
+                onChange={(e) => handleHeightCmChange(e.target.value)}
+                className="h-14 text-lg font-semibold text-center"
+                placeholder="e.g. 175"
+              />
+            </div>
+          )}
 
           {canProceed && (
             <motion.div
@@ -132,7 +207,9 @@ export function StepHeight({
               <p className="text-sm text-muted-foreground">
                 Your height:{" "}
                 <span className="font-semibold text-foreground">
-                  {heightFeet}&apos;{heightInches}&quot;
+                  {unit === "imperial"
+                    ? `${heightFeet}'${heightInches}"`
+                    : `${heightCm} cm`}
                 </span>
               </p>
             </motion.div>

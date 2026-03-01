@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 export interface WorkoutStats {
   duration: string; // e.g., "1h 23m"
   exerciseCount: number;
-  totalVolume: number; // in lbs
+  totalVolume: number;
+  unitLabel: "kg" | "lbs";
   prCount: number; // number of PRs hit
   totalSets: number;
   beatGhostCount?: number; // number of exercises where user beat their ghost
@@ -19,7 +20,7 @@ export interface WorkoutStats {
     name: string;
     sets: Array<{
       reps: number | null;
-      weight: number | null; // in lbs
+      weight: number | null;
       completed: boolean;
       isPR: boolean;
     }>;
@@ -208,7 +209,7 @@ export function WorkoutCompleteCelebration({
                   </div>
                   <p className="mt-2 text-2xl font-bold tabular-nums">
                     {stats.totalVolume.toLocaleString()}{" "}
-                    <span className="text-sm font-normal text-muted-foreground">lbs</span>
+                    <span className="text-sm font-normal text-muted-foreground">{stats.unitLabel}</span>
                   </p>
                 </motion.div>
 
@@ -272,7 +273,7 @@ export function WorkoutCompleteCelebration({
                           >
                             {set.weight != null && set.reps != null ? (
                               <>
-                                {set.weight} lbs × {set.reps}
+                                {set.weight} {stats.unitLabel} × {set.reps}
                                 {set.isPR && " 🏆"}
                               </>
                             ) : set.reps != null ? (

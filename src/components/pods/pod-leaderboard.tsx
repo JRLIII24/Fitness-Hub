@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Trophy, Flame, Route } from 'lucide-react';
+import { useUnitPreferenceStore } from '@/stores/unit-preference-store';
 import type { ChallengeLeaderboard, LeaderboardEntry } from '@/types/pods';
 
 interface PodLeaderboardProps {
@@ -16,6 +17,7 @@ interface PodLeaderboardProps {
 
 export function PodLeaderboard({ podId }: PodLeaderboardProps) {
     const { leaderboards, loading, error } = usePodLeaderboard(podId);
+    const unitPreference = useUnitPreferenceStore((state) => state.preference);
     const [activeTab, setActiveTab] = useState<'volume' | 'consistency' | 'distance'>('volume');
 
     if (loading) {
@@ -60,7 +62,15 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                 <CardDescription>Real-time rankings for your pod challenges</CardDescription>
             </CardHeader>
             <CardContent>
-                <Tabs defaultValue="volume" value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+                <Tabs
+                    defaultValue="volume"
+                    value={activeTab}
+                    onValueChange={(v) => {
+                        if (v === 'volume' || v === 'consistency' || v === 'distance') {
+                            setActiveTab(v);
+                        }
+                    }}
+                >
                     <TabsList className="grid w-full grid-cols-3 mb-6">
                         <TabsTrigger value="volume" className="flex items-center gap-1.5">
                             <Trophy className="h-4 w-4" />
@@ -81,6 +91,7 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                             leaderboard={volumeLeaderboard}
                             emptyMessage="No Volume challenge active or no data yet."
                             icon={<Trophy className="h-4 w-4 text-primary" />}
+                            unitPreference={unitPreference}
                         />
                     </TabsContent>
                     <TabsContent value="consistency" className="mt-0">
@@ -88,6 +99,7 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                             leaderboard={consistencyLeaderboard}
                             emptyMessage="No Consistency challenge active or no data yet."
                             icon={<Flame className="h-4 w-4 text-orange-500" />}
+                            unitPreference={unitPreference}
                         />
                     </TabsContent>
                     <TabsContent value="distance" className="mt-0">
@@ -95,6 +107,7 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                             leaderboard={distanceLeaderboard}
                             emptyMessage="No Distance challenge active or no data yet."
                             icon={<Route className="h-4 w-4 text-blue-500" />}
+                            unitPreference={unitPreference}
                         />
                     </TabsContent>
                 </Tabs>
@@ -106,11 +119,13 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
 function LeaderboardList({
     leaderboard,
     emptyMessage,
-    icon
+    icon,
+    unitPreference,
 }: {
     leaderboard: ChallengeLeaderboard | null;
     emptyMessage: string;
     icon: React.ReactNode;
+    unitPreference: "metric" | "imperial";
 }) {
     if (!leaderboard || !leaderboard.entries || leaderboard.entries.length === 0) {
         return (
@@ -131,6 +146,7 @@ function LeaderboardList({
                         key={entry.user_id}
                         entry={entry}
                         unit={leaderboard.score_unit}
+                        unitPreference={unitPreference}
                     />
                 ))}
             </div>
@@ -138,8 +154,39 @@ function LeaderboardList({
     );
 }
 
-function LeaderboardRow({ entry, unit }: { entry: LeaderboardEntry; unit: string }) {
+function LeaderboardRow({
+    entry,
+    unit,
+    unitPreference,
+}: {
+    entry: LeaderboardEntry;
+    unit: string;
+    unitPreference: "metric" | "imperial";
+}) {
     const isTop3 = entry.rank <= 3;
+    const isImperial = unitPreference === "imperial";
+
+    const convertedScore =
+        isImperial && unit === "kg"
+            ? entry.score * 2.20462
+            : isImperial && unit === "km"
+              ? entry.score * 0.621371
+              : entry.score;
+
+    const roundedScore = Math.round(convertedScore * 10) / 10;
+    const formattedScore = Number.isInteger(roundedScore)
+        ? roundedScore.toLocaleString()
+        : roundedScore.toLocaleString(undefined, {
+              minimumFractionDigits: 1,
+              maximumFractionDigits: 1,
+          });
+
+    const displayUnit =
+        isImperial && unit === "kg"
+            ? "lbs"
+            : isImperial && unit === "km"
+              ? "mi"
+              : unit;
 
     const getRankBadgeContent = (rank: number) => {
         switch (rank) {
@@ -181,11 +228,18 @@ function LeaderboardRow({ entry, unit }: { entry: LeaderboardEntry; unit: string
     };
 
     return (
-        <div className={`flex items-center justify-between p-3 rounded-lg border transition-all hover:bg-muted/50 \${isTop3 ? getRankColorClasses(entry.rank) : 'bg-background border-border/40'}`}>
+        <div
+            className={`flex items-center justify-between rounded-lg border p-3 transition-all hover:bg-muted/50 ${
+                isTop3 ? getRankColorClasses(entry.rank) : 'bg-background border-border/40'
+            }`}
+        >
             <div className="flex items-center gap-4">
                 <div className="w-12 text-center font-bold text-sm">
                     {isTop3 ? (
-                        <Badge variant={getRankBadgeVariant(entry.rank)} className={`whitespace-nowrap \${entry.rank === 1 ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}`}>
+                        <Badge
+                            variant={getRankBadgeVariant(entry.rank)}
+                            className={`whitespace-nowrap ${entry.rank === 1 ? 'bg-yellow-500 text-white hover:bg-yellow-600' : ''}`}
+                        >
                             {getRankBadgeContent(entry.rank)}
                         </Badge>
                     ) : (
@@ -210,11 +264,11 @@ function LeaderboardRow({ entry, unit }: { entry: LeaderboardEntry; unit: string
             </div>
 
             <div className="flex flex-col items-end">
-                <span className={`font-bold text-lg leading-none \${entry.rank === 1 ? 'text-yellow-600 dark:text-yellow-400' : ''}`}>
-                    {entry.score.toLocaleString()}
+                <span className={`font-bold text-lg leading-none ${entry.rank === 1 ? 'text-yellow-600 dark:text-yellow-400' : ''}`}>
+                    {formattedScore}
                 </span>
                 <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mt-1">
-                    {unit}
+                    {displayUnit}
                 </span>
             </div>
         </div>

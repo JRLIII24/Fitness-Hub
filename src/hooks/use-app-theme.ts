@@ -58,7 +58,7 @@ function applyThemeClass(theme: AppTheme) {
 
 export function useAppTheme(userId: string | null) {
   const supabase = useSupabase();
-  const [appTheme, setAppThemeState] = useState<AppTheme>(() => readStoredTheme() ?? "default");
+  const [appTheme, setAppThemeState] = useState<AppTheme>("default");
   const [canPersistTheme, setCanPersistTheme] = useState(true);
   const lastLocalThemeChangeAt = useRef(0);
   const appThemeRef = useRef<AppTheme>(appTheme);
@@ -66,6 +66,15 @@ export function useAppTheme(userId: string | null) {
   useEffect(() => {
     appThemeRef.current = appTheme;
   }, [appTheme]);
+
+  // Hydration-safe: read localStorage only after mount
+  useEffect(() => {
+    const stored = readStoredTheme();
+    if (stored) {
+      setAppThemeState(stored);
+      applyThemeClass(stored);
+    }
+  }, []);
 
   // Keep class synchronized with the current in-memory theme.
   useEffect(() => {

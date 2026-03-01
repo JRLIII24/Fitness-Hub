@@ -226,7 +226,7 @@ function SparklineCard({
 function SingleTooltip({
   active,
   payload,
-  unitLabel = "lbs",
+  unitLabel = "kg",
 }: {
   active?: boolean;
   payload?: { payload: { date: string; topWeight: number; topWeightReps: number; topSetWeight: number; topSetReps: number; topSetScore: number } }[];
@@ -255,7 +255,7 @@ function StackedVolumeTooltip({
   active,
   payload,
   label,
-  unitLabel = "lbs",
+  unitLabel = "kg",
 }: {
   active?: boolean;
   payload?: { name: string; value: number; fill: string }[];
@@ -295,7 +295,7 @@ function MiniVolumeTooltip({
   active,
   payload,
   color,
-  unitLabel = "lbs",
+  unitLabel = "kg",
 }: {
   active?: boolean;
   payload?: { value: number }[];

@@ -7,13 +7,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
-import { computeLauncherWorkout, getAlternativeTemplates, logLauncherEvent } from '@/lib/adaptive/launcher';
+import { computeLauncherWorkout, getAlternativeTemplates, logLauncherEvent, enrichWithAI } from '@/lib/adaptive/launcher';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/workout/launcher
  * Returns suggested workout based on user patterns
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -36,9 +37,13 @@ export async function GET() {
       );
     }
 
-    // Compute launcher prediction
-    const suggested_workout = await computeLauncherWorkout(user.id);
-    const alternative_templates = await getAlternativeTemplates(user.id, 3);
+    // Compute launcher prediction, then enrich with AI asynchronously
+    const base_prediction = await computeLauncherWorkout(user.id);
+    const origin = new URL(request.url).origin;
+    const [suggested_workout, alternative_templates] = await Promise.all([
+      enrichWithAI(base_prediction, origin),
+      getAlternativeTemplates(user.id, 3),
+    ]);
 
     // Log impression
     await logLauncherEvent(user.id, 'launcher_shown', {
@@ -60,7 +65,7 @@ export async function GET() {
       alternative_templates
     });
   } catch (error) {
-    console.error('Launcher GET error:', error);
+    logger.error('Launcher GET error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -120,7 +125,7 @@ export async function POST(request: NextRequest) {
       message: accepted ? 'Launcher workout accepted' : 'Alternative chosen'
     });
   } catch (error) {
-    console.error('Launcher POST error:', error);
+    logger.error('Launcher POST error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

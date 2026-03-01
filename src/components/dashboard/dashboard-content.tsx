@@ -8,7 +8,6 @@ import {
   Dumbbell,
   Apple,
   Flame,
-  Zap,
   CalendarDays,
   ChevronRight,
   Trophy,
@@ -25,6 +24,7 @@ import { StreakSection } from "@/components/dashboard/streak-section";
 import { SmartLauncherWidget } from "@/components/workout/smart-launcher-widget";
 import { FatigueLevelCard } from "@/components/dashboard/fatigue-level-card";
 import { PodsDashboardCard } from "@/components/pods/pods-dashboard-card";
+import { XpProgressBar } from "@/components/profile/xp-progress-bar";
 
 
 import type { FatigueSnapshot } from "@/lib/fatigue/types";
@@ -353,14 +353,8 @@ export function DashboardContent({
                     {todayFormatted}
                   </span>
                 </div>
-                {/* Level badge */}
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/15 px-3 py-1">
-                  <Zap className="h-2.5 w-2.5 text-primary" />
-                  <span className="text-[10px] font-bold text-primary">Level {level}</span>
-                  <span className="text-[10px] font-normal text-muted-foreground">
-                    · {xp.toLocaleString()} XP
-                  </span>
-                </div>
+                {/* XP progress bar */}
+                <XpProgressBar level={level} xp={xp} />
               </div>
 
               {/* Heading */}

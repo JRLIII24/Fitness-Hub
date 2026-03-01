@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Sparkles, ChevronRight, Loader2, Clock } from "lucide-react";
+import { Zap, Sparkles, ChevronRight, Loader2, Clock, Brain } from "lucide-react";
+import { logger } from "@/lib/logger";
 import { getCachedPrediction, cachePrediction, clearExpiredCache } from "@/lib/launcher-cache";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,13 +42,13 @@ export function SmartLauncherWidget() {
     async function fetchLauncher() {
       try {
         // Clear expired cache entries on mount
-        clearExpiredCache().catch(console.error);
+        clearExpiredCache().catch((e) => logger.error('[Launcher] Cache cleanup failed:', e));
 
         // Get current user ID from auth
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          console.error('[Launcher] No authenticated user');
+          logger.error('[Launcher] No authenticated user');
           setLoading(false);
           return;
         }
@@ -55,7 +56,7 @@ export function SmartLauncherWidget() {
         // Check cache first
         const cached = await getCachedPrediction(user.id) as LauncherResponse | null;
         if (cached) {
-          console.log('[Launcher] Serving from cache');
+          logger.log('[Launcher] Serving from cache');
           setData(cached);
           setLoading(false);
         }
@@ -80,7 +81,7 @@ export function SmartLauncherWidget() {
           setLoading(false);
         }
       } catch (err) {
-        console.error("Launcher fetch error:", err);
+        logger.error("Launcher fetch error:", err);
         setError(err instanceof Error ? err.message : "Failed to load");
         setLoading(false);
       }
@@ -115,7 +116,7 @@ export function SmartLauncherWidget() {
         router.push("/workout?from_launcher=true");
       }
     } catch (err) {
-      console.error("Failed to start workout:", err);
+      logger.error("Failed to start workout:", err);
       setStarting(false);
     }
   }
@@ -173,7 +174,33 @@ export function SmartLauncherWidget() {
               <Clock className="h-3 w-3" />
               ~{suggested_workout.estimated_duration_mins} min
             </span>
+            {suggested_workout.ai_intensity && (
+              <span className={`flex items-center gap-1 font-medium ${
+                suggested_workout.ai_intensity === "recovery"
+                  ? "text-blue-500"
+                  : suggested_workout.ai_intensity === "high"
+                  ? "text-orange-500"
+                  : "text-green-500"
+              }`}>
+                {suggested_workout.ai_intensity === "recovery"
+                  ? "↓ Recovery"
+                  : suggested_workout.ai_intensity === "high"
+                  ? "↑ Push"
+                  : "● Moderate"}
+              </span>
+            )}
           </div>
+          {suggested_workout.ai_reasoning && (
+            <p className="mt-2 flex items-start gap-1.5 text-xs italic text-muted-foreground/80">
+              <Brain className="mt-0.5 h-3 w-3 shrink-0 text-primary/60" />
+              {suggested_workout.ai_reasoning}
+            </p>
+          )}
+          {suggested_workout.ai_coaching_note && (
+            <p className="mt-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+              {suggested_workout.ai_coaching_note}
+            </p>
+          )}
         </div>
 
         <div className="flex gap-2">
@@ -240,7 +267,7 @@ export function SmartLauncherWidget() {
                           time_to_decision_ms: Date.now() - Date.now(),
                           reason: 'start_from_scratch'
                         }),
-                      }).catch(err => console.error('Failed to log launcher rejection:', err));
+                      }).catch(err => logger.error('Failed to log launcher rejection:', err));
                       // Navigate to empty workout page
                       router.push("/workout");
                     }}

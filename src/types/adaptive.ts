@@ -69,6 +69,10 @@ export interface LauncherPrediction {
   estimated_duration_mins: number;
   confidence: 'high' | 'medium' | 'low';
   reason: string;
+  // Optional AI enrichment — present only when ANTHROPIC_API_KEY is configured
+  ai_reasoning?: string;
+  ai_coaching_note?: string;
+  ai_intensity?: 'high' | 'moderate' | 'recovery';
 }
 
 export interface LauncherExercise {

@@ -12,12 +12,14 @@ import {
   Plus,
   Settings,
   Store,
+  Route,
 } from "lucide-react";
 import type { ElementType } from "react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkoutStore } from "@/stores/workout-store";
+import { MARKETPLACE_ENABLED, RUN_FEATURE_ENABLED } from "@/lib/features";
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -106,7 +108,8 @@ export function BottomNav() {
     { href: "/sets", label: "Sets", icon: Clapperboard },
     { href: "/nutrition", label: "Nutrition", icon: Apple },
     { href: "/social", label: "Social", icon: Users, badge: unreadCount },
-    { href: "/marketplace", label: "Marketplace", icon: Store },
+    ...(MARKETPLACE_ENABLED ? [{ href: "/marketplace", label: "Marketplace", icon: Store }] : []),
+    ...(RUN_FEATURE_ENABLED ? [{ href: "/run", label: "Run", icon: Route }] : []),
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

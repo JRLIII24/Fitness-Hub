@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
 import { generateAdaptiveWorkout } from '@/lib/adaptive/workout-generator';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/workout/adaptive
@@ -39,7 +40,7 @@ export async function GET() {
 
     return NextResponse.json(adaptiveWorkout);
   } catch (error) {
-    console.error('Adaptive workout GET error:', error);
+    logger.error('Adaptive workout GET error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
       message: accepted ? 'Adaptive workout accepted' : 'Adaptive workout rejected'
     });
   } catch (error) {
-    console.error('Adaptive workout POST error:', error);
+    logger.error('Adaptive workout POST error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

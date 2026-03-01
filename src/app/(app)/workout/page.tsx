@@ -51,6 +51,7 @@ import { useSharedItems, type TemplateSnapshot } from "@/hooks/use-shared-items"
 import { ExerciseSelectionCard } from "@/components/workout/exercise-selection-card";
 import { WorkoutCompleteCelebration } from "@/components/workout/workout-complete-celebration";
 import type { WorkoutStats } from "@/components/workout/workout-complete-celebration";
+import { LevelUpCelebration } from "@/components/dashboard/level-up-celebration";
 
 type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 
@@ -341,6 +342,7 @@ export default function WorkoutPage() {
   >({});
   const [celebrationStats, setCelebrationStats] = useState<WorkoutStats | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [levelUpData, setLevelUpData] = useState<{ newLevel: number } | null>(null);
   const [sessionRpePromptOpen, setSessionRpePromptOpen] = useState(false);
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [sessionRpeValue, setSessionRpeValue] = useState(7);
@@ -1838,6 +1840,14 @@ export default function WorkoutPage() {
       return;
     }
 
+    // Snapshot level before completion so we can detect a level-up afterwards
+    const { data: levelBefore } = await supabase
+      .from("profiles")
+      .select("level")
+      .eq("id", userId)
+      .maybeSingle();
+    const levelBeforeCompletion = levelBefore?.level ?? 1;
+
     const { error: completeError } = await supabase
       .from("workout_sessions")
       .update({
@@ -1898,18 +1908,22 @@ export default function WorkoutPage() {
     try {
       const { data: profileSnapshot } = await supabase
         .from("profiles")
-        .select("current_streak, level")
+        .select("current_streak, level, xp")
         .eq("id", userId)
         .maybeSingle();
 
       const currentStreak = profileSnapshot?.current_streak ?? 0;
       const level = profileSnapshot?.level ?? null;
+      const xp = profileSnapshot?.xp ?? 0;
       const milestones = [7, 30, 100, 365];
       const nextMilestone = milestones.find((m) => m > currentStreak) ?? null;
       const milestoneText =
         nextMilestone != null
           ? `${nextMilestone - currentStreak} days to ${nextMilestone}-day milestone`
           : "Milestone ladder complete";
+
+      // Calculate XP awarded this session for the toast message
+      const xpAwarded = 100 + (setsCompleted * 2);
 
       void logRetentionEvent(supabase, {
         userId,
@@ -1923,14 +1937,21 @@ export default function WorkoutPage() {
           beat_ghost_count: ghostWorkoutData ? beatGhostCount : 0,
           workout_name: workout.name,
           completed_sets: setsCompleted,
+          xp_awarded: xpAwarded,
         },
       });
 
-      toast.success("Micro win locked: +50 XP and streak protected.", {
-        description: level != null ? `Level ${level} • ${milestoneText}` : milestoneText,
+      toast.success(`+${xpAwarded} XP earned`, {
+        description: level != null ? `Level ${level} • ${xp} XP • ${milestoneText}` : milestoneText,
       });
+
+      // Detect and queue level-up celebration (shown after workout celebration closes)
+      if (level != null && level > levelBeforeCompletion) {
+        setLevelUpData({ newLevel: level });
+      }
     } catch (err) {
-      console.error("Failed to load micro-win snapshot:", err);
+      // Non-critical — keep workout flow resilient
+      void err;
     }
 
     // Show celebration modal with stats
@@ -1956,7 +1977,20 @@ export default function WorkoutPage() {
     setShowCelebration(false);
     setCelebrationStats(null);
 
+    if (levelUpData) {
+      // Show level-up modal first; RPE prompt follows after that
+      return;
+    }
+
     // Open the second popup only after the first one is closed.
+    setTimeout(() => {
+      fireConfetti();
+      setSessionRpePromptOpen(true);
+    }, 650);
+  }
+
+  function handleCloseLevelUp() {
+    setLevelUpData(null);
     setTimeout(() => {
       fireConfetti();
       setSessionRpePromptOpen(true);
@@ -3011,6 +3045,14 @@ export default function WorkoutPage() {
             stats={celebrationStats}
             confettiStyle="gold"
             onClose={handleCloseWorkoutCelebration}
+          />
+        )}
+
+        {/* Level-Up Celebration — shown after workout celebration closes */}
+        {!showCelebration && levelUpData && (
+          <LevelUpCelebration
+            newLevel={levelUpData.newLevel}
+            onClose={handleCloseLevelUp}
           />
         )}
 

@@ -3,6 +3,8 @@
  * Provides instant loading and offline support
  */
 
+import { logger } from '@/lib/logger';
+
 interface CachedLauncherPrediction {
   userId: string;
   prediction: unknown; // LauncherPrediction from API
@@ -54,21 +56,21 @@ export async function getCachedPrediction(userId: string): Promise<unknown | nul
 
         // Check if cache exists and is not expired
         if (cached && Date.now() < cached.expiresAt) {
-          console.log('[Launcher Cache] Hit - serving from cache');
+          logger.log('[Launcher Cache] Hit - serving from cache');
           resolve(cached.prediction);
         } else {
-          console.log('[Launcher Cache] Miss or expired');
+          logger.log('[Launcher Cache] Miss or expired');
           resolve(null);
         }
       };
 
       request.onerror = () => {
-        console.error('[Launcher Cache] Read error:', request.error);
+        logger.error('[Launcher Cache] Read error:', request.error);
         resolve(null); // Fail gracefully
       };
     });
   } catch (error) {
-    console.error('[Launcher Cache] Failed to get cached prediction:', error);
+    logger.error('[Launcher Cache] Failed to get cached prediction:', error);
     return null;
   }
 }
@@ -93,17 +95,17 @@ export async function cachePrediction(userId: string, prediction: unknown): Prom
       const request = store.put(cached);
 
       request.onsuccess = () => {
-        console.log('[Launcher Cache] Saved prediction');
+        logger.log('[Launcher Cache] Saved prediction');
         resolve();
       };
 
       request.onerror = () => {
-        console.error('[Launcher Cache] Write error:', request.error);
+        logger.error('[Launcher Cache] Write error:', request.error);
         reject(request.error);
       };
     });
   } catch (error) {
-    console.error('[Launcher Cache] Failed to cache prediction:', error);
+    logger.error('[Launcher Cache] Failed to cache prediction:', error);
   }
 }
 
@@ -137,12 +139,12 @@ export async function clearExpiredCache(): Promise<void> {
       };
 
       request.onerror = () => {
-        console.error('[Launcher Cache] Clear error:', request.error);
+        logger.error('[Launcher Cache] Clear error:', request.error);
         reject(request.error);
       };
     });
   } catch (error) {
-    console.error('[Launcher Cache] Failed to clear expired cache:', error);
+    logger.error('[Launcher Cache] Failed to clear expired cache:', error);
   }
 }
 
@@ -159,16 +161,16 @@ export async function clearUserCache(userId: string): Promise<void> {
       const request = store.delete(userId);
 
       request.onsuccess = () => {
-        console.log('[Launcher Cache] Cleared user cache');
+        logger.log('[Launcher Cache] Cleared user cache');
         resolve();
       };
 
       request.onerror = () => {
-        console.error('[Launcher Cache] Delete error:', request.error);
+        logger.error('[Launcher Cache] Delete error:', request.error);
         reject(request.error);
       };
     });
   } catch (error) {
-    console.error('[Launcher Cache] Failed to clear user cache:', error);
+    logger.error('[Launcher Cache] Failed to clear user cache:', error);
   }
 }

@@ -4,10 +4,12 @@ import { requireAuth } from "@/lib/auth-utils";
 import { z } from "zod";
 import { parsePayload } from "@/lib/validation/parse";
 import { RUN_FEATURE_ENABLED } from "@/lib/features";
+import { logger } from "@/lib/logger";
 
 const createActiveRunSchema = z.object({
   run_session_id: z.string().uuid(),
   session_name: z.string().trim().min(1).max(120),
+  is_treadmill: z.boolean().optional().default(false),
 });
 
 function formatDbError(error: unknown) {
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(parsed.error, { status: 400 });
     }
 
-    const { run_session_id, session_name } = parsed.data;
+    const { run_session_id, session_name, is_treadmill } = parsed.data;
 
     // Check for existing active session
     const { data: existing, error: existingError } = await supabase
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existingError) {
-      console.error("Active run existing lookup error:", existingError);
+      logger.error("Active run existing lookup error:", existingError);
       return NextResponse.json(
         { error: "Failed to check active session" },
         { status: 500 }
@@ -75,6 +77,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Step 1: Pre-insert an in-progress run_sessions row so the FK constraint
+    // on active_workout_sessions.run_session_id is satisfied.
+    const { error: runInsertError } = await supabase.from("run_sessions").insert({
+      id: run_session_id,
+      user_id: user.id,
+      name: session_name,
+      status: "in_progress" as const,
+      started_at: new Date().toISOString(),
+      is_treadmill,
+      zone_breakdown: {},
+    });
+
+    if (runInsertError) {
+      logger.error("Active run: run_sessions pre-insert error:", runInsertError);
+      return NextResponse.json(formatDbError(runInsertError), { status: 500 });
+    }
+
+    // Step 2: Register the active session (FK is now satisfied).
     const payload = {
       user_id: user.id,
       session_name,
@@ -88,13 +108,20 @@ export async function POST(request: NextRequest) {
       .upsert(payload, { onConflict: "user_id" });
 
     if (error) {
-      console.error("Active run POST error:", error);
+      // Roll back the pre-inserted run_sessions row.
+      await supabase
+        .from("run_sessions")
+        .delete()
+        .eq("id", run_session_id)
+        .eq("user_id", user.id);
+
+      logger.error("Active run POST error:", error);
       return NextResponse.json(formatDbError(error), { status: 500 });
     }
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
-    console.error("Active run POST error:", error);
+    logger.error("Active run POST error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -115,21 +142,40 @@ export async function DELETE() {
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
+    // Read the active session to get the run_session_id before deleting.
+    const { data: activeSession } = await supabase
+      .from("active_workout_sessions")
+      .select("run_session_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
     const { error } = await supabase
       .from("active_workout_sessions")
       .delete()
       .eq("user_id", user.id);
+
     if (error) {
-      console.error("Active run DELETE table error:", error);
+      logger.error("Active run DELETE table error:", error);
       return NextResponse.json(
         { error: "Failed to clear active run" },
         { status: 500 }
       );
     }
 
+    // Delete the in-progress run_sessions record that was pre-inserted on start.
+    // Only delete if still in_progress (don't touch completed sessions).
+    if (activeSession?.run_session_id) {
+      await supabase
+        .from("run_sessions")
+        .delete()
+        .eq("id", activeSession.run_session_id)
+        .eq("user_id", user.id)
+        .eq("status", "in_progress");
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Active run DELETE error:", error);
+    logger.error("Active run DELETE error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

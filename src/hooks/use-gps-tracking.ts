@@ -8,6 +8,7 @@ import { shouldAcceptPoint, computeElevationDelta } from "@/lib/run/gps-smoother
 import { computeRollingPaceSecPerKm, computeAvgPaceSecPerKm } from "@/lib/run/pace";
 import { classifyPaceZone, computeZoneThresholds } from "@/lib/run/zones";
 import { appendGpsPoint, flushGpsPoints } from "@/lib/run/track-store";
+import { logger } from "@/lib/logger";
 
 interface PaceWindowEntry {
   distM: number;
@@ -21,7 +22,7 @@ const GPS_OPTIONS: PositionOptions = {
 };
 
 const AUTO_PAUSE_SPEED_MS = 0.5;
-const AUTO_PAUSE_DURATION_MS = 5000;
+const AUTO_PAUSE_DURATION_MS = 3000; // 3 s is enough to distinguish a genuine stop
 const AUTO_RESUME_SPEED_MS = 0.8;
 
 export function useGpsTracking() {
@@ -211,7 +212,7 @@ export function useGpsTracking() {
 
   const startWatching = useCallback((resetTrackingRefs = true) => {
     if (!navigator.geolocation) {
-      console.error("Geolocation not supported");
+      logger.error("Geolocation not supported");
       return;
     }
 
@@ -235,7 +236,7 @@ export function useGpsTracking() {
     watchIdRef.current = navigator.geolocation.watchPosition(
       handlePosition,
       (error) => {
-        console.error("GPS error:", error.message);
+        logger.error("GPS error:", error.message);
       },
       GPS_OPTIONS
     );

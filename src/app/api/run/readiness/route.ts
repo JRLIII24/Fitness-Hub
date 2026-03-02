@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { getCachedOrComputeFatigueSnapshot } from "@/lib/fatigue/server";
 import { RUN_FEATURE_ENABLED } from "@/lib/features";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   if (!RUN_FEATURE_ENABLED) {
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
         timezone,
       });
     } catch (error) {
-      console.warn("Run readiness fatigue snapshot unavailable:", error);
+      logger.warn("Run readiness fatigue snapshot unavailable:", error);
       snapshot = null;
     }
 
@@ -113,7 +114,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Run readiness GET error:", error);
+    logger.error("Run readiness GET error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

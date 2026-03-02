@@ -34,6 +34,7 @@ export default function RunStartPage() {
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsAcquiring, setGpsAcquiring] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsRetryKey, setGpsRetryKey] = useState(0);
   const [readiness, setReadiness] = useState<RunReadinessData | null>(null);
 
   const initRun = useRunStore((s) => s.initRun);
@@ -57,22 +58,28 @@ export default function RunStartPage() {
     fetchReadiness();
   }, []);
 
-  // Acquire GPS on mount
+  // Acquire GPS on mount (re-runs on retry)
   useEffect(() => {
     if (isTreadmill) return;
 
-    queueMicrotask(() => {
-      setGpsAcquiring(true);
-      setGpsError(null);
-    });
-    const watchId = navigator.geolocation?.watchPosition(
+    if (!navigator.geolocation) {
+      setGpsError("GPS not supported by your browser");
+      setGpsAcquiring(false);
+      return;
+    }
+
+    setGpsAccuracy(null);
+    setGpsAcquiring(true);
+    setGpsError(null);
+
+    const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         setGpsAccuracy(pos.coords.accuracy);
         setGpsAcquiring(false);
       },
       (error) => {
         if (error.code === error.PERMISSION_DENIED) {
-          setGpsError("Location permission denied");
+          setGpsError("Location permission denied — enable it in browser settings");
         } else if (error.code === error.POSITION_UNAVAILABLE) {
           setGpsError("Location unavailable");
         } else if (error.code === error.TIMEOUT) {
@@ -86,9 +93,9 @@ export default function RunStartPage() {
     );
 
     return () => {
-      if (watchId !== undefined) navigator.geolocation?.clearWatch(watchId);
+      navigator.geolocation.clearWatch(watchId);
     };
-  }, [isTreadmill]);
+  }, [isTreadmill, gpsRetryKey]);
 
   const handleStart = useCallback(async () => {
     const runId = initRun(name, tag, isTreadmill, splitDistanceM);
@@ -101,6 +108,7 @@ export default function RunStartPage() {
       body: JSON.stringify({
         run_session_id: runId,
         session_name: name,
+        is_treadmill: isTreadmill,
       }),
     }).catch(() => null);
 
@@ -200,25 +208,36 @@ export default function RunStartPage() {
 
       {/* GPS Status */}
       {!isTreadmill && (
-        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card p-3">
-          <div className="flex items-center gap-2">
-            <Navigation
-              className={cn(
-                "h-4 w-4",
-                gpsReady ? "text-green-400" : gpsWeak ? "text-red-400" : "text-yellow-400"
-              )}
-            />
-            <span className="text-sm">
-              {gpsError
-                ? gpsError
-                : !hasGpsFix && gpsAcquiring
-                ? "Acquiring GPS signal..."
-                : gpsReady
-                  ? "GPS locked"
-                  : "GPS signal weak"}
-            </span>
+        <div className="rounded-xl border border-border/60 bg-card p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Navigation
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  gpsReady ? "text-green-400" : gpsError ? "text-red-400" : "text-yellow-400"
+                )}
+              />
+              <span className="text-sm">
+                {gpsError
+                  ? gpsError
+                  : !hasGpsFix && gpsAcquiring
+                  ? "Acquiring GPS signal..."
+                  : gpsReady
+                    ? "GPS locked"
+                    : "GPS signal weak"}
+              </span>
+            </div>
+            <GpsStatusIndicator accuracy={gpsAccuracy} />
           </div>
-          <GpsStatusIndicator accuracy={gpsAccuracy} />
+          {/* Retry button — shown for retryable errors (not permission denied) */}
+          {gpsError && !gpsError.includes("permission") && !gpsError.includes("supported") && (
+            <button
+              onClick={() => setGpsRetryKey((k) => k + 1)}
+              className="text-xs text-primary underline-offset-2 hover:underline"
+            >
+              Retry GPS
+            </button>
+          )}
         </div>
       )}
 
@@ -245,7 +264,7 @@ export default function RunStartPage() {
           onClick={handleStart}
           className="w-full text-sm text-muted-foreground"
         >
-          Start without GPS lock
+          {gpsError ? "Start without GPS" : "Start without GPS lock"}
         </Button>
       )}
     </div>

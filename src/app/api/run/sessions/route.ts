@@ -6,6 +6,7 @@ import { saveRunSchema } from "@/lib/validation/run.schemas";
 import { computeRunSessionLoad } from "@/lib/run/fatigue-integration";
 import type { RunIntensityZone } from "@/types/run";
 import { RUN_FEATURE_ENABLED } from "@/lib/features";
+import { logger } from "@/lib/logger";
 
 async function insertMirrorWorkoutSession(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error("Run sessions GET error:", error);
+      logger.error("Run sessions GET error:", error);
       return NextResponse.json(
         { error: "Failed to fetch runs" },
         { status: 500 }
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ runs: data ?? [] });
   } catch (error) {
-    console.error("Run sessions GET error:", error);
+    logger.error("Run sessions GET error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -121,41 +122,44 @@ export async function POST(request: NextRequest) {
           )
         : null;
 
-    // 1. Insert run session
+    // 1. Upsert run session (an in-progress record may already exist from start time)
     const { data: runSession, error: runError } = await supabase
       .from("run_sessions")
-      .insert({
-        id: d.local_id,
-        user_id: user.id,
-        name: d.name,
-        status: "completed" as const,
-        tag: d.tag,
-        notes: d.notes ?? null,
-        started_at: d.started_at,
-        completed_at: d.completed_at,
-        duration_seconds: d.duration_seconds,
-        moving_duration_seconds: d.moving_duration_seconds,
-        distance_meters: d.distance_meters,
-        avg_pace_sec_per_km: d.avg_pace_sec_per_km,
-        best_pace_sec_per_km: d.best_pace_sec_per_km,
-        elevation_gain_m: d.elevation_gain_m,
-        elevation_loss_m: d.elevation_loss_m,
-        avg_cadence_spm: d.avg_cadence_spm ?? null,
-        estimated_calories: d.estimated_calories,
-        session_rpe: d.session_rpe,
-        estimated_vo2max: d.estimated_vo2max,
-        session_load: sessionLoad,
-        zone_breakdown: d.zone_breakdown,
-        primary_zone: d.primary_zone,
-        route_polyline: d.route_polyline,
-        is_treadmill: d.is_treadmill,
-        map_bbox: d.map_bbox,
-      })
+      .upsert(
+        {
+          id: d.local_id,
+          user_id: user.id,
+          name: d.name,
+          status: "completed" as const,
+          tag: d.tag,
+          notes: d.notes ?? null,
+          started_at: d.started_at,
+          completed_at: d.completed_at,
+          duration_seconds: d.duration_seconds,
+          moving_duration_seconds: d.moving_duration_seconds,
+          distance_meters: d.distance_meters,
+          avg_pace_sec_per_km: d.avg_pace_sec_per_km,
+          best_pace_sec_per_km: d.best_pace_sec_per_km,
+          elevation_gain_m: d.elevation_gain_m,
+          elevation_loss_m: d.elevation_loss_m,
+          avg_cadence_spm: d.avg_cadence_spm ?? null,
+          estimated_calories: d.estimated_calories,
+          session_rpe: d.session_rpe,
+          estimated_vo2max: d.estimated_vo2max,
+          session_load: sessionLoad,
+          zone_breakdown: d.zone_breakdown,
+          primary_zone: d.primary_zone,
+          route_polyline: d.route_polyline,
+          is_treadmill: d.is_treadmill,
+          map_bbox: d.map_bbox,
+        },
+        { onConflict: "id" }
+      )
       .select()
       .single();
 
     if (runError) {
-      console.error("Run session insert error:", runError);
+      logger.error("Run session upsert error:", runError);
       return NextResponse.json(
         { error: "Failed to save run" },
         { status: 500 }
@@ -185,7 +189,7 @@ export async function POST(request: NextRequest) {
         .insert(splitsToInsert);
 
       if (splitsError) {
-        console.error("Run splits insert error:", splitsError);
+        logger.error("Run splits insert error:", splitsError);
       }
     }
 
@@ -205,7 +209,7 @@ export async function POST(request: NextRequest) {
 
       if (!mirrorResult.success) {
         mirrorConfirmed = false;
-        console.error(
+        logger.error(
           "CRITICAL: mirrored workout session insert failed after retries:",
           mirrorResult.error
         );
@@ -228,7 +232,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Run sessions POST error:", error);
+    logger.error("Run sessions POST error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

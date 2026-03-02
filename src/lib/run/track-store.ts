@@ -1,5 +1,6 @@
 import type { GpsPoint } from "@/types/run";
 import { openDB, type IDBPDatabase } from "idb";
+import { logger } from "@/lib/logger";
 
 interface RunTrackDB {
   tracks: {
@@ -71,7 +72,7 @@ export async function flushGpsPoints(runId: string) {
     });
     pending.points = [];
   } catch (e) {
-    console.error("Failed to flush GPS points to IDB:", e);
+    logger.error("Failed to flush GPS points to IDB:", e);
   }
 }
 
@@ -96,6 +97,6 @@ export async function deleteRunTrack(runId: string) {
     await tx.done;
     pendingByRun.delete(runId);
   } catch (e) {
-    console.error("Failed to delete run track from IDB:", e);
+    logger.error("Failed to delete run track from IDB:", e);
   }
 }

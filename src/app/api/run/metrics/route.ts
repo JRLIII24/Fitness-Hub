@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { RUN_FEATURE_ENABLED } from "@/lib/features";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   if (!RUN_FEATURE_ENABLED) {
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
       .limit(weeks);
 
     if (error) {
-      console.error("Run metrics GET error:", error);
+      logger.error("Run metrics GET error:", error);
       return NextResponse.json(
         { error: "Failed to fetch metrics" },
         { status: 500 }
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
       { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } }
     );
   } catch (error) {
-    console.error("Run metrics GET error:", error);
+    logger.error("Run metrics GET error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

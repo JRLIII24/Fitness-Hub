@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth-utils";
 import { parsePayload } from "@/lib/validation/parse";
 import { patchRunSchema } from "@/lib/validation/run.schemas";
 import { RUN_FEATURE_ENABLED } from "@/lib/features";
+import { logger } from "@/lib/logger";
 
 export async function GET(
   _request: NextRequest,
@@ -47,7 +48,7 @@ export async function GET(
       splits: splitsResult.data ?? [],
     });
   } catch (error) {
-    console.error("Run detail GET error:", error);
+    logger.error("Run detail GET error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -95,7 +96,7 @@ export async function PATCH(
 
     return NextResponse.json({ run: data });
   } catch (error) {
-    console.error("Run PATCH error:", error);
+    logger.error("Run PATCH error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -144,7 +145,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Run DELETE error:", error);
+    logger.error("Run DELETE error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

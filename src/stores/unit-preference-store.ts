@@ -1,3 +1,5 @@
+"use client";
+
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -18,13 +20,27 @@ interface UnitPreferenceState {
   paceLabel: "/mi" | "/km";
 }
 
+function getDerivedUnitState(preference: UnitPreference) {
+  return {
+    splitDistanceM: preference === "imperial" ? 1609.34 : 1000,
+    unitLabel: preference === "imperial" ? ("lbs" as const) : ("kg" as const),
+    heightLabel: preference === "imperial" ? ("inches" as const) : ("cm" as const),
+    distanceLabel: preference === "imperial" ? ("mi" as const) : ("km" as const),
+    paceLabel: preference === "imperial" ? ("/mi" as const) : ("/km" as const),
+  };
+}
+
 export const useUnitPreferenceStore = create<UnitPreferenceState>()(
   persist(
     (set, get) => ({
-      preference: "imperial",
+      preference: "metric",
+      ...getDerivedUnitState("metric"),
 
       setPreference: (preference: UnitPreference) => {
-        set({ preference });
+        set({
+          preference,
+          ...getDerivedUnitState(preference),
+        });
       },
 
       formatWeight: (kg: number) => {
@@ -74,30 +90,27 @@ export const useUnitPreferenceStore = create<UnitPreferenceState>()(
         return `${Math.round(meters)} m`;
       },
 
-      get splitDistanceM() {
-        return get().preference === "imperial" ? 1609.34 : 1000;
-      },
-
-      get unitLabel() {
-        return get().preference === "imperial" ? "lbs" : "kg";
-      },
-
-      get heightLabel() {
-        return get().preference === "imperial" ? "inches" : "cm";
-      },
-
-      get distanceLabel() {
-        return get().preference === "imperial" ? "mi" : "km";
-      },
-
-      get paceLabel() {
-        return get().preference === "imperial" ? "/mi" : "/km";
-      },
     }),
     {
       name: "fit-hub-unit-preference",
       // Only persist the preference value, not computed values
       partialize: (state) => ({ preference: state.preference }),
+      // Avoid SSR/client hydration mismatch from localStorage-backed state.
+      skipHydration: true,
+      merge: (persistedState, currentState) => {
+        const persistedPreference =
+          (persistedState as Partial<UnitPreferenceState> | undefined)?.preference ?? "metric";
+        const preference =
+          persistedPreference === "imperial" || persistedPreference === "metric"
+            ? persistedPreference
+            : currentState.preference;
+
+        return {
+          ...currentState,
+          preference,
+          ...getDerivedUnitState(preference),
+        };
+      },
     }
   )
 );

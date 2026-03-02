@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { applyAccentColor } from "@/hooks/use-accent-color";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
 export interface OnboardingData {
   accentColor: string;
   fitnessGoal: "build_muscle" | "lose_weight" | "maintain" | "improve_endurance" | null;
+  unitPreference: "metric" | "imperial";
   heightFeet: number | null;
   heightInches: number | null;
   currentWeight: number | null;
@@ -22,6 +24,7 @@ export interface OnboardingData {
 const initialData: OnboardingData = {
   accentColor: "electric-blue",
   fitnessGoal: null,
+  unitPreference: "imperial",
   heightFeet: null,
   heightInches: null,
   currentWeight: null,
@@ -312,6 +315,7 @@ export function useOnboarding() {
       const profileData: Record<string, unknown> = {
         id: user.id,
         fitness_goal: data.fitnessGoal,
+        unit_preference: data.unitPreference,
         height_cm: heightCm,
         current_weight_kg: data.currentWeight,
         goal_weight_kg: data.goalWeight,
@@ -354,6 +358,16 @@ export function useOnboarding() {
         updateError = retry.error;
       }
 
+      if (updateError && isMissingProfilesColumnError(updateError, "unit_preference")) {
+        delete profileData.unit_preference;
+        const retry = await supabase
+          .from("profiles")
+          .upsert(profileData, { onConflict: "id" })
+          .select("id")
+          .single();
+        updateError = retry.error;
+      }
+
       if (updateError) {
         console.error("Update error:", updateError);
         throw new Error(
@@ -375,6 +389,8 @@ export function useOnboarding() {
         localStorage.removeItem(ACCENT_STORAGE_KEY);
         applyAccentColor(null);
       }
+
+      useUnitPreferenceStore.getState().setPreference(data.unitPreference);
       applyOnboardingAccentPreview(data.accentColor);
 
       // Trigger confetti celebration

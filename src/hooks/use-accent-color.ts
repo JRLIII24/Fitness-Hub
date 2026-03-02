@@ -94,8 +94,16 @@ export function applyAccentColor(color: string | null) {
 
 export function useAccentColor(enabled = true, userId?: string | null) {
   const supabase = useSupabase();
-  const [accentColor, setAccentColorState] = useState<string | null>(() => readStoredAccentColor());
+  const [accentColor, setAccentColorState] = useState<string | null>(null);
   const [canPersistAccent, setCanPersistAccent] = useState(true);
+
+  // Hydration-safe: read localStorage only after mount
+  useEffect(() => {
+    const stored = readStoredAccentColor();
+    if (stored) {
+      setAccentColorState(stored);
+    }
+  }, []);
 
   useEffect(() => {
     applyAccentColor(enabled ? accentColor : null);

@@ -8,6 +8,7 @@ import { Pencil, Trash2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { usePrimaryColor } from "@/hooks/use-primary-color";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -53,6 +54,7 @@ export default function HistoryPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const primaryColor = usePrimaryColor();
+  const { preference, unitLabel } = useUnitPreferenceStore();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
@@ -69,6 +71,12 @@ export default function HistoryPage() {
     const hh = String(d.getHours()).padStart(2, "0");
     const mi = String(d.getMinutes()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  }
+
+  function toDisplayWeight(kg: number) {
+    return preference === "imperial"
+      ? Math.round(kg * 2.20462 * 10) / 10
+      : Math.round(kg * 10) / 10;
   }
 
   useEffect(() => {
@@ -343,7 +351,9 @@ export default function HistoryPage() {
                         <p className="font-medium text-foreground">{exerciseName}</p>
                         <p className="text-xs text-muted-foreground">
                           {sets
-                            .map((set) => `${set.weight_kg ?? 0} x ${set.reps ?? 0}`)
+                            .map((set) =>
+                              `${set.weight_kg != null ? `${toDisplayWeight(set.weight_kg)} ${unitLabel}` : "BW"} x ${set.reps ?? 0}`
+                            )
                             .join(" | ")}
                         </p>
                       </div>

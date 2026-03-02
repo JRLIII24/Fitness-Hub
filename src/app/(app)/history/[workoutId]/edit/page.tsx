@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, ChevronLeft, Check, Trash2 } from "lucide-react";
 import { celebratePR, triggerHaptic } from "@/lib/celebrations";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 
 interface WorkoutSession {
   id: string;
@@ -288,6 +289,7 @@ export default function EditWorkoutPage() {
   const workoutId = params.workoutId as string;
 
   const supabase = useMemo(() => createClient(), []);
+  const { preference, unitLabel } = useUnitPreferenceStore();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -295,6 +297,14 @@ export default function EditWorkoutPage() {
   const [workoutName, setWorkoutName] = useState("");
   const [workoutNotes, setWorkoutNotes] = useState("");
   const [exercises, setExercises] = useState<EditableExerciseBlock[]>([]);
+
+  const toDisplayWeight = (kg: number) =>
+    preference === "imperial"
+      ? Math.round(kg * 2.20462 * 10) / 10
+      : Math.round(kg * 10) / 10;
+
+  const fromDisplayWeight = (value: number) =>
+    preference === "imperial" ? value / 2.20462 : value;
 
   useEffect(() => {
     async function load() {
@@ -505,19 +515,21 @@ export default function EditWorkoutPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label htmlFor={`weight-${exerciseIndex}-${setIndex}`} className="text-xs">
-                      Weight (kg)
+                      Weight ({unitLabel})
                     </Label>
                     <Input
                       id={`weight-${exerciseIndex}-${setIndex}`}
                       type="number"
-                      step="0.5"
-                      value={set.weight_kg ?? ""}
+                      step={preference === "imperial" ? "1" : "0.5"}
+                      value={set.weight_kg == null ? "" : toDisplayWeight(set.weight_kg)}
                       onChange={(e) =>
                         handleSetUpdate(
                           exerciseIndex,
                           setIndex,
                           "weight_kg",
-                          e.target.value ? parseFloat(e.target.value) : null
+                          e.target.value
+                            ? fromDisplayWeight(parseFloat(e.target.value))
+                            : null
                         )
                       }
                       placeholder="Weight"

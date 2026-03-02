@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Moon, Sun, Monitor, Globe } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -44,11 +44,6 @@ function isSafariBrowser() {
   return /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|OPR/i.test(ua);
 }
 
-function kgToLbs(kg: number | null): string {
-  if (kg === null || kg === undefined) return "";
-  return String(Math.round(kg * LBS_PER_KG * 10) / 10);
-}
-
 function lbsToKg(lbs: number): number {
   return lbs / LBS_PER_KG;
 }
@@ -73,9 +68,19 @@ function feetInchesToCm(feet: number, inches: number): number {
   return (feet * 12 + inches) * CM_PER_INCH;
 }
 
+function kgToDisplayWeight(kg: number | null, unitPreference: "metric" | "imperial"): string {
+  if (kg === null || kg === undefined || Number.isNaN(kg)) return "";
+  const value = unitPreference === "imperial" ? kg * LBS_PER_KG : kg;
+  return String(Math.round(value * 10) / 10);
+}
+
+function displayWeightToKg(value: number, unitPreference: "metric" | "imperial"): number {
+  return unitPreference === "imperial" ? lbsToKg(value) : value;
+}
+
 export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
-  const { preference: hookUnitPreference, updatePreference: updateUnitPreference, loading: unitLoading } = useUnitPreference();
-  const { preference: unitPreference, setPreference: setUnitPreference } = useUnitPreferenceStore();
+  const { updatePreference: updateUnitPreference, loading: unitLoading } = useUnitPreference();
+  const unitPreference = useUnitPreferenceStore((state) => state.preference);
   const { theme, setTheme } = useTheme();
   const { appTheme, setAppTheme } = useAppTheme(userId);
   const { accentColor, setAccentColor, clearAccentColor } = useAccentColor(
@@ -87,7 +92,8 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
     goal_weight_kg?: number | null;
   };
 
-  const initialHeight = cmToFeetInches(profile?.height_cm ?? null);
+  const initialHeightCm = profile?.height_cm ?? null;
+  const initialHeight = cmToFeetInches(initialHeightCm);
   const initialWeightKg =
     profileWithOnboardingFields.current_weight_kg ?? profile?.weight_kg ?? null;
 
@@ -99,7 +105,14 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
   const [isPublic, setIsPublic] = useState((profile as unknown as { is_public?: boolean })?.is_public ?? false);
   const [heightFeet, setHeightFeet] = useState(initialHeight.feet);
   const [heightInches, setHeightInches] = useState(initialHeight.inches);
-  const [weightLbs, setWeightLbs] = useState(kgToLbs(initialWeightKg));
+  const [heightCm, setHeightCm] = useState(
+    initialHeightCm != null && !Number.isNaN(initialHeightCm)
+      ? String(Math.round(initialHeightCm * 10) / 10)
+      : ""
+  );
+  const [weightInput, setWeightInput] = useState(
+    kgToDisplayWeight(initialWeightKg, unitPreference)
+  );
   const [dateOfBirth, setDateOfBirth] = useState(profile?.date_of_birth ?? "");
   const [gender, setGender] = useState<string>(profile?.gender ?? "");
   const [fitnessGoal, setFitnessGoal] = useState<string>(
@@ -107,18 +120,63 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingUnit, setIsUpdatingUnit] = useState(false);
-
-  // Sync hook preference to Zustand store
-  useEffect(() => {
-    if (!unitLoading && hookUnitPreference) {
-      setUnitPreference(hookUnitPreference);
-    }
-  }, [hookUnitPreference, unitLoading, setUnitPreference]);
+  const previousUnitPreferenceRef = useRef(unitPreference);
 
   useEffect(() => {
     setMounted(true);
     setIsSafari(isSafariBrowser());
   }, []);
+
+  useEffect(() => {
+    const previousPreference = previousUnitPreferenceRef.current;
+    if (previousPreference === unitPreference) return;
+
+    const parsedWeight =
+      weightInput.trim() === "" ? null : Number.parseFloat(weightInput);
+    const currentWeightKg =
+      parsedWeight == null || Number.isNaN(parsedWeight)
+        ? null
+        : displayWeightToKg(parsedWeight, previousPreference);
+    setWeightInput(kgToDisplayWeight(currentWeightKg, unitPreference));
+
+    const currentHeightCm =
+      previousPreference === "imperial"
+        ? (() => {
+            const parsedFeet = heightFeet !== "" ? Number.parseInt(heightFeet, 10) : null;
+            const parsedInches = heightInches !== "" ? Number.parseInt(heightInches, 10) : null;
+            if (
+              parsedFeet == null ||
+              parsedInches == null ||
+              Number.isNaN(parsedFeet) ||
+              Number.isNaN(parsedInches) ||
+              parsedFeet < 0 ||
+              parsedInches < 0 ||
+              parsedInches > 11
+            ) {
+              return null;
+            }
+            return feetInchesToCm(parsedFeet, parsedInches);
+          })()
+        : (() => {
+            if (heightCm.trim() === "") return null;
+            const parsed = Number.parseFloat(heightCm);
+            return Number.isNaN(parsed) ? null : parsed;
+          })();
+
+    if (unitPreference === "imperial") {
+      const converted = cmToFeetInches(currentHeightCm);
+      setHeightFeet(converted.feet);
+      setHeightInches(converted.inches);
+    } else {
+      setHeightCm(
+        currentHeightCm != null && !Number.isNaN(currentHeightCm)
+          ? String(Math.round(currentHeightCm * 10) / 10)
+          : ""
+      );
+    }
+
+    previousUnitPreferenceRef.current = unitPreference;
+  }, [heightCm, heightFeet, heightInches, unitPreference, weightInput]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -126,43 +184,57 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
 
     const supabase = createClient();
 
-    const parsedWeightLbs = weightLbs !== "" ? parseFloat(weightLbs) : null;
+    const parsedWeight = weightInput !== "" ? Number.parseFloat(weightInput) : null;
     const weightKg =
-      parsedWeightLbs !== null && !Number.isNaN(parsedWeightLbs)
-        ? lbsToKg(parsedWeightLbs)
+      parsedWeight !== null && !Number.isNaN(parsedWeight)
+        ? displayWeightToKg(parsedWeight, unitPreference)
         : null;
 
-    const parsedFeet = heightFeet !== "" ? parseInt(heightFeet, 10) : null;
-    const parsedInches = heightInches !== "" ? parseInt(heightInches, 10) : null;
-    const hasAnyHeightInput = heightFeet !== "" || heightInches !== "";
+    let parsedHeight: number | null = null;
+    if (unitPreference === "imperial") {
+      const parsedFeet = heightFeet !== "" ? Number.parseInt(heightFeet, 10) : null;
+      const parsedInches = heightInches !== "" ? Number.parseInt(heightInches, 10) : null;
+      const hasAnyHeightInput = heightFeet !== "" || heightInches !== "";
 
-    if (
-      hasAnyHeightInput &&
-      (
-        parsedFeet === null ||
-        parsedInches === null ||
-        Number.isNaN(parsedFeet) ||
-        Number.isNaN(parsedInches) ||
-        parsedFeet < 0 ||
-        parsedInches < 0 ||
-        parsedInches > 11
-      )
-    ) {
-      setIsSaving(false);
-      toast.error("Please enter height as feet and inches (inches must be 0-11).");
-      return;
+      if (
+        hasAnyHeightInput &&
+        (
+          parsedFeet === null ||
+          parsedInches === null ||
+          Number.isNaN(parsedFeet) ||
+          Number.isNaN(parsedInches) ||
+          parsedFeet < 0 ||
+          parsedInches < 0 ||
+          parsedInches > 11
+        )
+      ) {
+        setIsSaving(false);
+        toast.error("Please enter height as feet and inches (inches must be 0-11).");
+        return;
+      }
+
+      parsedHeight =
+        parsedFeet !== null &&
+        parsedInches !== null &&
+        !Number.isNaN(parsedFeet) &&
+        !Number.isNaN(parsedInches) &&
+        parsedFeet >= 0 &&
+        parsedInches >= 0 &&
+        parsedInches < 12
+          ? feetInchesToCm(parsedFeet, parsedInches)
+          : null;
+    } else {
+      const parsedHeightCm = heightCm !== "" ? Number.parseFloat(heightCm) : null;
+      if (
+        parsedHeightCm !== null &&
+        (Number.isNaN(parsedHeightCm) || parsedHeightCm <= 0 || parsedHeightCm > 280)
+      ) {
+        setIsSaving(false);
+        toast.error("Please enter a valid height in centimeters.");
+        return;
+      }
+      parsedHeight = parsedHeightCm;
     }
-
-    const parsedHeight =
-      parsedFeet !== null &&
-      parsedInches !== null &&
-      !Number.isNaN(parsedFeet) &&
-      !Number.isNaN(parsedInches) &&
-      parsedFeet >= 0 &&
-      parsedInches >= 0 &&
-      parsedInches < 12
-        ? feetInchesToCm(parsedFeet, parsedInches)
-        : null;
 
     const updates = {
       display_name: displayName || null,
@@ -198,20 +270,16 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
   }
 
   async function handleUnitChange(newUnit: "metric" | "imperial") {
+    if (newUnit === unitPreference) return;
+
     setIsUpdatingUnit(true);
     try {
-      // Update Zustand store immediately (optimistic)
-      setUnitPreference(newUnit);
-
-      // Then update database
       await updateUnitPreference(newUnit);
       toast.success(`Units updated to ${newUnit === "metric" ? "metric (kg)" : "imperial (lbs)"}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to update unit preference";
       console.error("Unit preference error:", message);
       toast.error(message);
-      // Revert to previous preference if update failed
-      setUnitPreference(unitPreference);
     } finally {
       setIsUpdatingUnit(false);
     }
@@ -317,48 +385,66 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className={`grid gap-4 ${unitPreference === "imperial" ? "grid-cols-3" : "grid-cols-2"}`}>
               {/* Height */}
-              <div className="space-y-1.5">
-                <Label htmlFor="height-feet">Height (ft)</Label>
-                <Input
-                  id="height-feet"
-                  type="number"
-                  placeholder="e.g. 5"
-                  min={0}
-                  max={8}
-                  step={1}
-                  value={heightFeet}
-                  onChange={(e) => setHeightFeet(e.target.value)}
-                />
-              </div>
+              {unitPreference === "imperial" ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="height-feet">Height (ft)</Label>
+                    <Input
+                      id="height-feet"
+                      type="number"
+                      placeholder="e.g. 5"
+                      min={0}
+                      max={8}
+                      step={1}
+                      value={heightFeet}
+                      onChange={(e) => setHeightFeet(e.target.value)}
+                    />
+                  </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="height-inches">Height (in)</Label>
-                <Input
-                  id="height-inches"
-                  type="number"
-                  placeholder="e.g. 10"
-                  min={0}
-                  max={11}
-                  step={1}
-                  value={heightInches}
-                  onChange={(e) => setHeightInches(e.target.value)}
-                />
-              </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="height-inches">Height (in)</Label>
+                    <Input
+                      id="height-inches"
+                      type="number"
+                      placeholder="e.g. 10"
+                      min={0}
+                      max={11}
+                      step={1}
+                      value={heightInches}
+                      onChange={(e) => setHeightInches(e.target.value)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label htmlFor="height-cm">Height (cm)</Label>
+                  <Input
+                    id="height-cm"
+                    type="number"
+                    placeholder="e.g. 175"
+                    min={90}
+                    max={280}
+                    step={0.1}
+                    value={heightCm}
+                    onChange={(e) => setHeightCm(e.target.value)}
+                  />
+                </div>
+              )}
 
               {/* Weight */}
               <div className="space-y-1.5">
-                <Label htmlFor="weight">Weight (lbs)</Label>
+                <Label htmlFor="weight">Weight ({unitPreference === "imperial" ? "lbs" : "kg"})</Label>
                 <Input
                   id="weight"
                   type="number"
-                  placeholder="e.g. 165"
-                  min={50}
-                  max={1000}
+                  placeholder={unitPreference === "imperial" ? "e.g. 165" : "e.g. 75"}
+                  min={unitPreference === "imperial" ? 50 : 20}
+                  max={unitPreference === "imperial" ? 1000 : 450}
                   step={0.1}
-                  value={weightLbs}
-                  onChange={(e) => setWeightLbs(e.target.value)}
+                  value={weightInput}
+                  onChange={(e) => setWeightInput(e.target.value)}
                 />
               </div>
             </div>

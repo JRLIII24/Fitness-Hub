@@ -154,6 +154,8 @@ export default function OnboardingPage() {
             key="height"
             heightFeet={data.heightFeet}
             heightInches={data.heightInches}
+            unitPreference={data.unitPreference}
+            onUnitChange={(unitPreference) => updateData({ unitPreference })}
             onUpdate={(feet, inches) =>
               updateData({ heightFeet: feet, heightInches: inches })
             }
@@ -166,6 +168,8 @@ export default function OnboardingPage() {
             key="weight"
             currentWeight={data.currentWeight}
             goalWeight={data.goalWeight}
+            unitPreference={data.unitPreference}
+            onUnitChange={(unitPreference) => updateData({ unitPreference })}
             showWeight={data.showWeight}
             onUpdate={(current, goal, showWeight) =>
               updateData({

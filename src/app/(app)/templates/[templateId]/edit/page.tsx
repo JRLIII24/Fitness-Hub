@@ -13,6 +13,7 @@ import { Loader2, ChevronLeft, Trash2, Plus, Globe } from "lucide-react";
 import { AddExerciseToTemplateDialog } from "@/components/workout/add-exercise-to-template-dialog";
 import { Switch } from "@/components/ui/switch";
 import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 
 // Category options — all filter values except "All"
 const CATEGORY_OPTIONS = MUSCLE_FILTERS.filter(f => f !== "All");
@@ -62,6 +63,7 @@ export default function EditTemplatePage() {
   const [togglingPublic, setTogglingPublic] = useState(false);
   const [primaryMuscleGroup, setPrimaryMuscleGroup] = useState<string | null>(null);
   const [addExerciseOpen, setAddExerciseOpen] = useState(false);
+  const { preference, unitLabel } = useUnitPreferenceStore();
 
   useEffect(() => {
     async function loadTemplate() {
@@ -437,7 +439,12 @@ export default function EditTemplatePage() {
                       >
                         <span>
                           Set {set.set_number}:{" "}
-                          {set.weight_kg ? `${set.weight_kg}kg` : ""}
+                          {set.weight_kg != null
+                            ? `${preference === "imperial"
+                              ? Math.round(set.weight_kg * 2.20462 * 10) / 10
+                              : Math.round(set.weight_kg * 10) / 10
+                            } ${unitLabel}`
+                            : ""}
                           {set.weight_kg && set.reps && " × "}
                           {set.reps ? `${set.reps}reps` : ""}
                         </span>

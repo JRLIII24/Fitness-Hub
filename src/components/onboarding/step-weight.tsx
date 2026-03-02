@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 interface StepWeightProps {
   currentWeight: number | null;
   goalWeight: number | null;
+  unitPreference: "metric" | "imperial";
+  onUnitChange: (preference: "metric" | "imperial") => void;
   showWeight: boolean;
   onUpdate: (
     current: number | null,
@@ -23,11 +24,13 @@ interface StepWeightProps {
 export function StepWeight({
   currentWeight,
   goalWeight,
+  unitPreference,
+  onUnitChange,
   showWeight,
   onUpdate,
   onNext,
 }: StepWeightProps) {
-  const [unit, setUnit] = useState<"kg" | "lbs">("lbs"); // Default to lbs
+  const unit = unitPreference === "imperial" ? "lbs" : "kg";
 
   // Conversion helpers
   const kgToLbs = (kg: number) => kg * 2.20462;
@@ -102,7 +105,7 @@ export function StepWeight({
           <div className="flex items-center justify-center gap-2 pb-4 border-b border-white/10">
             <button
               type="button"
-              onClick={() => setUnit("kg")}
+              onClick={() => onUnitChange("metric")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 unit === "kg"
                   ? "bg-[var(--accent-500)] text-white"
@@ -113,7 +116,7 @@ export function StepWeight({
             </button>
             <button
               type="button"
-              onClick={() => setUnit("lbs")}
+              onClick={() => onUnitChange("imperial")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 unit === "lbs"
                   ? "bg-[var(--accent-500)] text-white"

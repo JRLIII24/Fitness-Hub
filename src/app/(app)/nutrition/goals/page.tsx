@@ -419,8 +419,8 @@ export default function NutritionGoalsPage() {
               <div className="space-y-1 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground">Goal Setting Tips</p>
                 <p>
-                  A common starting point: protein 0.8–1g per lb of body weight,
-                  fat 20–35% of calories, rest from carbs.
+                  A common starting point: protein 0.8–1g per lb (1.8–2.2g per kg)
+                  of body weight, fat 20–35% of calories, rest from carbs.
                 </p>
                 <p>
                   Goals take effect today and remain active until you update them.

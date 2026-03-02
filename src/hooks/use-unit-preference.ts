@@ -1,22 +1,31 @@
 import { useCallback, useState, useEffect } from "react";
 import { useSupabase } from "./use-supabase";
+import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 
 export type UnitPreference = "metric" | "imperial";
 
+function isMissingUnitPreferenceColumnError(error: unknown): boolean {
+  const message = ((error as { message?: string } | null)?.message ?? "").toLowerCase();
+  return message.includes("unit_preference") && message.includes("column");
+}
+
 export function useUnitPreference() {
   const supabase = useSupabase();
-  const [preference, setPreference] = useState<UnitPreference>("metric");
+  const preference = useUnitPreferenceStore((state) => state.preference);
+  const setPreference = useUnitPreferenceStore((state) => state.setPreference);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadPreference() {
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
 
-        if (!user) {
+        if (!user || cancelled) {
           setLoading(false);
           return;
         }
@@ -25,31 +34,43 @@ export function useUnitPreference() {
           .from("profiles")
           .select("unit_preference")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
 
         if (fetchError) {
-          console.warn("Could not fetch unit_preference (column may not exist yet):", fetchError);
-          setError(null); // Don't show error to user, just use default
-          setPreference("metric");
-        } else if (data?.unit_preference) {
+          if (!isMissingUnitPreferenceColumnError(fetchError)) {
+            console.warn("Could not fetch unit_preference:", fetchError);
+          }
+          setError(null); // Keep local/store preference if DB read is unavailable.
+        } else if (
+          data?.unit_preference === "metric" ||
+          data?.unit_preference === "imperial"
+        ) {
           setPreference(data.unit_preference as UnitPreference);
           setError(null);
         }
       } catch (err) {
         console.error("Failed to load unit preference:", err);
-        setError("Could not load unit preference");
+        if (!cancelled) setError("Could not load unit preference");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadPreference();
-  }, [supabase]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, setPreference]);
 
   const updatePreference = useCallback(
     async (newPreference: UnitPreference) => {
+      const previousPreference = preference;
+
       try {
         setError(null);
+        setPreference(newPreference); // Optimistic update for immediate UI consistency.
+
         const {
           data: { user },
         } = await supabase.auth.getUser();
@@ -58,30 +79,34 @@ export function useUnitPreference() {
           throw new Error("Not authenticated");
         }
 
-        const { error: updateError } = await supabase
+        const { error: upsertError } = await supabase
           .from("profiles")
-          .update({ unit_preference: newPreference })
-          .eq("id", user.id);
+          .upsert(
+            {
+              id: user.id,
+              unit_preference: newPreference,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" }
+          );
 
-        if (updateError) {
+        if (upsertError) {
           // If column doesn't exist, just set it locally
-          if (updateError.message.includes("column") || updateError.message.includes("unit_preference")) {
+          if (isMissingUnitPreferenceColumnError(upsertError)) {
             console.warn("unit_preference column may not exist in database yet. Setting locally.");
-            setPreference(newPreference);
           } else {
-            throw updateError;
+            throw upsertError;
           }
-        } else {
-          setPreference(newPreference);
         }
       } catch (err) {
+        setPreference(previousPreference);
         const message = err instanceof Error ? err.message : "Failed to update unit preference";
         console.error("Failed to update unit preference:", err);
         setError(message);
         throw err;
       }
     },
-    [supabase]
+    [supabase, preference, setPreference]
   );
 
   const formatWeight = useCallback(

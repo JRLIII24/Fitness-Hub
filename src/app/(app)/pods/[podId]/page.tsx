@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, UserPlus, Target, MessageSquare, Trash2, LogOut } from "lucide-react";
+import { ArrowLeft, UserPlus, Target, MessageSquare, Trash2, LogOut, Plus, Trophy, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,10 +12,167 @@ import { usePodDetail } from "@/hooks/use-pods";
 import { InviteMemberDialog } from "@/components/pods/invite-member-dialog";
 import { SetCommitmentDialog } from "@/components/pods/set-commitment-dialog";
 import { SendMessageDialog } from "@/components/pods/send-message-dialog";
+import { CreateChallengeDialog } from "@/components/pods/create-challenge-dialog";
+import { PodLeaderboard } from "@/components/pods/pod-leaderboard";
 import { createClient } from "@/lib/supabase/client";
+import { POD_CHALLENGES_ENABLED } from "@/lib/features";
+import type { PodChallenge } from "@/types/pods";
 
 interface PageProps {
   params: Promise<{ podId: string }>;
+}
+
+function formatChallengeDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function ChallengeTypeIcon({ type }: { type: PodChallenge["challenge_type"] }) {
+  if (type === "volume") return <Trophy className="h-3.5 w-3.5" />;
+  if (type === "distance") return <span className="text-xs">🏃</span>;
+  return <span className="text-xs">🔥</span>;
+}
+
+function ChallengesSection({ podId, currentUserId }: { podId: string; currentUserId: string | null }) {
+  const [challenges, setChallenges] = useState<(PodChallenge & { is_active: boolean })[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const fetchChallenges = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/pods/${podId}/challenges`);
+      if (res.ok) {
+        const data = await res.json();
+        setChallenges(data.challenges ?? []);
+      }
+    } catch {
+      // non-critical
+    } finally {
+      setLoading(false);
+    }
+  }, [podId]);
+
+  useEffect(() => {
+    fetchChallenges();
+  }, [fetchChallenges]);
+
+  async function handleDelete(challengeId: string) {
+    if (!confirm("Delete this challenge?")) return;
+    const res = await fetch(`/api/pods/${podId}/challenges/${challengeId}`, { method: "DELETE" });
+    if (res.ok) {
+      setChallenges((prev) => prev.filter((c) => c.id !== challengeId));
+    }
+  }
+
+  const activeChallenges = challenges.filter((c) => c.is_active);
+  const pastChallenges = challenges.filter((c) => !c.is_active);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
+          <Trophy className="h-3.5 w-3.5" />
+          Challenges
+        </h2>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs"
+          onClick={() => setCreateOpen(true)}
+        >
+          <Plus className="h-3 w-3 mr-1" />
+          New
+        </Button>
+      </div>
+
+      {loading ? (
+        <Card><CardContent className="pt-4"><Skeleton className="h-12 w-full" /></CardContent></Card>
+      ) : challenges.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <Trophy className="h-7 w-7 mx-auto mb-2 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">No challenges yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Create one to compete with your pod!</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {activeChallenges.map((challenge) => (
+            <Card key={challenge.id} className="border-primary/30 bg-primary/5">
+              <CardContent className="pt-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ChallengeTypeIcon type={challenge.challenge_type} />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">{challenge.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatChallengeDate(challenge.start_date)} – {formatChallengeDate(challenge.end_date)}
+                        {challenge.target_value && (
+                          <> · target: {challenge.target_value} {challenge.challenge_type === "volume" ? "kg" : challenge.challenge_type === "distance" ? "km" : "sessions"}</>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-500/20 text-green-600 border-green-500/30">
+                      Active
+                    </Badge>
+                    {currentUserId === challenge.created_by && (
+                      <button
+                        onClick={() => handleDelete(challenge.id)}
+                        className="text-muted-foreground/50 hover:text-destructive transition-colors text-xs"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {pastChallenges.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground pl-1">Past challenges</p>
+              {pastChallenges.map((challenge) => (
+                <Card key={challenge.id} className="opacity-60">
+                  <CardContent className="py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ChallengeTypeIcon type={challenge.challenge_type} />
+                        <p className="text-sm truncate">{challenge.name}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] text-muted-foreground">
+                          ended {formatChallengeDate(challenge.end_date)}
+                        </span>
+                        {currentUserId === challenge.created_by && (
+                          <button
+                            onClick={() => handleDelete(challenge.id)}
+                            className="text-muted-foreground/50 hover:text-destructive transition-colors text-xs"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      <CreateChallengeDialog
+        open={createOpen}
+        podId={podId}
+        onClose={() => setCreateOpen(false)}
+        onCreated={fetchChallenges}
+      />
+    </div>
+  );
 }
 
 export default function PodDetailPage({ params }: PageProps) {
@@ -29,12 +186,11 @@ export default function PodDetailPage({ params }: PageProps) {
   const [messageOpen, setMessageOpen] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string | null>(null);
 
-  // Get current user ID
-  useState(() => {
+  useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
       if (user) setCurrentUserId(user.id);
     });
-  });
+  }, []);
 
   const isCreator = pod && currentUserId && pod.creator_id === currentUserId;
   const currentUserProgress = pod?.members_progress.find((m) => m.user_id === currentUserId);
@@ -42,17 +198,13 @@ export default function PodDetailPage({ params }: PageProps) {
   async function handleLeave() {
     if (!confirm("Are you sure you want to leave this pod?")) return;
     const success = await leavePod();
-    if (success) {
-      router.push("/pods");
-    }
+    if (success) router.push("/pods");
   }
 
   async function handleDelete() {
     if (!confirm("Are you sure you want to delete this pod? This cannot be undone.")) return;
     const success = await deletePod(podId);
-    if (success) {
-      router.push("/pods");
-    }
+    if (success) router.push("/pods");
   }
 
   async function handleInvite(username: string) {
@@ -67,9 +219,7 @@ export default function PodDetailPage({ params }: PageProps) {
 
   async function handleSetCommitment(workouts: number) {
     const success = await setCommitment(workouts);
-    if (success) {
-      setCommitmentOpen(false);
-    }
+    if (success) setCommitmentOpen(false);
   }
 
   async function handleSendMessage(message: string, recipientId?: string) {
@@ -142,7 +292,6 @@ export default function PodDetailPage({ params }: PageProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Actions */}
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => setCommitmentOpen(true)} className="flex-1 min-w-[120px]">
               <Target className="h-4 w-4 mr-2" />
@@ -205,7 +354,6 @@ export default function PodDetailPage({ params }: PageProps) {
                     )}
                   </div>
                 </div>
-
                 {member.commitment > 0 && (
                   <div className="space-y-1">
                     <Progress
@@ -222,6 +370,14 @@ export default function PodDetailPage({ params }: PageProps) {
           );
         })}
       </div>
+
+      {/* Challenges + Live Leaderboard */}
+      {POD_CHALLENGES_ENABLED && (
+        <>
+          <ChallengesSection podId={podId} currentUserId={currentUserId} />
+          <PodLeaderboard podId={podId} />
+        </>
+      )}
 
       {/* Recent Messages */}
       {pod.recent_messages.length > 0 && (

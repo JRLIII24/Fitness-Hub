@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { logger } from '@/lib/logger';
 import type { ChallengeLeaderboard, PodChallenge } from '@/types/pods';
 
 interface UsePodLeaderboard {
@@ -53,7 +54,7 @@ export function usePodLeaderboard(podId: string): UsePodLeaderboard {
                 setLeaderboards(sorted);
             }
         } catch (err) {
-            console.error('Fetch pod leaderboards error:', err);
+            logger.error('Fetch pod leaderboards error:', err);
             // Only set error if it's not a missing implementation edge case while Claude builds the endpoint
             setError(err instanceof Error ? err.message : 'Failed to load leaderboards');
         } finally {
@@ -79,7 +80,7 @@ export function usePodLeaderboard(podId: string): UsePodLeaderboard {
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'workout_sessions' },
                 (payload) => {
-                    console.log('[Real-Time] Workout Session changed:', payload);
+                    logger.log('[Real-Time] Workout Session changed:', payload);
                     // When a workout session changes (e.g. status goes to completed), refetch leaderboard.
                     fetchLeaderboards();
                 }
@@ -93,7 +94,7 @@ export function usePodLeaderboard(podId: string): UsePodLeaderboard {
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'run_sessions' },
                 (payload) => {
-                    console.log('[Real-Time] Run Session changed:', payload);
+                    logger.log('[Real-Time] Run Session changed:', payload);
                     // When a run session changes, refetch leaderboard.
                     fetchLeaderboards();
                 }

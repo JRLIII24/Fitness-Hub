@@ -1,6 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { uuid } from '@/lib/uuid';
 import { SyncMutationPayload } from './queue.types';
+import { getSyncHandler } from './sync-registry';
 
 interface SyncQueueDB extends DBSchema {
     mutations: {
@@ -46,29 +47,43 @@ export async function triggerSync() {
     const db = await getDB();
     if (!db) return;
 
-    const tx = db.transaction('mutations', 'readwrite');
-    const store = tx.objectStore('mutations');
     const allMutations = await db.getAllFromIndex('mutations', 'by-date');
-
     if (allMutations.length === 0) return;
 
     for (const mutation of allMutations) {
+        const handler = getSyncHandler(mutation.type);
+        if (!handler) {
+            // Unknown type — remove stale entry
+            await db.delete('mutations', mutation.id);
+            continue;
+        }
+
         try {
-            // We will map mutation logic based on type elsewhere, e.g. a sync registry.
-            // For now, emit a custom event to allow service layers to listen and execute.
-            if (typeof window !== 'undefined') {
-                const event = new CustomEvent('sync-mutation', {
-                    detail: { mutation, db }
-                });
-                window.dispatchEvent(event);
-            }
-        } catch {
+            await handler(mutation.payload);
+            // Success — remove from queue
+            await db.delete('mutations', mutation.id);
+        } catch (err) {
             mutation.attempts += 1;
             mutation.lastAttemptAt = Date.now();
-            await store.put(mutation);
+
+            // Give up after 10 attempts
+            if (mutation.attempts >= 10) {
+                console.error(
+                    `[OfflineQueue] Giving up on mutation ${mutation.id} after ${mutation.attempts} attempts`,
+                    err
+                );
+                await db.delete('mutations', mutation.id);
+            } else {
+                await db.put('mutations', mutation);
+            }
         }
     }
-    await tx.done;
+}
+
+export async function getPendingCount(): Promise<number> {
+    const db = await getDB();
+    if (!db) return 0;
+    return db.count('mutations');
 }
 
 if (typeof window !== 'undefined') {

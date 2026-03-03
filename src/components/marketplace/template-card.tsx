@@ -25,8 +25,11 @@ interface TemplateCardProps {
 
 export function TemplateCard({ template, isSaved, onSave, onPreview, currentUserId }: TemplateCardProps) {
   const exercises = template.template_exercises ?? [];
-  // Prefer the explicit category set at publish time; fall back to first exercise group
-  const primaryGroup = template.primary_muscle_group
+  // Prefer the explicit categories set at publish time; fall back to first exercise group
+  const categoryList = template.primary_muscle_group
+    ? template.primary_muscle_group.split(",").map(s => s.trim()).filter(Boolean)
+    : [];
+  const primaryGroup = categoryList[0]
     ?? exercises[0]?.exercises?.muscle_group
     ?? "full body";
   const gc = getMuscleColor(primaryGroup);
@@ -55,13 +58,21 @@ export function TemplateCard({ template, isSaved, onSave, onPreview, currentUser
       >
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.06] to-transparent" />
 
-        {/* Category label — bottom-left when tall */}
-        <span
-          className="absolute left-2 bottom-2 rounded-full px-2 py-0.5 text-[9px] font-bold capitalize backdrop-blur-sm"
-          style={{ background: "rgba(0,0,0,0.40)", color: gc.labelColor }}
-        >
-          {primaryGroup.replace(/_/g, " ")}
-        </span>
+        {/* Category labels — bottom-left */}
+        <div className="absolute left-2 bottom-2 flex flex-wrap gap-1">
+          {(categoryList.length > 0 ? categoryList : [primaryGroup]).map((cat) => {
+            const catGc = getMuscleColor(cat);
+            return (
+              <span
+                key={cat}
+                className="rounded-full px-2 py-0.5 text-[9px] font-bold capitalize backdrop-blur-sm"
+                style={{ background: "rgba(0,0,0,0.40)", color: catGc.labelColor }}
+              >
+                {cat.replace(/_/g, " ")}
+              </span>
+            );
+          })}
+        </div>
 
         {/* "Yours" badge */}
         {isOwn && (
@@ -86,6 +97,29 @@ export function TemplateCard({ template, isSaved, onSave, onPreview, currentUser
           {template.name}
         </p>
 
+        {/* Muscle group tags */}
+        {muscleGroups.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {muscleGroups.slice(0, 3).map(g => {
+              const mgc = getMuscleColor(g);
+              return (
+                <span
+                  key={g}
+                  className="rounded-full px-[6px] py-[2px] text-[10px] font-semibold capitalize"
+                  style={{ background: mgc.bgAlpha, color: mgc.labelColor, border: `1px solid ${mgc.borderAlpha}` }}
+                >
+                  {g}
+                </span>
+              );
+            })}
+            {muscleGroups.length > 3 && (
+              <span className="rounded-full bg-card/60 px-[6px] py-[2px] text-[10px] text-muted-foreground">
+                +{muscleGroups.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Exercise + sets summary */}
         <p className="mb-2 text-[11px] text-muted-foreground">
           {exercises.length} exercise{exercises.length !== 1 ? "s" : ""}
@@ -106,29 +140,6 @@ export function TemplateCard({ template, isSaved, onSave, onPreview, currentUser
           </div>
           <span className="truncate text-[11px] text-muted-foreground">{creatorName}</span>
         </div>
-
-        {/* Muscle group tags */}
-        {muscleGroups.length > 0 && (
-          <div className="mb-2.5 flex flex-wrap gap-1">
-            {muscleGroups.slice(0, 2).map(g => {
-              const mgc = getMuscleColor(g);
-              return (
-                <span
-                  key={g}
-                  className="rounded-full px-[6px] py-[2px] text-[10px] font-semibold"
-                  style={{ background: mgc.bgAlpha, color: mgc.labelColor, border: `1px solid ${mgc.borderAlpha}` }}
-                >
-                  {g}
-                </span>
-              );
-            })}
-            {muscleGroups.length > 2 && (
-              <span className="rounded-full bg-card/60 px-[6px] py-[2px] text-[10px] text-muted-foreground">
-                +{muscleGroups.length - 2}
-              </span>
-            )}
-          </div>
-        )}
 
         {/* Footer stats */}
         <div className="flex items-center gap-2">

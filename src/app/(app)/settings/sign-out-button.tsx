@@ -29,6 +29,9 @@ export function SignOutButton({
       return;
     }
 
+    // Clear onboarding cache cookie so the next user gets the onboarding flow
+    document.cookie = "fh_onboarded=; path=/; max-age=0";
+
     router.push("/login");
     router.refresh();
   }

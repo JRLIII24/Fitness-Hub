@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Trophy, Flame } from 'lucide-react';
+import { kgToLbs } from '@/lib/units';
 import { useUnitPreferenceStore } from '@/stores/unit-preference-store';
 import type { ChallengeLeaderboard, LeaderboardEntry } from '@/types/pods';
 
@@ -155,7 +156,7 @@ function LeaderboardRow({
 
     const convertedScore =
         isImperial && unit === "kg"
-            ? entry.score * 2.20462
+            ? kgToLbs(entry.score)
             : entry.score;
 
     const roundedScore = Math.round(convertedScore * 10) / 10;

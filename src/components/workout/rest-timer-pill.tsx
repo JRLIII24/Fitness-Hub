@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useShallow } from "zustand/shallow";
 import { useTimerStore } from "@/stores/timer-store";
 import { Pause, Play, X, Plus, Minus, BellOff, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,14 +13,27 @@ interface RestTimerPillProps {
 }
 
 export function RestTimerPill({ className }: RestTimerPillProps) {
-  const timers = useTimerStore((s) => s.timers);
-  const lastTickMs = useTimerStore((s) => s.lastTickMs);
-  const pauseTimer = useTimerStore((s) => s.pauseTimer);
-  const resumeTimer = useTimerStore((s) => s.resumeTimer);
-  const stopTimer = useTimerStore((s) => s.stopTimer);
-  const adjustTime = useTimerStore((s) => s.adjustTime);
-  const notificationPermission = useTimerStore((s) => s.notificationPermission);
-  const requestNotificationPermission = useTimerStore((s) => s.requestNotificationPermission);
+  const {
+    timers,
+    lastTickMs,
+    pauseTimer,
+    resumeTimer,
+    stopTimer,
+    adjustTime,
+    notificationPermission,
+    requestNotificationPermission,
+  } = useTimerStore(
+    useShallow((s) => ({
+      timers: s.timers,
+      lastTickMs: s.lastTickMs,
+      pauseTimer: s.pauseTimer,
+      resumeTimer: s.resumeTimer,
+      stopTimer: s.stopTimer,
+      adjustTime: s.adjustTime,
+      notificationPermission: s.notificationPermission,
+      requestNotificationPermission: s.requestNotificationPermission,
+    }))
+  );
 
   const [isDone, setIsDone] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -105,7 +120,11 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
     stopTimer(timer.id);
   }
 
-  return (
+  // Portal to document.body so `position: fixed` works correctly even when
+  // a parent has a CSS transform (e.g. PageTransition's will-change-transform).
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {visible && (
         <>
@@ -350,6 +369,7 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

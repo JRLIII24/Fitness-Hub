@@ -1,4 +1,4 @@
-const KG_TO_LBS = 2.20462;
+import { KG_TO_LBS } from "@/lib/units";
 
 /**
  * Returns a suggested weight in **kg**, bumped by the standard plate increment

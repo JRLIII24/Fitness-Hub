@@ -119,7 +119,7 @@ export function StepAccentColor({ selected, onSelect, onNext }: StepAccentColorP
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-bold text-foreground"
           >
-            Choose Your Vibe 🎨
+            Choose Your Vibe <Palette className="inline h-8 w-8 ml-1" />
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}

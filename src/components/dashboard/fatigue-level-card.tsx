@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Activity, CircleHelp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,10 +32,9 @@ export function FatigueLevelCard({ initialSnapshot }: Props) {
     motivation: 8,
   });
 
-  const timezone = useMemo(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone || snapshot.timezone,
-    [snapshot.timezone]
-  );
+  // Use snapshot timezone from the server to avoid hydration mismatch
+  // (Intl.DateTimeFormat().resolvedOptions().timeZone differs on server vs client)
+  const timezone = snapshot.timezone || "UTC";
 
   async function handleSubmitCheckin() {
     setSaving(true);

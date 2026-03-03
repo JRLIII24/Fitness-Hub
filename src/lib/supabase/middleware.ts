@@ -34,22 +34,26 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Allow unauthenticated access to auth and password reset pages
-  const publicPaths = [
-    "/",
-    "/login",
-    "/signup",
-    "/forgot-password",
-    "/reset-password",
-  ];
-  const isPublicPath = publicPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  );
+  const isPublicPath =
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname.startsWith("/login") ||
+    request.nextUrl.pathname.startsWith("/signup") ||
+    request.nextUrl.pathname.startsWith("/forgot-password") ||
+    request.nextUrl.pathname.startsWith("/reset-password");
 
   // Protected routes — redirect to login if not authenticated
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    const response = NextResponse.redirect(url);
+    // Clear stale onboarding cookie so the next user gets the onboarding flow
+    response.cookies.set("fh_onboarded", "", { path: "/", maxAge: 0 });
+    return response;
+  }
+
+  // Clear stale onboarding cookie when no user is signed in
+  if (!user && request.cookies.get("fh_onboarded")?.value) {
+    supabaseResponse.cookies.set("fh_onboarded", "", { path: "/", maxAge: 0 });
   }
 
   // Redirect authenticated users away from auth pages

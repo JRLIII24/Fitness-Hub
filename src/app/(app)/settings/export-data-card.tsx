@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { format, formatDuration, intervalToDuration } from "date-fns";
 import { DateRange } from "react-day-picker";
+import { KG_TO_LBS } from "@/lib/units";
 import {
     Download,
     FileSpreadsheet,
@@ -50,7 +51,7 @@ export function ExportDataCard() {
     const [status, setStatus] = useState<Status>(null);
     const { preference, unitLabel } = useUnitPreferenceStore();
 
-    const volumeFactor = preference === "imperial" ? 2.20462 : 1;
+    const volumeFactor = preference === "imperial" ? KG_TO_LBS : 1;
     const toDisplayWeight = (kg: number) => Math.round(kg * volumeFactor * 10) / 10;
     const toDisplayVolumeValue = (kgVolume: number) => kgVolume * volumeFactor;
 

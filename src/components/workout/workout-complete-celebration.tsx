@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Clock, Dumbbell, TrendingUp, X, Star, Zap } from "lucide-react";
+import { Trophy, Clock, Dumbbell, TrendingUp, X, Star, Zap, Ghost, Flame } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
@@ -188,28 +188,28 @@ export function WorkoutCompleteCelebration({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.5 }}
-                  className="rounded-xl border border-border/70 bg-secondary/45 p-4"
+                  className="min-w-0 rounded-xl border border-border/70 bg-secondary/45 p-4"
                 >
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="h-4 w-4" />
+                    <Clock className="h-4 w-4 shrink-0" />
                     <span className="text-xs font-medium uppercase tracking-wider">Duration</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums">{stats.duration}</p>
+                  <p className="mt-2 truncate text-xl font-bold tabular-nums sm:text-2xl">{stats.duration}</p>
                 </motion.div>
 
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.6 }}
-                  className="rounded-xl border border-border/70 bg-secondary/45 p-4"
+                  className="min-w-0 rounded-xl border border-border/70 bg-secondary/45 p-4"
                 >
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <TrendingUp className="h-4 w-4" />
+                    <TrendingUp className="h-4 w-4 shrink-0" />
                     <span className="text-xs font-medium uppercase tracking-wider">Volume</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums">
-                    {stats.totalVolume.toLocaleString()}{" "}
-                    <span className="text-sm font-normal text-muted-foreground">{stats.unitLabel}</span>
+                  <p className="mt-2 truncate text-xl font-bold tabular-nums sm:text-2xl">
+                    {stats.totalVolume.toLocaleString()}
+                    <span className="ml-1 text-xs font-normal text-muted-foreground sm:text-sm">{stats.unitLabel}</span>
                   </p>
                 </motion.div>
 
@@ -217,26 +217,26 @@ export function WorkoutCompleteCelebration({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.7 }}
-                  className="rounded-xl border border-border/70 bg-secondary/45 p-4"
+                  className="min-w-0 rounded-xl border border-border/70 bg-secondary/45 p-4"
                 >
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Dumbbell className="h-4 w-4" />
+                    <Dumbbell className="h-4 w-4 shrink-0" />
                     <span className="text-xs font-medium uppercase tracking-wider">Exercises</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums">{stats.exerciseCount}</p>
+                  <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">{stats.exerciseCount}</p>
                 </motion.div>
 
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.8 }}
-                  className="rounded-xl border border-border/70 bg-secondary/45 p-4"
+                  className="min-w-0 rounded-xl border border-border/70 bg-secondary/45 p-4"
                 >
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <TrendingUp className="h-4 w-4" />
+                    <TrendingUp className="h-4 w-4 shrink-0" />
                     <span className="text-xs font-medium uppercase tracking-wider">Sets</span>
                   </div>
-                  <p className="mt-2 text-2xl font-bold tabular-nums">{stats.totalSets}</p>
+                  <p className="mt-2 text-xl font-bold tabular-nums sm:text-2xl">{stats.totalSets}</p>
                 </motion.div>
               </div>
 
@@ -259,13 +259,13 @@ export function WorkoutCompleteCelebration({
                       transition={{ delay: 0.9 + exerciseIndex * 0.05 }}
                       className="space-y-1.5"
                     >
-                      <p className="text-sm font-semibold">{exercise.name}</p>
-                      <div className="flex flex-wrap gap-2">
+                      <p className="truncate text-sm font-semibold">{exercise.name}</p>
+                      <div className="flex flex-wrap gap-1.5">
                         {exercise.completedSets.map((set, setIndex) => (
                           <div
                             key={setIndex}
                             className={cn(
-                              "rounded-md border px-2.5 py-1 text-xs font-medium transition-all",
+                              "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-xs font-medium tabular-nums transition-all",
                               set.isPR
                                 ? "border-primary/40 bg-gradient-to-r from-primary/20 to-accent/20 text-primary"
                                 : "border-border/70 bg-card/50 text-foreground"
@@ -273,8 +273,8 @@ export function WorkoutCompleteCelebration({
                           >
                             {set.weight != null && set.reps != null ? (
                               <>
-                                {set.weight} {stats.unitLabel} × {set.reps}
-                                {set.isPR && " 🏆"}
+                                {set.weight}{stats.unitLabel} × {set.reps}
+                                {set.isPR && <Trophy className="inline h-3 w-3 ml-1" />}
                               </>
                             ) : set.reps != null ? (
                               `${set.reps} reps`
@@ -303,7 +303,7 @@ export function WorkoutCompleteCelebration({
                       {stats.prCount} Personal Record{stats.prCount > 1 ? "s" : ""}!
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">You&apos;re getting stronger! 🏆</p>
+                  <p className="mt-1 text-xs text-muted-foreground inline-flex items-center justify-center gap-1">You&apos;re getting stronger! <Trophy className="inline h-3 w-3" /></p>
                 </motion.div>
               )}
 
@@ -316,12 +316,12 @@ export function WorkoutCompleteCelebration({
                   className="mt-4 rounded-xl border border-accent/45 bg-gradient-to-r from-accent/20 to-primary/20 p-4 text-center"
                 >
                   <div className="flex items-center justify-center gap-2">
-                    <span className="text-xl">👻</span>
+                    <Ghost className="h-5 w-5 text-foreground" />
                     <span className="text-lg font-bold text-foreground">
                       Beat Your Past Self on {stats.beatGhostCount}/{stats.exerciseCount} Exercises!
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">You&apos;re making progress! 🔥</p>
+                  <p className="mt-1 text-xs text-muted-foreground inline-flex items-center justify-center gap-1">You&apos;re making progress! <Flame className="inline h-3 w-3" /></p>
                 </motion.div>
               )}
 

@@ -4,6 +4,7 @@ import type { Exercise, WorkoutExercise, WorkoutSet, ActiveWorkout } from "@/typ
 import { idbStorage } from "@/lib/idb-storage";
 import { createClient } from "@/lib/supabase/client";
 import { uuid } from "@/lib/uuid";
+import { createActiveWorkoutSession, deleteActiveWorkoutSession } from "@/lib/services/workout.service";
 
 interface WorkoutState {
   activeWorkout: ActiveWorkout | null;
@@ -75,17 +76,7 @@ export const useWorkoutStore = create<WorkoutState>()(
         const workoutId = generateId();
         const startedAt = new Date().toISOString();
 
-        // Sync to database: create active session record
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-
-        if (user) {
-          // Changed to use abstracted service with offline queue for AS-01
-          const { createActiveWorkoutSession } = await import('@/lib/services/workout.service');
-          await createActiveWorkoutSession(user.id, name, startedAt);
-        }
-
-        // Set local state
+        // Set local state IMMEDIATELY for instant UI response
         set({
           activeWorkout: {
             id: workoutId,
@@ -98,6 +89,13 @@ export const useWorkoutStore = create<WorkoutState>()(
           isWorkoutActive: true,
           editingWorkoutId: null,
         });
+
+        // Sync to database in background (fire-and-forget)
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          void createActiveWorkoutSession(user.id, name, startedAt);
+        }
       },
 
       loadWorkoutForEdit: (workout: ActiveWorkout, workoutSessionId: string) => {
@@ -129,33 +127,31 @@ export const useWorkoutStore = create<WorkoutState>()(
       },
 
       cancelWorkout: async () => {
-        // Remove active session from database
+        // Clear local state IMMEDIATELY
+        set({ activeWorkout: null, isWorkoutActive: false, editingWorkoutId: null });
+
+        // Remove active session from database in background
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
-
         if (user) {
-          const { deleteActiveWorkoutSession } = await import('@/lib/services/workout.service');
-          await deleteActiveWorkoutSession(user.id);
+          void deleteActiveWorkoutSession(user.id);
         }
-
-        // Clear local state
-        set({ activeWorkout: null, isWorkoutActive: false, editingWorkoutId: null });
       },
 
       finishWorkout: async () => {
+        // Capture workout reference before clearing state
         const workout = get().activeWorkout;
 
-        // Remove active session from database
+        // Clear local state IMMEDIATELY
+        set({ activeWorkout: null, isWorkoutActive: false, editingWorkoutId: null });
+
+        // Remove active session from database in background
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
-
         if (user) {
-          const { deleteActiveWorkoutSession } = await import('@/lib/services/workout.service');
-          await deleteActiveWorkoutSession(user.id);
+          void deleteActiveWorkoutSession(user.id);
         }
 
-        // Clear local state
-        set({ activeWorkout: null, isWorkoutActive: false, editingWorkoutId: null });
         return workout;
       },
 

@@ -120,16 +120,20 @@ export function TemplatesManagerClient({
                 )}
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  {t.primary_muscle_group && (
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize",
-                        MUSCLE_BADGE_COLORS[t.primary_muscle_group] ?? "bg-muted/50 text-muted-foreground"
-                      )}
-                    >
-                      {muscleGroupLabels[t.primary_muscle_group] ?? t.primary_muscle_group}
-                    </span>
-                  )}
+                  {t.primary_muscle_group && t.primary_muscle_group.split(",").map((cat) => {
+                    const trimmed = cat.trim();
+                    return (
+                      <span
+                        key={trimmed}
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize",
+                          MUSCLE_BADGE_COLORS[trimmed] ?? "bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        {muscleGroupLabels[trimmed] ?? trimmed}
+                      </span>
+                    );
+                  })}
                   <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                     <Dumbbell className="h-2.5 w-2.5" />
                     {t.exercise_count} exercises

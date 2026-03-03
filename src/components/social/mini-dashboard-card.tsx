@@ -159,7 +159,7 @@ export function MiniDashboardCard({
               <div className="flex items-center gap-1.5 bg-green-500/10 rounded-full px-3 py-1 animate-pulse">
                 <Activity className="size-3.5 text-green-500" />
                 <span className="text-xs font-semibold text-green-500">
-                  Working out now 💪
+                  Working out now <Dumbbell className="inline size-3.5 ml-0.5" />
                 </span>
               </div>
             )}
@@ -198,7 +198,7 @@ export function MiniDashboardCard({
                 className="flex-1"
                 onClick={onPing}
               >
-                Ping 💪
+                Ping <Dumbbell className="inline size-3.5 ml-0.5" />
               </Button>
             </div>
           )}

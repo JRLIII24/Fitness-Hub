@@ -7,6 +7,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { ChevronDown, Clock3, NotebookPen, Plus, Save, X, LayoutList, Dumbbell, Layers, CircleCheck, Activity, Zap, Send, Pencil, Copy, Trash2, Heart, ArrowLeftRight, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
 import { fireConfetti } from "@/lib/celebrations";
 import {
@@ -42,6 +43,7 @@ import { ExerciseSparkline } from "@/components/workout/exercise-sparkline";
 import { useExerciseTrendlines } from "@/hooks/use-exercise-trendlines";
 import { calcSuggestedWeight } from "@/lib/progressive-overload";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
+import { weightToDisplay, kgToLbs } from "@/lib/units";
 import { RestTimerPill } from "@/components/workout/rest-timer-pill";
 import { FormTipsPanel } from "@/components/workout/form-tips-panel";
 import { SaveTemplateDialog } from "@/components/workout/save-template-dialog";
@@ -70,11 +72,15 @@ type WorkoutPresetId =
   | "arms-shoulders"
   | "custom";
 
+type PresetLift = { name: string; sets: number; reps: string };
+
 const POPULAR_WORKOUTS: Array<{
   id: Exclude<WorkoutPresetId, "custom">;
   label: string;
   defaultName: string;
   category: string;
+  lifts: PresetLift[];
+  /** Derived for display — kept in sync with lifts */
   liftNames: string[];
 }> = [
     {
@@ -82,83 +88,89 @@ const POPULAR_WORKOUTS: Array<{
       label: "Upper Body Strength",
       defaultName: "Upper Body Strength",
       category: "chest",
-      liftNames: [
-        "Barbell Bench Press",
-        "Barbell Bent-Over Row",
-        "Seated Dumbbell Press",
-        "Lat Pulldown (Wide Grip)",
-        "Close-Grip Bench Press",
-        "EZ-Bar Curl",
+      lifts: [
+        { name: "Barbell Bench Press", sets: 4, reps: "8" },
+        { name: "Barbell Bent-Over Row", sets: 4, reps: "8" },
+        { name: "Seated Dumbbell Press", sets: 3, reps: "10" },
+        { name: "Lat Pulldown (Wide Grip)", sets: 3, reps: "10" },
+        { name: "Close-Grip Bench Press", sets: 3, reps: "10" },
+        { name: "EZ-Bar Curl", sets: 3, reps: "12" },
       ],
+      get liftNames() { return this.lifts.map(l => l.name); },
     },
     {
       id: "push-day",
       label: "Push Day (Chest/Shoulders/Triceps)",
       defaultName: "Push Day",
       category: "chest",
-      liftNames: [
-        "Incline Barbell Bench Press",
-        "Seated Chest Press Machine",
-        "Arnold Press",
-        "Dumbbell Lateral Raise",
-        "Rope Pushdown",
-        "Overhead Dumbbell Extension",
+      lifts: [
+        { name: "Incline Barbell Bench Press", sets: 4, reps: "8" },
+        { name: "Seated Chest Press Machine", sets: 3, reps: "10" },
+        { name: "Arnold Press", sets: 3, reps: "10" },
+        { name: "Dumbbell Lateral Raise", sets: 3, reps: "15" },
+        { name: "Rope Pushdown", sets: 3, reps: "12" },
+        { name: "Overhead Dumbbell Extension", sets: 3, reps: "12" },
       ],
+      get liftNames() { return this.lifts.map(l => l.name); },
     },
     {
       id: "pull-day",
       label: "Pull Day (Back/Biceps)",
       defaultName: "Pull Day",
       category: "back",
-      liftNames: [
-        "Conventional Deadlift",
-        "Weighted Pull-Ups",
-        "Seated Cable Row",
-        "Face Pulls",
-        "Hammer Curl",
-        "Cable Curl",
+      lifts: [
+        { name: "Conventional Deadlift", sets: 4, reps: "5" },
+        { name: "Weighted Pull-Ups", sets: 4, reps: "8" },
+        { name: "Seated Cable Row", sets: 3, reps: "10" },
+        { name: "Face Pulls", sets: 3, reps: "15" },
+        { name: "Hammer Curl", sets: 3, reps: "12" },
+        { name: "Cable Curl", sets: 3, reps: "12" },
       ],
+      get liftNames() { return this.lifts.map(l => l.name); },
     },
     {
       id: "leg-day",
       label: "Leg Day (Quads/Glutes/Hams)",
       defaultName: "Leg Day",
       category: "legs",
-      liftNames: [
-        "Barbell Back Squat",
-        "Leg Press",
-        "Romanian Deadlift",
-        "Bulgarian Split Squat",
-        "Leg Extension",
-        "Seated Leg Curl",
+      lifts: [
+        { name: "Barbell Back Squat", sets: 4, reps: "6" },
+        { name: "Leg Press", sets: 4, reps: "10" },
+        { name: "Romanian Deadlift", sets: 3, reps: "10" },
+        { name: "Bulgarian Split Squat", sets: 3, reps: "10" },
+        { name: "Leg Extension", sets: 3, reps: "12" },
+        { name: "Seated Leg Curl", sets: 3, reps: "12" },
       ],
+      get liftNames() { return this.lifts.map(l => l.name); },
     },
     {
       id: "full-body",
       label: "Full Body Compound",
       defaultName: "Full Body",
       category: "full body",
-      liftNames: [
-        "Trap Bar Deadlift",
-        "Barbell Bench Press",
-        "Barbell Bent-Over Row",
-        "Barbell Overhead Press",
-        "Farmer's Carry",
+      lifts: [
+        { name: "Trap Bar Deadlift", sets: 4, reps: "6" },
+        { name: "Barbell Bench Press", sets: 4, reps: "8" },
+        { name: "Barbell Bent-Over Row", sets: 4, reps: "8" },
+        { name: "Barbell Overhead Press", sets: 3, reps: "8" },
+        { name: "Farmer's Carry", sets: 3, reps: "1" },
       ],
+      get liftNames() { return this.lifts.map(l => l.name); },
     },
     {
       id: "arms-shoulders",
       label: "Arms + Delts",
       defaultName: "Arms & Delts",
       category: "arms",
-      liftNames: [
-        "EZ-Bar Curl",
-        "Incline Dumbbell Curl",
-        "Rope Pushdown",
-        "Skull Crushers",
-        "Dumbbell Lateral Raise",
-        "Rear Delt Fly",
+      lifts: [
+        { name: "EZ-Bar Curl", sets: 3, reps: "10" },
+        { name: "Incline Dumbbell Curl", sets: 3, reps: "12" },
+        { name: "Rope Pushdown", sets: 3, reps: "12" },
+        { name: "Skull Crushers", sets: 3, reps: "10" },
+        { name: "Dumbbell Lateral Raise", sets: 3, reps: "15" },
+        { name: "Rear Delt Fly", sets: 3, reps: "15" },
       ],
+      get liftNames() { return this.lifts.map(l => l.name); },
     },
   ];
 
@@ -291,7 +303,7 @@ export default function WorkoutPage() {
 
   const [presetId, setPresetId] = useState<WorkoutPresetId>("upper-body-strength");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("none");
-  const [pendingCategory, setPendingCategory] = useState<string | null>(null);
+  const [pendingCategories, setPendingCategories] = useState<string[]>([]);
   const [workoutName, setWorkoutName] = useState("Upper Body Strength");
   const [setupTab, setSetupTab] = useState<"templates" | "quick">("templates");
   const [quickFilter, setQuickFilter] = useState<string>("All");
@@ -321,7 +333,6 @@ export default function WorkoutPage() {
   // API exercise search state
   const [apiExercises, setApiExercises] = useState<Exercise[]>([]);
   const [loadingExercises, setLoadingExercises] = useState(false);
-  const selectedMuscleGroupRef = useRef<MuscleGroup>(selectedMuscleGroup);
   const searchRequestSeq = useRef(0);
 
   const [previousByExerciseId, setPreviousByExerciseId] = useState<
@@ -406,13 +417,11 @@ export default function WorkoutPage() {
   const { preference, unitLabel } = useUnitPreferenceStore();
 
   const toDisplayWeight = (kg: number) =>
-    preference === "imperial"
-      ? Math.round(kg * 2.20462 * 10) / 10
-      : Math.round(kg * 10) / 10;
+    weightToDisplay(kg, preference === "imperial", 1);
 
   const toDisplayVolume = (kgVolume: number) =>
     preference === "imperial"
-      ? Math.round(kgVolume * 2.20462)
+      ? Math.round(kgToLbs(kgVolume))
       : Math.round(kgVolume);
 
   const allExercises = useMemo(
@@ -438,19 +447,6 @@ export default function WorkoutPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [liftSearch, filteredByMuscleGroup]);
 
-  const groupCounts = useMemo(() => {
-    const counts: Partial<Record<MuscleGroup, number>> = Object.fromEntries(
-      MUSCLE_GROUPS.map((group) => [group, 0])
-    ) as Partial<Record<MuscleGroup, number>>;
-
-    for (const exercise of allExercises) {
-      const key = exercise.muscle_group as MuscleGroup;
-      if (counts[key] == null) continue;
-      counts[key] = (counts[key] ?? 0) + 1;
-    }
-
-    return counts;
-  }, [allExercises]);
 
   const selectedExercise = useMemo(
     () => allExercises.find((exercise) => exercise.id === selectedExerciseId) ?? null,
@@ -540,10 +536,6 @@ export default function WorkoutPage() {
     setLoadingTemplates(false);
   }, [supabase]);
 
-  useEffect(() => {
-    selectedMuscleGroupRef.current = selectedMuscleGroup;
-  }, [selectedMuscleGroup]);
-
   // iOS Safari fallback: AudioContext cannot beep without a prior user gesture,
   // so timer-store dispatches 'rest-timer-complete' when audio is unavailable.
   // We show a toast here so the user always gets feedback on rest completion.
@@ -610,11 +602,10 @@ export default function WorkoutPage() {
         const params = new URLSearchParams();
         const query = liftSearch.trim();
 
-        // Preserve existing behavior: only pass muscle group when searching
         if (query.length > 0) {
           params.set("query", query);
-          params.set("muscle_group", selectedMuscleGroupRef.current);
         }
+        params.set("muscle_groups", selectedMuscleGroup);
 
         const response = await fetch(`/api/exercises/search?${params}`, {
           signal: controller.signal,
@@ -641,7 +632,7 @@ export default function WorkoutPage() {
       clearTimeout(timeoutId);
       controller.abort("Search cancelled");
     };
-  }, [liftSearch]); // Intentional: only search term triggers fetch
+  }, [liftSearch, selectedMuscleGroup]);
 
   useEffect(() => {
     if (selectedTemplateId === "none") return;
@@ -948,7 +939,7 @@ export default function WorkoutPage() {
 
           const source = fromAdaptive ? 'adaptive system' : 'launcher';
           await applyAutofillFromHistory();
-          toast.success(`Started ${template.name} from ${source} 🚀`);
+          toast.success(`Started ${template.name} from ${source}`);
         } catch (error) {
           console.error('Template load error:', error);
           toast.error('Failed to load template');
@@ -1007,7 +998,7 @@ export default function WorkoutPage() {
         }
 
         await applyAutofillFromHistory();
-        toast.success(`Started ${launcherData.template_name} from launcher 🚀`);
+        toast.success(`Started ${launcherData.template_name} from launcher`);
       } catch (error) {
         console.error('Preset load error:', error);
         sessionStorage.removeItem('launcher_prediction');
@@ -1431,24 +1422,25 @@ export default function WorkoutPage() {
     if (setupTab === "templates") {
       if (activeTemplateId) {
         const tpl = templates.find((t) => t.id === activeTemplateId);
-        const categoryToUse = tpl?.primary_muscle_group ?? pendingCategory;
+        const categoryToUse = tpl?.primary_muscle_group ?? (pendingCategories.length > 0 ? pendingCategories.join(",") : null);
         if (!categoryToUse) {
           toast.error("Please select a workout type before starting.");
           return;
         }
-        // Persist the pending category to DB if it wasn't already saved on the template
-        if (!tpl?.primary_muscle_group && pendingCategory) {
+        // Persist the pending categories to DB if it wasn't already saved on the template
+        if (!tpl?.primary_muscle_group && pendingCategories.length > 0) {
+          const joined = pendingCategories.join(",");
           await supabase
             .from("workout_templates")
-            .update({ primary_muscle_group: pendingCategory })
+            .update({ primary_muscle_group: joined })
             .eq("id", activeTemplateId);
           setTemplates((prev) =>
-            prev.map((t) => t.id === activeTemplateId ? { ...t, primary_muscle_group: pendingCategory } : t)
+            prev.map((t) => t.id === activeTemplateId ? { ...t, primary_muscle_group: joined } : t)
           );
         }
       } else {
         // Start Fresh — require a category too
-        if (!pendingCategory) {
+        if (pendingCategories.length === 0) {
           toast.error("Please select a workout type before starting.");
           return;
         }
@@ -1506,10 +1498,14 @@ export default function WorkoutPage() {
       if (presetId !== "custom") {
         const preset = POPULAR_WORKOUTS.find((item) => item.id === presetId);
 
-        for (const liftName of preset?.liftNames ?? []) {
-          const exercise = allExercises.find((item) => item.name === liftName);
+        for (const lift of preset?.lifts ?? []) {
+          const exercise = allExercises.find((item) => item.name === lift.name);
           if (!exercise) continue;
-          await addExerciseToWorkout(exercise, { silent: true });
+          await addExerciseToWorkout(exercise, {
+            targetSets: lift.sets,
+            targetReps: lift.reps,
+            silent: true,
+          });
         }
       }
 
@@ -1618,7 +1614,7 @@ export default function WorkoutPage() {
     setSaveTemplateDialogOpen(true);
   }
 
-  async function handleSaveTemplate(templateName: string, isPublic: boolean, difficulty: string = "grind") {
+  async function handleSaveTemplate(templateName: string, isPublic: boolean, difficulty: string = "grind", categories: string[] = []) {
     if (!activeWorkout || !userId) {
       toast.error("Start a workout first.");
       return;
@@ -1643,6 +1639,7 @@ export default function WorkoutPage() {
         description: `Saved from ${activeWorkout.name}`,
         is_public: isPublic,
         difficulty_level: difficulty,
+        primary_muscle_group: categories.length > 0 ? categories.join(",") : null,
       })
       .select("id")
       .single();
@@ -2162,7 +2159,7 @@ export default function WorkoutPage() {
                     onClick={() => {
                       setSetupTab("quick");
                       setSelectedTemplateId("none");
-                      setPendingCategory(null);
+                      setPendingCategories([]);
                       setQuickFilter("All");
                     }}
                     className={`h-9 rounded-lg text-xs font-semibold transition ${setupTab === "quick"
@@ -2303,14 +2300,14 @@ export default function WorkoutPage() {
                           onClick={() => {
                             setSelectedTemplateId(template.id);
                             setWorkoutName(template.name);
-                            setPendingCategory(null);
+                            setPendingCategories([]);
                           }}
                           onKeyDown={(event) => {
                             if (event.key !== "Enter" && event.key !== " ") return;
                             event.preventDefault();
                             setSelectedTemplateId(template.id);
                             setWorkoutName(template.name);
-                            setPendingCategory(null);
+                            setPendingCategories([]);
                           }}
                           className={`rounded-xl border px-3 py-2 text-left transition ${selectedTemplateId === template.id
                             ? "border-primary/40 bg-primary/10"
@@ -2323,17 +2320,19 @@ export default function WorkoutPage() {
                               {likedTemplateIds.has(template.id) ? (
                                 <Heart className="h-3.5 w-3.5 text-rose-400" />
                               ) : null}
-                              {template.primary_muscle_group && (() => {
-                                const tgc = getMuscleColor(template.primary_muscle_group);
+                              {template.primary_muscle_group && template.primary_muscle_group.split(",").map((cat) => {
+                                const trimmed = cat.trim();
+                                const tgc = getMuscleColor(trimmed);
                                 return (
                                   <span
+                                    key={trimmed}
                                     className="rounded-full px-1.5 py-0.5 text-[8px] font-bold capitalize"
                                     style={{ background: tgc.bgAlpha, color: tgc.labelColor, border: `1px solid ${tgc.borderAlpha}` }}
                                   >
-                                    {template.primary_muscle_group}
+                                    {trimmed}
                                   </span>
                                 );
-                              })()}
+                              })}
                             </div>
                           </div>
                           <p className="text-xs text-muted-foreground">Tap to preload</p>
@@ -2504,12 +2503,16 @@ export default function WorkoutPage() {
                       {categoryOptions.map((cat) => {
                         const lc = cat.toLowerCase();
                         const cgc = getMuscleColor(lc);
-                        const active = (pendingCategory ?? "") === lc;
+                        const active = pendingCategories.includes(lc);
                         return (
                           <button
                             key={cat}
                             type="button"
-                            onClick={() => setPendingCategory(lc)}
+                            onClick={() =>
+                              setPendingCategories((prev) =>
+                                active ? prev.filter((c) => c !== lc) : [...prev, lc]
+                              )
+                            }
                             className="rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize transition-all"
                             style={active ? {
                               background: cgc.bgAlpha,
@@ -2537,7 +2540,7 @@ export default function WorkoutPage() {
                 disabled={
                   ghostIsLoading ||
                   (setupTab === "templates" &&
-                    !pendingCategory &&
+                    pendingCategories.length === 0 &&
                     (selectedTemplateId === "none" ||
                       !templates.find((t) => t.id === selectedTemplateId)?.primary_muscle_group))
                 }
@@ -2624,28 +2627,32 @@ export default function WorkoutPage() {
                   ) : null}
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-3">
                     <div className="space-y-2">
-                      <Label>Target muscle group</Label>
-                      <Select
-                        value={selectedMuscleGroup}
-                        onValueChange={(value) => {
-                          setSelectedMuscleGroup(value as MuscleGroup);
-                          setSelectedExerciseId("");
-                          setLiftSearch("");
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Choose muscle group" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MUSCLE_GROUPS.map((group) => (
-                            <SelectItem key={group} value={group}>
-                              {MUSCLE_GROUP_LABELS[group]} ({groupCounts[group] ?? 0})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Muscle groups</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {MUSCLE_GROUPS.filter((g) => g !== "full_body").map((group) => {
+                          const isSelected = selectedMuscleGroup === group;
+                          return (
+                            <button
+                              key={group}
+                              type="button"
+                              onClick={() => {
+                                setSelectedMuscleGroup(group);
+                                setSelectedExerciseId("");
+                              }}
+                              className={cn(
+                                "rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all",
+                                isSelected
+                                  ? "border-primary/40 bg-primary/15 text-primary"
+                                  : "border-border/60 bg-card/40 text-muted-foreground"
+                              )}
+                            >
+                              {MUSCLE_GROUP_LABELS[group]}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -2899,7 +2906,7 @@ export default function WorkoutPage() {
                                           <span className="text-cyan-100/90">
                                             {ghostSet.weight != null
                                               ? preference === "imperial"
-                                                ? Math.round(ghostSet.weight * 2.20462 * 10) / 10
+                                                ? weightToDisplay(ghostSet.weight, true, 1)
                                                 : ghostSet.weight
                                               : "—"} x {ghostSet.reps ?? "—"}
                                           </span>
@@ -3031,6 +3038,14 @@ export default function WorkoutPage() {
         <SaveTemplateDialog
           open={saveTemplateDialogOpen}
           defaultName={activeWorkout?.name || ""}
+          defaultCategories={(() => {
+            if (!activeWorkout) return [];
+            const groups = new Set<string>();
+            for (const ex of activeWorkout.exercises) {
+              if (ex.exercise.muscle_group) groups.add(ex.exercise.muscle_group);
+            }
+            return [...groups];
+          })()}
           onClose={() => setSaveTemplateDialogOpen(false)}
           onSave={handleSaveTemplate}
         />

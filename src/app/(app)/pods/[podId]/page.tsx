@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, UserPlus, Target, MessageSquare, Trash2, LogOut, Plus, Trophy, Calendar } from "lucide-react";
+import { ArrowLeft, UserPlus, Target, MessageSquare, Trash2, LogOut, Plus, Trophy, Calendar, Flame, Dumbbell } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,7 @@ function formatChallengeDate(dateStr: string) {
 
 function ChallengeTypeIcon({ type }: { type: PodChallenge["challenge_type"] }) {
   if (type === "volume") return <Trophy className="h-3.5 w-3.5" />;
-  return <span className="text-xs">🔥</span>;
+  return <Flame className="h-3.5 w-3.5" />;
 }
 
 function ChallengesSection({ podId, currentUserId }: { podId: string; currentUserId: string | null }) {
@@ -336,7 +336,7 @@ export default function PodDetailPage({ params }: PageProps) {
                   <div className="flex items-center gap-2">
                     {member.streak > 0 && (
                       <Badge variant="secondary" className="text-xs">
-                        🔥 {member.streak} week{member.streak !== 1 ? "s" : ""}
+                        <Flame className="inline h-3 w-3" /> {member.streak} week{member.streak !== 1 ? "s" : ""}
                       </Badge>
                     )}
                     {!isCurrentUser && (
@@ -360,7 +360,7 @@ export default function PodDetailPage({ params }: PageProps) {
                       className={member.is_on_track ? "[&>div]:bg-green-500" : ""}
                     />
                     <p className="text-xs text-muted-foreground">
-                      {member.is_on_track ? "On track 💪" : `${member.commitment - member.completed} to go`}
+                      {member.is_on_track ? <span className="inline-flex items-center gap-1">On track <Dumbbell className="inline h-3 w-3" /></span> : `${member.commitment - member.completed} to go`}
                     </p>
                   </div>
                 )}

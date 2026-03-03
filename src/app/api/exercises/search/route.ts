@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
     // Parse query parameters
     const query = searchParams.get("query") || "";
-    const muscleGroup = searchParams.get("muscle_group") || "";
+    const muscleGroups = searchParams.get("muscle_groups") || searchParams.get("muscle_group") || "";
     const equipment = searchParams.get("equipment") || "";
     const category = searchParams.get("category") || "";
     const source = searchParams.get("source") || "";
@@ -51,8 +51,13 @@ export async function GET(request: Request) {
       .select("id, name, slug, muscle_group, equipment, category, instructions, image_url, gif_url, source");
 
     // Apply filters
-    if (muscleGroup) {
-      supabaseQuery = supabaseQuery.eq("muscle_group", muscleGroup);
+    if (muscleGroups) {
+      const groups = muscleGroups.split(",").map((g) => g.trim()).filter(Boolean);
+      if (groups.length === 1) {
+        supabaseQuery = supabaseQuery.eq("muscle_group", groups[0]);
+      } else if (groups.length > 1) {
+        supabaseQuery = supabaseQuery.in("muscle_group", groups);
+      }
     }
 
     if (equipment) {
@@ -104,7 +109,7 @@ export async function GET(request: Request) {
         count: normalizedExercises.length,
         filters: {
           query,
-          muscle_group: muscleGroup,
+          muscle_groups: muscleGroups,
           equipment,
           category,
           source,

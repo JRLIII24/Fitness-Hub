@@ -121,7 +121,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-card/90 backdrop-blur-[20px]">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-center px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <LayoutGroup id="bottom-nav">
-          <div className="flex max-w-full items-center gap-0.5 overflow-x-auto scrollbar-none rounded-full border border-border/70 bg-background/60 p-1 sm:gap-1">
+          <div className="flex max-w-full items-center gap-1 overflow-x-auto scrollbar-none rounded-full border border-border/70 bg-background/60 p-1 sm:gap-1">
             {tabs.map((tab) => {
               const isActive = isTabActive(tab.href);
               const Icon = tab.icon;

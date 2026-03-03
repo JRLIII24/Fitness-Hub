@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Dumbbell, Flame, Scale, Footprints } from "lucide-react";
+import { Dumbbell, Flame, Scale, Footprints, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface StepFitnessGoalProps {
@@ -16,28 +16,24 @@ const goals = [
     label: "Build Muscle",
     icon: Dumbbell,
     description: "Get stronger and more defined",
-    emoji: "💪",
   },
   {
     id: "lose_weight" as const,
     label: "Lose Weight",
     icon: Flame,
     description: "Burn fat and get lean",
-    emoji: "🔥",
   },
   {
     id: "maintain" as const,
     label: "Maintain Weight",
     icon: Scale,
     description: "Stay healthy and balanced",
-    emoji: "⚖️",
   },
   {
     id: "improve_endurance" as const,
     label: "Improve Endurance",
     icon: Footprints,
     description: "Boost stamina and cardio",
-    emoji: "🏃",
   },
 ];
 
@@ -58,7 +54,7 @@ export function StepFitnessGoal({ selected, onSelect, onNext }: StepFitnessGoalP
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-bold text-foreground"
           >
-            What&apos;s Your Goal? 🎯
+            What&apos;s Your Goal? <Target className="inline h-8 w-8 ml-1" />
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -112,7 +108,6 @@ export function StepFitnessGoal({ selected, onSelect, onNext }: StepFitnessGoalP
                   <div>
                     <p className="text-xl font-semibold flex items-center gap-2 justify-center">
                       {goal.label}
-                      <span className="text-2xl">{goal.emoji}</span>
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">
                       {goal.description}

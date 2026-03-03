@@ -6,13 +6,13 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type { ActiveWorkout, Exercise, WorkoutSet } from "@/types/workout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, ChevronLeft, Check, Trash2 } from "lucide-react";
 import { celebratePR, triggerHaptic } from "@/lib/celebrations";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
+import { weightToDisplay, lbsToKg } from "@/lib/units";
 
 interface WorkoutSession {
   id: string;
@@ -299,12 +299,10 @@ export default function EditWorkoutPage() {
   const [exercises, setExercises] = useState<EditableExerciseBlock[]>([]);
 
   const toDisplayWeight = (kg: number) =>
-    preference === "imperial"
-      ? Math.round(kg * 2.20462 * 10) / 10
-      : Math.round(kg * 10) / 10;
+    weightToDisplay(kg, preference === "imperial", 1);
 
   const fromDisplayWeight = (value: number) =>
-    preference === "imperial" ? value / 2.20462 : value;
+    preference === "imperial" ? lbsToKg(value) : value;
 
   useEffect(() => {
     async function load() {
@@ -410,89 +408,90 @@ export default function EditWorkoutPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 px-4 pt-6 pb-28">
-        <div className="flex items-center gap-2">
-          <button onClick={() => router.back()} className="p-1">
-            <ChevronLeft className="size-5" />
+      <div className="mx-auto max-w-2xl space-y-5 px-4 py-5">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.back()} className="rounded-xl border border-border/60 bg-card/40 h-10 px-3 text-[13px] font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
+            <ChevronLeft className="size-4" />
+            Back
           </button>
-          <h1 className="text-2xl font-bold">Edit Workout</h1>
+          <h1 className="text-[13px] font-bold text-foreground">Edit Workout</h1>
         </div>
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          </CardContent>
-        </Card>
+        <div className="rounded-2xl border border-border/60 bg-card/30 flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 pt-6 pb-28">
-      <div className="flex items-center gap-2">
-        <button onClick={() => router.back()} className="p-1 hover:bg-accent rounded">
-          <ChevronLeft className="size-5" />
+    <div className="mx-auto max-w-2xl space-y-5 px-4 py-5">
+      <div className="flex items-center gap-3">
+        <button onClick={() => router.back()} className="rounded-xl border border-border/60 bg-card/40 h-10 px-3 text-[13px] font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
+          <ChevronLeft className="size-4" />
+          Back
         </button>
-        <h1 className="text-2xl font-bold">Edit Workout</h1>
+        <h1 className="text-[13px] font-bold text-foreground">Edit Workout</h1>
       </div>
 
       {/* Workout Header */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Workout Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Workout Name</Label>
-            <Input
-              id="name"
-              value={workoutName}
-              onChange={(e) => setWorkoutName(e.target.value)}
-              placeholder="Workout name"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={workoutNotes}
-              onChange={(e) => setWorkoutNotes(e.target.value)}
-              placeholder="Workout notes..."
-              rows={3}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-2xl border border-border/60 bg-card/30 p-5 space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="name" className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Workout Name
+          </Label>
+          <Input
+            id="name"
+            value={workoutName}
+            onChange={(e) => setWorkoutName(e.target.value)}
+            placeholder="Workout name"
+            className="h-11 rounded-xl text-[15px] font-semibold"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="notes" className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Notes
+          </Label>
+          <Textarea
+            id="notes"
+            value={workoutNotes}
+            onChange={(e) => setWorkoutNotes(e.target.value)}
+            placeholder="Workout notes..."
+            rows={3}
+            className="rounded-xl min-h-[80px]"
+          />
+        </div>
+      </div>
 
       {/* Exercises */}
       {exercises.map((exerciseBlock, exerciseIndex) => (
-        <Card key={exerciseIndex}>
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1">
-                <CardTitle className="text-lg">{exerciseBlock.exercise.name}</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {exerciseBlock.sets.length} set{exerciseBlock.sets.length !== 1 ? "s" : ""}
-                </p>
-              </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => handleRemoveExercise(exerciseIndex)}
-                className="shrink-0"
-              >
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
+        <div key={exerciseIndex} className="rounded-2xl border border-border/60 bg-card/30 overflow-hidden">
+          <div className="px-5 py-3 border-b border-border/40 flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <p className="text-[13px] font-bold min-w-0 truncate">{exerciseBlock.exercise.name}</p>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-muted/50 text-muted-foreground">
+                {exerciseBlock.exercise.muscle_group}
+              </span>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => handleRemoveExercise(exerciseIndex)}
+              className="h-8 w-8 rounded-lg shrink-0"
+            >
+              <Trash2 className="size-4 text-destructive" />
+            </Button>
+          </div>
+          <div className="divide-y divide-border/30">
             {exerciseBlock.sets.map((set: WorkoutSet, setIndex: number) => (
-              <div key={set.id} className="rounded-lg border border-border/60 p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium">Set {set.set_number}</p>
-                  <div className="flex items-center gap-1">
+              <div key={set.id} className="px-5 py-3">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="h-7 min-w-7 rounded-lg bg-muted px-2 text-[12px] font-bold flex items-center justify-center">
+                    Set {set.set_number}
+                  </span>
+                  <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => handleToggleCompleted(exerciseIndex, setIndex)}
-                      className={`p-1 rounded-md transition-colors ${
+                      className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${
                         set.completed
                           ? "bg-green-500/20 text-green-400"
                           : "bg-border/40 text-muted-foreground hover:bg-accent"
@@ -505,16 +504,16 @@ export default function EditWorkoutPage() {
                       size="icon"
                       variant="ghost"
                       onClick={() => handleRemoveSet(exerciseIndex, setIndex)}
-                      className="h-8 w-8"
+                      className="h-8 w-8 rounded-lg"
                       title="Remove set"
                     >
                       <Trash2 className="size-3 text-destructive" />
                     </Button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label htmlFor={`weight-${exerciseIndex}-${setIndex}`} className="text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`weight-${exerciseIndex}-${setIndex}`} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                       Weight ({unitLabel})
                     </Label>
                     <Input
@@ -533,11 +532,11 @@ export default function EditWorkoutPage() {
                         )
                       }
                       placeholder="Weight"
-                      className="text-sm"
+                      className="h-11 text-center text-[16px] font-semibold tabular-nums rounded-xl"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor={`reps-${exerciseIndex}-${setIndex}`} className="text-xs">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`reps-${exerciseIndex}-${setIndex}`} className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                       Reps
                     </Label>
                     <Input
@@ -553,19 +552,19 @@ export default function EditWorkoutPage() {
                         )
                       }
                       placeholder="Reps"
-                      className="text-sm"
+                      className="h-11 text-center text-[16px] font-semibold tabular-nums rounded-xl"
                     />
                   </div>
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ))}
 
       {/* Action Buttons */}
-      <div className="grid gap-3">
-        <Button onClick={handleSave} disabled={saving} size="lg">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button onClick={handleSave} disabled={saving} className="h-12 rounded-xl text-[14px] font-bold flex-1">
           {saving ? (
             <>
               <Loader2 className="mr-2 size-4 animate-spin" />
@@ -575,7 +574,7 @@ export default function EditWorkoutPage() {
             "Save Changes"
           )}
         </Button>
-        <Button variant="outline" onClick={() => router.back()} size="lg">
+        <Button variant="outline" onClick={() => router.back()} className="h-12 rounded-xl text-[14px] font-bold flex-1">
           Cancel
         </Button>
       </div>

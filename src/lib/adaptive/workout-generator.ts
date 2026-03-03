@@ -254,7 +254,7 @@ async function createPresetWorkout(
  * Get adapted workout name with prefix
  */
 function getAdaptedName(baseName: string, recommendation: 'REST' | 'VOLUME' | 'INTENSITY'): string {
-  const prefix = recommendation === 'REST' ? '🔋 Recovery' : recommendation === 'INTENSITY' ? '💪 Intensity' : '⚖️';
+  const prefix = recommendation === 'REST' ? 'Recovery' : recommendation === 'INTENSITY' ? 'Intensity' : 'Balanced';
   return `${prefix} ${baseName}`;
 }
 

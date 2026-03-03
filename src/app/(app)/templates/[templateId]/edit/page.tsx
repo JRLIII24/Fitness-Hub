@@ -14,6 +14,7 @@ import { AddExerciseToTemplateDialog } from "@/components/workout/add-exercise-t
 import { Switch } from "@/components/ui/switch";
 import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
+import { weightToDisplay } from "@/lib/units";
 
 // Category options — all filter values except "All"
 const CATEGORY_OPTIONS = MUSCLE_FILTERS.filter(f => f !== "All");
@@ -61,7 +62,7 @@ export default function EditTemplatePage() {
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [togglingPublic, setTogglingPublic] = useState(false);
-  const [primaryMuscleGroup, setPrimaryMuscleGroup] = useState<string | null>(null);
+  const [primaryMuscleGroups, setPrimaryMuscleGroups] = useState<string[]>([]);
   const [addExerciseOpen, setAddExerciseOpen] = useState(false);
   const { preference, unitLabel } = useUnitPreferenceStore();
 
@@ -97,7 +98,7 @@ export default function EditTemplatePage() {
         setName(t.name);
         setDescription(t.description || "");
         setIsPublic(t.is_public ?? false);
-        setPrimaryMuscleGroup(t.primary_muscle_group ?? null);
+        setPrimaryMuscleGroups(t.primary_muscle_group ? t.primary_muscle_group.split(",").map(s => s.trim()).filter(Boolean) : []);
       } finally {
         setLoading(false);
       }
@@ -114,7 +115,7 @@ export default function EditTemplatePage() {
         .update({
           name: name.trim(),
           description: description.trim() || null,
-          primary_muscle_group: primaryMuscleGroup,
+          primary_muscle_group: primaryMuscleGroups.length > 0 ? primaryMuscleGroups.join(",") : null,
         })
         .eq("id", templateId);
 
@@ -132,7 +133,7 @@ export default function EditTemplatePage() {
 
   async function handlePublishToggle(newValue: boolean) {
     // Must have a category set before publishing
-    if (newValue && !primaryMuscleGroup) {
+    if (newValue && primaryMuscleGroups.length === 0) {
       toast.error("Please select a category before publishing to the marketplace.");
       return;
     }
@@ -322,21 +323,25 @@ export default function EditTemplatePage() {
           {/* ── Category ──────────────────────────────────────────────── */}
           <div className="space-y-2.5">
             <Label>
-              Category
+              Workout Type
               <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
-                (required to publish to marketplace)
+                (select one or more — required to publish)
               </span>
             </Label>
             <div className="flex flex-wrap gap-2">
               {CATEGORY_OPTIONS.map((cat) => {
                 const val = cat.toLowerCase();
-                const on  = primaryMuscleGroup === val;
+                const on  = primaryMuscleGroups.includes(val);
                 const gc  = getMuscleColor(val);
                 return (
                   <button
                     key={cat}
                     type="button"
-                    onClick={() => setPrimaryMuscleGroup(on ? null : val)}
+                    onClick={() =>
+                      setPrimaryMuscleGroups((prev) =>
+                        on ? prev.filter((c) => c !== val) : [...prev, val]
+                      )
+                    }
                     className="rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all duration-150"
                     style={{
                       background:   on ? gc.bgAlpha      : "rgba(255,255,255,0.04)",
@@ -350,9 +355,9 @@ export default function EditTemplatePage() {
                 );
               })}
             </div>
-            {!primaryMuscleGroup && (
+            {primaryMuscleGroups.length === 0 && (
               <p className="text-[11px] text-muted-foreground">
-                Select a category so users can find this template by muscle group.
+                Select at least one category so users can find this template.
               </p>
             )}
           </div>
@@ -364,7 +369,7 @@ export default function EditTemplatePage() {
               <div>
                 <p className="text-sm font-medium">Publish to Marketplace</p>
                 <p className="text-xs text-muted-foreground">
-                  {primaryMuscleGroup
+                  {primaryMuscleGroups.length > 0
                     ? "Let the community discover and import your template"
                     : "Select a category above to enable publishing"}
                 </p>
@@ -373,7 +378,7 @@ export default function EditTemplatePage() {
             <Switch
               checked={isPublic}
               onCheckedChange={handlePublishToggle}
-              disabled={togglingPublic || (!isPublic && !primaryMuscleGroup)}
+              disabled={togglingPublic || (!isPublic && primaryMuscleGroups.length === 0)}
             />
           </div>
         </CardContent>
@@ -440,10 +445,7 @@ export default function EditTemplatePage() {
                         <span>
                           Set {set.set_number}:{" "}
                           {set.weight_kg != null
-                            ? `${preference === "imperial"
-                              ? Math.round(set.weight_kg * 2.20462 * 10) / 10
-                              : Math.round(set.weight_kg * 10) / 10
-                            } ${unitLabel}`
+                            ? `${weightToDisplay(set.weight_kg, preference === "imperial", 1)} ${unitLabel}`
                             : ""}
                           {set.weight_kg && set.reps && " × "}
                           {set.reps ? `${set.reps}reps` : ""}

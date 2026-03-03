@@ -1,13 +1,14 @@
 "use client";
 
 import { memo } from "react";
-import { Check, Play, Trash2, Trophy } from "lucide-react";
+import { Check, Flame, Ghost, Play, Trash2, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { WorkoutSet } from "@/types/workout";
 import { cn } from "@/lib/utils";
 import { REST_PRESETS } from "@/lib/constants";
 import { motion } from "framer-motion";
+import { KG_TO_LBS } from "@/lib/units";
 import { celebratePR, triggerHaptic } from "@/lib/celebrations";
 import {
   Select,
@@ -58,7 +59,6 @@ export const SetRow = memo(function SetRow({
   const { preference, unitLabel } = useUnitPreferenceStore();
 
   // Conversion helpers — all DB values are true kg
-  const KG_TO_LBS = 2.20462;
   const toDisplay = (kg: number) =>
     preference === "imperial"
       ? Math.round(kg * KG_TO_LBS * 10) / 10
@@ -224,7 +224,7 @@ export const SetRow = memo(function SetRow({
               variant={set.completed ? "default" : "secondary"}
               size="icon"
               className={cn(
-                "h-11 w-11 shrink-0 transition-all duration-300",
+                "h-11 w-11 shrink-0 select-none transition-all duration-300",
                 set.completed && beatPrevious
                   ? "bg-gradient-to-br from-yellow-400 to-amber-500 text-black shadow-[0_0_20px_rgba(251,191,36,0.4)] animate-pulse"
                   : set.completed && beatGhost
@@ -235,10 +235,10 @@ export const SetRow = memo(function SetRow({
               title={
                 beatPrevious && set.completed
                   ? weightPR
-                    ? "Weight PR! 🏆"
-                    : "Rep PR! 🏆"
+                    ? "Weight PR!"
+                    : "Rep PR!"
                   : beatGhost && set.completed
-                    ? "Beat your ghost! 👻"
+                    ? "Beat your ghost!"
                     : undefined
               }
             >
@@ -271,7 +271,7 @@ export const SetRow = memo(function SetRow({
         <div className="space-y-1 rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1.5 text-xs">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-cyan-400/70">
-              <span className="text-[10px]">👻</span>
+              <Ghost className="h-3.5 w-3.5 shrink-0" />
               <span className="font-medium">Previous:</span>
               <span className="font-semibold tabular-nums">
                 {ghostWeightText} × {ghostRepsText}
@@ -285,7 +285,7 @@ export const SetRow = memo(function SetRow({
           </div>
           {suggestedWeight != null && (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px]">🔥</span>
+              <Flame className="h-3.5 w-3.5 shrink-0 text-amber-400" />
               <span className="font-medium text-amber-400/80">Suggested:</span>
               <span className="font-bold tabular-nums text-amber-400">
                 {toDisplay(suggestedWeight)} {unitLabel}

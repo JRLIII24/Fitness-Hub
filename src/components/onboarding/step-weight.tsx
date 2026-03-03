@@ -1,11 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { kgToLbs, lbsToKg } from "@/lib/units";
 
 interface StepWeightProps {
   currentWeight: number | null;
@@ -31,10 +33,6 @@ export function StepWeight({
   onNext,
 }: StepWeightProps) {
   const unit = unitPreference === "imperial" ? "lbs" : "kg";
-
-  // Conversion helpers
-  const kgToLbs = (kg: number) => kg * 2.20462;
-  const lbsToKg = (lbs: number) => lbs / 2.20462;
 
   // Get display values (convert from kg to current unit if needed)
   const currentWeightDisplay =
@@ -83,7 +81,7 @@ export function StepWeight({
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-bold text-foreground"
           >
-            Let&apos;s Set Your Targets ⚖️
+            Let&apos;s Set Your Targets <Scale className="inline h-8 w-8 ml-1" />
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}

@@ -188,7 +188,7 @@ export default function UserProfilePage() {
       message,
     });
     if (error) throw error;
-    toast.success("Ping sent! 💪");
+    toast.success("Ping sent!");
   }
 
   async function handleCopyTemplate(template: MiniTemplate) {

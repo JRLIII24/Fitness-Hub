@@ -35,17 +35,17 @@ export type DifficultyLevel = "warm_up" | "grind" | "beast_mode";
 export const DIFFICULTY_LEVELS: { value: DifficultyLevel; label: string; description: string }[] = [
   {
     value: "warm_up",
-    label: "🔥 Warm Up",
+    label: "Warm Up",
     description: "Light and easy — perfect for beginners or recovery days",
   },
   {
     value: "grind",
-    label: "💪 Grind",
+    label: "Grind",
     description: "Balanced intensity — steady progress and solid gains",
   },
   {
     value: "beast_mode",
-    label: "🦾 Beast Mode",
+    label: "Beast Mode",
     description: "Maximum intensity — for the experienced and determined",
   },
 ];

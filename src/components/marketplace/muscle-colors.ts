@@ -20,6 +20,8 @@ const PALETTE: Record<string, MuscleColor> = {
   hiit:        { from: '#f43f5e', to: '#7f1d1d', labelColor: '#fb7185', borderAlpha: '#f43f5e44', bgAlpha: '#f43f5e18' },
   cardio:      { from: '#34d399', to: '#065f46', labelColor: '#6ee7b7', borderAlpha: '#34d39944', bgAlpha: '#34d39918' },
   glutes:      { from: '#a3e635', to: '#3f6212', labelColor: '#bef264', borderAlpha: '#a3e63544', bgAlpha: '#a3e63518' },
+  push:        { from: '#ec4899', to: '#831843', labelColor: '#f472b6', borderAlpha: '#ec489944', bgAlpha: '#ec489918' },
+  pull:        { from: '#06b6d4', to: '#164e63', labelColor: '#67e8f9', borderAlpha: '#06b6d444', bgAlpha: '#06b6d418' },
   'full body': { from: '#38bdf8', to: '#7c3aed', labelColor: '#a78bfa', borderAlpha: '#38bdf844', bgAlpha: '#38bdf818' },
 };
 
@@ -36,6 +38,6 @@ export function getMuscleColor(group: string): MuscleColor {
  *  Full Body is listed first (after All) as it is the most beginner-friendly.
  */
 export const MUSCLE_FILTERS = [
-  'All', 'Full Body', 'Chest', 'Back', 'Legs', 'Arms', 'Shoulders', 'Core', 'Glutes', 'HIIT', 'Cardio',
+  'All', 'Full Body', 'Push', 'Pull', 'Chest', 'Back', 'Legs', 'Arms', 'Shoulders', 'Core', 'Glutes', 'HIIT', 'Cardio',
 ] as const;
 export type MuscleFilter = typeof MUSCLE_FILTERS[number];

@@ -13,10 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const PRESET_MESSAGES = [
-  "💪 Keep it up!",
-  "🔥 Great work!",
-  "🏆 Crushing it!",
-  "👏 Amazing effort!",
+  "Keep it up!",
+  "Great work!",
+  "Crushing it!",
+  "Amazing effort!",
 ];
 
 interface SendPingDialogProps {

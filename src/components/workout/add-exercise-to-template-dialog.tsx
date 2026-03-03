@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreateCustomExerciseDialog } from "./create-custom-exercise-dialog";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
+import { weightToDisplay, lbsToKg } from "@/lib/units";
 
 interface Exercise {
   id: string;
@@ -137,12 +138,10 @@ export function AddExerciseToTemplateDialog({ open, onClose, onAdd }: Props) {
   }
 
   const toDisplayWeight = (kg: number) =>
-    preference === "imperial"
-      ? Math.round(kg * 2.20462 * 10) / 10
-      : Math.round(kg * 10) / 10;
+    weightToDisplay(kg, preference === "imperial", 1);
 
   const fromDisplayWeight = (value: number) =>
-    preference === "imperial" ? value / 2.20462 : value;
+    preference === "imperial" ? lbsToKg(value) : value;
 
   return (
     <>

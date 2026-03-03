@@ -94,8 +94,13 @@ export async function GET(request: NextRequest) {
     }
 
     // ── DB-level muscle-group filter ─────────────────────────────────────────
+    // primary_muscle_group can be comma-separated (e.g. "push,chest"), so use
+    // ilike patterns to match any template containing the selected group.
     if (muscleGroups.length > 0) {
-      query = query.in('primary_muscle_group', muscleGroups);
+      const orFilters = muscleGroups
+        .map((g: string) => `primary_muscle_group.ilike.%${g}%`)
+        .join(",");
+      query = query.or(orFilters);
     }
 
     // ── Fuzzy search ────────────────────────────────────────────────────────

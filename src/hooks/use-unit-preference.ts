@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from "react";
 import { useSupabase } from "./use-supabase";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
+import { kgToLbs } from "@/lib/units";
 
 export type UnitPreference = "metric" | "imperial";
 
@@ -112,7 +113,7 @@ export function useUnitPreference() {
   const formatWeight = useCallback(
     (kg: number): string => {
       if (preference === "imperial") {
-        const lbs = kg * 2.20462;
+        const lbs = kgToLbs(kg);
         return `${Math.round(lbs)} lbs`;
       }
       return `${Math.round(kg)} kg`;

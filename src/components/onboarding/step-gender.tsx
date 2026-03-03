@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { User, UserCircle, Users } from "lucide-react";
+import { Star, User, UserCircle, Users } from "lucide-react";
 
 interface StepGenderProps {
   selected: "male" | "female" | "prefer_not_to_say" | null;
@@ -51,7 +51,7 @@ export function StepGender({
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-bold text-foreground"
           >
-            Almost There! 🌟
+            Almost There! <Star className="inline h-8 w-8 ml-1" />
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -144,7 +144,7 @@ export function StepGender({
             className="w-full text-base font-semibold"
             disabled={!selected || loading}
           >
-            {loading ? "Setting up your profile..." : "Complete Setup 🎉"}
+            {loading ? "Setting up your profile..." : "Complete Setup"}
           </Button>
 
           <p className="text-xs text-muted-foreground">

@@ -7,15 +7,13 @@ import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
+import { weightToDisplay, kgToLbs } from "@/lib/units";
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS } from "@/lib/constants";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrendingUp,
   BarChart3,
-  Trophy,
   ArrowLeft,
-  Search,
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -109,19 +107,18 @@ function TabBar({
   const tabs = [
     { id: "strength", label: "Strength", icon: TrendingUp },
     { id: "volume", label: "Volume", icon: BarChart3 },
-    { id: "records", label: "Records", icon: Trophy },
   ];
   return (
-    <div className="flex gap-0.5 rounded-2xl border border-border/60 bg-muted/40 p-1 backdrop-blur-sm">
+    <div className="flex gap-0.5 rounded-2xl border border-border/60 bg-card/40 p-1.5">
       {tabs.map((t) => {
         const on = active === t.id;
         return (
           <motion.button
             key={t.id}
-            whileTap={{ scale: 0.96 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => onChange(t.id)}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-medium transition-all duration-200",
+              "flex flex-1 items-center justify-center gap-1.5 h-10 rounded-xl text-[12px] font-semibold transition-all duration-200",
               on
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -146,19 +143,19 @@ function PillToggle({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="flex max-w-full gap-0.5 overflow-x-auto scrollbar-none rounded-full border border-border/60 bg-muted/40 p-1 backdrop-blur-sm">
+    <div className="flex max-w-full gap-0.5 overflow-x-auto scrollbar-none rounded-full p-1">
       {opts.map((o) => {
         const on = active === o;
         return (
           <motion.button
             key={o}
-            whileTap={{ scale: 0.95 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => onChange(o)}
             className={cn(
-              "shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
+              "shrink-0 whitespace-nowrap h-8 rounded-full px-3.5 text-[11px] font-semibold transition-all duration-200",
               on
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
             )}
           >
             {o}
@@ -191,9 +188,9 @@ function SparklineCard({
     <motion.button
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className="flex flex-col rounded-2xl border border-border/60 bg-card/60 p-3 text-left transition-all hover:border-primary/30 hover:bg-card/80"
+      className="flex flex-col rounded-2xl border border-border/60 bg-card/30 p-4 text-left transition-all hover:border-primary/30 hover:bg-card/80"
     >
-      <p className="truncate text-xs font-semibold text-foreground">{name}</p>
+      <p className="text-[13px] font-semibold min-w-0 truncate text-foreground">{name}</p>
       <p className="text-[10px] capitalize text-muted-foreground">
         {muscleGroup?.replace("_", " ")}
       </p>
@@ -205,7 +202,7 @@ function SparklineCard({
       <div className="mt-1 flex justify-end">
         <span
           className={cn(
-            "rounded-full border px-2 py-0.5 text-[10px] font-bold",
+            "rounded-full border px-2.5 py-0.5 text-[10px] font-bold tabular-nums",
             trend > 0
               ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-400"
               : trend < 0
@@ -244,7 +241,7 @@ function ChartSkeleton() {
 
 function SparklineSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
       {Array.from({ length: 6 }).map((_, i) => (
         <Skeleton key={i} className="h-[130px] w-full rounded-2xl" />
       ))}
@@ -266,9 +263,6 @@ export default function ProgressPage() {
   const [tab, setTab] = useState("strength");
   const [strengthView, setStrengthView] = useState<"all" | "single">("all");
   const [volumeView, setVolumeView] = useState("Stacked");
-  const [recordsFilter, setRecordsFilter] = useState("All");
-  const [recordsSearch, setRecordsSearch] = useState("");
-  const [recordsShowAll, setRecordsShowAll] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   // ── Data fetch ────────────────────────────────────────────────────────────
@@ -352,9 +346,7 @@ export default function ProgressPage() {
   }, [sets]);
 
   function convertWeight(kg: number) {
-    return unitPreference === "imperial"
-      ? Math.round(kg * 2.20462 * 10) / 10
-      : Math.round(kg * 10) / 10;
+    return weightToDisplay(kg, unitPreference === "imperial", 1);
   }
 
   // ── Sparklines for "All Exercises" ────────────────────────────────────────
@@ -513,7 +505,7 @@ export default function ProgressPage() {
 
     for (const s of sets) {
       if (s.weight_kg == null || !s.exercises?.muscle_group) continue;
-      const weight = unitPreference === "imperial" ? s.weight_kg * 2.20462 : s.weight_kg;
+      const weight = unitPreference === "imperial" ? kgToLbs(s.weight_kg) : s.weight_kg;
       const volume = weight * (s.reps ?? 0);
       const category = VOLUME_CATEGORIES[s.exercises.muscle_group] ?? "Full Body";
 
@@ -560,70 +552,6 @@ export default function ProgressPage() {
     };
   }, [categoryVolumeData]);
 
-  // ── Personal records (no cap) ─────────────────────────────────────────────
-
-  type PR = {
-    exerciseId: string;
-    name: string;
-    muscleGroup: string;
-    bestWeight: number;
-    bestReps: number;
-    bestScore: number;
-    dateAchieved: string;
-    rawDate: string;
-  };
-
-  const personalRecords = useMemo((): PR[] => {
-    const prMap = new Map<string, PR>();
-    for (const s of sets) {
-      const name = s.exercises?.name;
-      if (!name) continue;
-      const rawDate = s.workout_sessions.started_at;
-      const weight = convertWeight(s.weight_kg ?? 0);
-      const reps = s.reps ?? 0;
-      const score = weight * reps;
-      const existing = prMap.get(s.exercise_id);
-      if (!existing || score > existing.bestScore) {
-        prMap.set(s.exercise_id, {
-          name,
-          exerciseId: s.exercise_id,
-          muscleGroup: s.exercises?.muscle_group ?? "",
-          bestWeight: weight,
-          bestReps: reps,
-          bestScore: score,
-          dateAchieved: format(new Date(rawDate), "MMM d, yyyy"),
-          rawDate,
-        });
-      }
-    }
-    return [...prMap.values()].sort((a, b) => b.bestScore - a.bestScore);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sets, unitPreference]);
-
-  const filteredRecords = useMemo(() => {
-    let result = personalRecords;
-    if (recordsFilter !== "All") {
-      const key = recordsFilter.toLowerCase().replace(" ", "_");
-      result = result.filter((pr) => pr.muscleGroup === key);
-    }
-    if (recordsSearch.trim()) {
-      const q = recordsSearch.toLowerCase().trim();
-      result = result.filter((pr) => pr.name.toLowerCase().includes(q));
-    }
-    return result;
-  }, [personalRecords, recordsFilter, recordsSearch]);
-
-  const recordFilterPills = useMemo(() => {
-    const groups = new Set(personalRecords.map((pr) => pr.muscleGroup).filter(Boolean));
-    const pills = ["All"];
-    for (const g of MUSCLE_GROUPS) {
-      if (groups.has(g)) pills.push(MUSCLE_GROUP_LABELS[g] ?? g);
-    }
-    return pills;
-  }, [personalRecords]);
-
-  // Total stats for header
-  const totalPRs = personalRecords.length;
   const totalSessions = sessions.length;
 
   // ── PDF Export ────────────────────────────────────────────────────────────
@@ -635,16 +563,10 @@ export default function ProgressPage() {
         userName: "Athlete",
         reportDate: new Date(),
         totalSessions,
-        totalPRs,
+        totalPRs: 0,
         avgVolume: volumeStats?.avg,
         strengthCharts: allExerciseSparklines.map((c) => ({ ...c, unitLabel })),
-        personalRecords: personalRecords.map((pr) => ({
-          name: pr.name,
-          muscleGroup: pr.muscleGroup,
-          bestWeight: pr.bestWeight,
-          bestReps: pr.bestReps,
-          date: pr.dateAchieved,
-        })),
+        personalRecords: [],
       });
     } catch (error) {
       console.error("Failed to generate PDF:", error);
@@ -672,7 +594,7 @@ export default function ProgressPage() {
             </div>
             {sessions.length > 0 && (
               <motion.button
-                whileTap={{ scale: 0.95 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={handleExportPDF}
                 disabled={isExporting}
                 className={cn(
@@ -706,8 +628,7 @@ export default function ProgressPage() {
 
           {!loading && totalSessions > 0 && (
             <p className="mb-4 text-[13px] text-muted-foreground">
-              {totalSessions} session{totalSessions !== 1 ? "s" : ""} · {totalPRs} PR
-              {totalPRs !== 1 ? "s" : ""}
+              {totalSessions} session{totalSessions !== 1 ? "s" : ""}
             </p>
           )}
 
@@ -763,7 +684,7 @@ export default function ProgressPage() {
                         {allExerciseSparklines.length === 0 ? (
                           <EmptyState message="Need at least 2 sessions per exercise to show trends" />
                         ) : (
-                          <div className="grid grid-cols-2 gap-2.5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                             {allExerciseSparklines.map((ex) => (
                               <SparklineCard
                                 key={ex.exerciseId}
@@ -824,31 +745,38 @@ export default function ProgressPage() {
                           <EmptyState message="No data for this exercise" />
                         ) : (
                           <>
-                            <div className="mb-4 rounded-2xl border border-border/60 bg-card/60 p-4">
-                              <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                                {strengthMetric === "score" ? "Top Set Score" : `Max Weight (${unitLabel})`}
-                              </p>
-                              <ProgressCharts.StrengthLineChart strengthData={strengthData} unitLabel={unitLabel} />
+                            <div className="mb-4 rounded-2xl border border-border/60 bg-card/30 p-5">
+                              <div className="mb-3 flex items-center justify-between">
+                                <p className="text-[13px] font-bold text-foreground">
+                                  {exerciseOptions.find((e) => e.id === selectedExerciseId)?.name ?? "Exercise"}
+                                </p>
+                                <span className="rounded-full border border-border/50 bg-card/40 px-2.5 py-0.5 text-[10px] font-bold tabular-nums text-muted-foreground">
+                                  {strengthMetric === "score" ? "Top Set Score" : `Max Weight (${unitLabel})`}
+                                </span>
+                              </div>
+                              <div className="h-[240px] sm:h-[300px]">
+                                <ProgressCharts.StrengthLineChart strengthData={strengthData} unitLabel={unitLabel} />
+                              </div>
                             </div>
 
                             {/* Best stats pills */}
                             {bestStats && (
                               <div className="grid grid-cols-2 gap-2">
-                                <div className="rounded-xl border border-border/60 bg-card/60 p-3">
-                                  <p className="mb-1 text-[10px] text-muted-foreground">Best Weight</p>
-                                  <p className="text-base font-bold text-primary">
+                                <div className="rounded-xl border border-border/50 bg-card/40 p-4">
+                                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Best Weight</p>
+                                  <p className="tabular-nums text-[22px] font-black leading-none text-primary">
                                     {bestStats.bestWeight.value} {unitLabel}
                                   </p>
-                                  <p className="text-[10px] text-muted-foreground">
+                                  <p className="mt-1 text-[10px] text-muted-foreground">
                                     {bestStats.bestWeight.date} · {bestStats.bestWeight.reps} reps
                                   </p>
                                 </div>
-                                <div className="rounded-xl border border-border/60 bg-card/60 p-3">
-                                  <p className="mb-1 text-[10px] text-muted-foreground">Best Score</p>
-                                  <p className="text-base font-bold text-primary">
+                                <div className="rounded-xl border border-border/50 bg-card/40 p-4">
+                                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Best Score</p>
+                                  <p className="tabular-nums text-[22px] font-black leading-none text-primary">
                                     {Math.round(bestStats.bestScore.value).toLocaleString()} pts
                                   </p>
-                                  <p className="text-[10px] text-muted-foreground">
+                                  <p className="mt-1 text-[10px] text-muted-foreground">
                                     {bestStats.bestScore.date} · {bestStats.bestScore.reps} reps
                                   </p>
                                 </div>
@@ -908,8 +836,8 @@ export default function ProgressPage() {
                         </div>
 
                         {/* Stacked chart */}
-                        <div className="mb-4 rounded-2xl border border-border/60 bg-card/60 p-4">
-                          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                        <div className="mb-4 rounded-2xl border border-border/60 bg-card/30 p-5">
+                          <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                             Session Volume ({unitLabel})
                           </p>
                           <ProgressCharts.StackedVolumeBarChart
@@ -923,28 +851,32 @@ export default function ProgressPage() {
                         {/* Volume summary */}
                         {volumeStats && (
                           <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-xl border border-border/60 bg-card/60 p-3">
-                              <p className="mb-1 text-[10px] text-muted-foreground">Latest Session</p>
-                              <p className="text-base font-bold text-foreground">
-                                {(volumeStats.latest / 1000).toFixed(1)}k {unitLabel}
+                            <div className="rounded-xl border border-border/50 bg-card/40 p-4">
+                              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Latest Session</p>
+                              <p className="tabular-nums text-[22px] font-black leading-none text-foreground">
+                                {(volumeStats.latest / 1000).toFixed(1)}k
                               </p>
+                              <p className="mt-0.5 text-[10px] text-muted-foreground">{unitLabel}</p>
                             </div>
-                            <div className="rounded-xl border border-border/60 bg-card/60 p-3">
-                              <p className="mb-1 text-[10px] text-muted-foreground">Avg / Session</p>
-                              <p className="text-base font-bold text-foreground">
-                                {(volumeStats.avg / 1000).toFixed(1)}k {unitLabel}
+                            <div className="rounded-xl border border-border/50 bg-card/40 p-4">
+                              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Avg / Session</p>
+                              <p className="tabular-nums text-[22px] font-black leading-none text-foreground">
+                                {(volumeStats.avg / 1000).toFixed(1)}k
                               </p>
-                              {volumeStats.delta !== 0 && (
-                                <span
-                                  className={cn(
-                                    "text-[10px] font-bold",
-                                    volumeStats.delta > 0 ? "text-emerald-400" : "text-red-400"
-                                  )}
-                                >
-                                  {volumeStats.delta > 0 ? "+" : ""}
-                                  {volumeStats.delta}%
-                                </span>
-                              )}
+                              <div className="mt-0.5 flex items-center gap-1">
+                                <p className="text-[10px] text-muted-foreground">{unitLabel}</p>
+                                {volumeStats.delta !== 0 && (
+                                  <span
+                                    className={cn(
+                                      "text-[10px] font-bold tabular-nums",
+                                      volumeStats.delta > 0 ? "text-emerald-400" : "text-red-400"
+                                    )}
+                                  >
+                                    {volumeStats.delta > 0 ? "+" : ""}
+                                    {volumeStats.delta}%
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -972,7 +904,7 @@ export default function ProgressPage() {
                               (d) => (d[cat as keyof typeof d] as number) > 0
                             );
                             return (
-                              <div key={cat} className="overflow-hidden rounded-2xl border border-border/60 bg-card/60 p-3">
+                              <div key={cat} className="overflow-hidden rounded-2xl border border-border/60 bg-card/30 p-4">
                                 <p className="mb-2.5 text-xs font-semibold" style={{ color }}>
                                   {cat}
                                 </p>
@@ -997,136 +929,6 @@ export default function ProgressPage() {
               </motion.div>
             )}
 
-            {/* ── RECORDS TAB ──────────────────────────────────────────── */}
-            {tab === "records" && (
-              <motion.div
-                key="records"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.22 }}
-              >
-                {loading ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-                    ))}
-                  </div>
-                ) : personalRecords.length === 0 ? (
-                  <EmptyState message="No data yet — start logging workouts" />
-                ) : (
-                  <>
-                    {/* Search */}
-                    <div className="relative mb-3">
-                      <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        value={recordsSearch}
-                        onChange={(e) => {
-                          setRecordsSearch(e.target.value);
-                          setRecordsShowAll(false);
-                        }}
-                        placeholder="Search exercises..."
-                        className="rounded-xl border-border/60 bg-card pl-10"
-                      />
-                    </div>
-
-                    {/* Filter pills */}
-                    <div className="-mx-4 mb-3 overflow-x-auto px-4" style={{ scrollbarWidth: "none" }}>
-                      <div className="flex w-max gap-1.5">
-                        {recordFilterPills.map((pill) => {
-                          const on = recordsFilter === pill;
-                          return (
-                            <motion.button
-                              key={pill}
-                              whileTap={{ scale: 0.94 }}
-                              onClick={() => {
-                                setRecordsFilter(pill);
-                                setRecordsShowAll(false);
-                              }}
-                              className={cn(
-                                "whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all",
-                                on
-                                  ? "border-primary/25 bg-primary/15 text-primary"
-                                  : "border-border/60 text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              {pill}
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Count */}
-                    <p className="mb-3 text-xs text-muted-foreground">
-                      {filteredRecords.length < personalRecords.length
-                        ? `${filteredRecords.length} of ${personalRecords.length} records`
-                        : `${personalRecords.length} records`}
-                    </p>
-
-                    {/* PR cards */}
-                    {filteredRecords.length === 0 ? (
-                      <EmptyState message="No records match your search" />
-                    ) : (
-                      <>
-                        <div className="flex flex-col gap-2">
-                          <AnimatePresence mode="popLayout">
-                            {filteredRecords
-                              .slice(0, recordsShowAll ? undefined : 50)
-                              .map((pr, i) => (
-                                <motion.div
-                                  key={pr.exerciseId}
-                                  layout
-                                  initial={{ opacity: 0, y: 6 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -6 }}
-                                  transition={{ duration: 0.2, delay: i * 0.03 }}
-                                  className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/60 px-4 py-3.5"
-                                >
-                                  <div className="min-w-0 flex-1">
-                                    <p className="mb-1 truncate text-[13px] font-semibold text-foreground">
-                                      {pr.name}
-                                    </p>
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      {pr.muscleGroup && (
-                                        <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 text-[10px] font-medium capitalize text-muted-foreground">
-                                          {pr.muscleGroup.replace("_", " ")}
-                                        </span>
-                                      )}
-                                      <span className="text-[10px] text-muted-foreground">
-                                        {pr.dateAchieved}
-                                      </span>
-                                      <span className="text-[10px] text-muted-foreground">
-                                        {pr.bestWeight} {unitLabel} × {pr.bestReps}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="flex shrink-0 flex-col items-end gap-0.5">
-                                    <Trophy className="h-4 w-4 text-primary" />
-                                    <span className="text-sm font-bold text-primary">
-                                      {Math.round(pr.bestScore).toLocaleString()}
-                                    </span>
-                                  </div>
-                                </motion.div>
-                              ))}
-                          </AnimatePresence>
-                        </div>
-
-                        {!recordsShowAll && filteredRecords.length > 50 && (
-                          <motion.button
-                            whileTap={{ scale: 0.97 }}
-                            onClick={() => setRecordsShowAll(true)}
-                            className="mt-4 w-full rounded-xl border border-border/60 bg-transparent py-3 text-[13px] font-semibold text-muted-foreground transition-all hover:border-primary/25 hover:text-primary"
-                          >
-                            Show all {filteredRecords.length} records
-                          </motion.button>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-              </motion.div>
-            )}
           </AnimatePresence>
         </div>
       </div>

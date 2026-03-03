@@ -2,20 +2,30 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
-import { DayPicker } from "react-day-picker";
-import { Pencil, Trash2, CalendarClock } from "lucide-react";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  addMonths,
+  subMonths,
+  isSameMonth,
+  isSameDay,
+  isToday,
+} from "date-fns";
+import { ChevronLeft, ChevronRight, Pencil, Trash2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { usePrimaryColor } from "@/hooks/use-primary-color";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { weightToDisplay } from "@/lib/units";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/page-header";
 import { HistoryNav } from "@/components/history/history-nav";
-import { WorkoutHeatmap } from "@/components/history/workout-heatmap";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +33,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import "react-day-picker/style.css";
 
 type SessionSet = {
   set_number: number;
@@ -51,6 +60,8 @@ function dayKey(date: Date) {
   return format(date, "yyyy-MM-dd");
 }
 
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 export default function HistoryPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -58,6 +69,7 @@ export default function HistoryPage() {
   const { preference, unitLabel } = useUnitPreferenceStore();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [selectedDay, setSelectedDay] = useState<Date>(new Date());
+  const [viewMonth, setViewMonth] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [dateUpdating, setDateUpdating] = useState(false);
@@ -75,9 +87,7 @@ export default function HistoryPage() {
   }
 
   function toDisplayWeight(kg: number) {
-    return preference === "imperial"
-      ? Math.round(kg * 2.20462 * 10) / 10
-      : Math.round(kg * 10) / 10;
+    return weightToDisplay(kg, preference === "imperial", 1);
   }
 
   useEffect(() => {
@@ -126,9 +136,21 @@ export default function HistoryPage() {
   const selectedKey = dayKey(selectedDay);
   const sessionsForSelectedDay = sessionsByDay.get(selectedKey) ?? [];
 
-  const workoutDays = useMemo(() => {
-    return [...sessionsByDay.keys()].map((key) => new Date(`${key}T12:00:00`));
-  }, [sessionsByDay]);
+  // Build calendar grid for the current view month
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(viewMonth);
+    const monthEnd = endOfMonth(viewMonth);
+    const calStart = startOfWeek(monthStart); // Sunday
+    const calEnd = endOfWeek(monthEnd);       // Saturday
+
+    const days: Date[] = [];
+    let current = calStart;
+    while (current <= calEnd) {
+      days.push(current);
+      current = addDays(current, 1);
+    }
+    return days;
+  }, [viewMonth]);
 
   async function handleDeleteSession(sessionId: string) {
     const confirmed = window.confirm("Delete this workout from history?");
@@ -224,7 +246,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-4 px-4 pt-6 pb-28 md:px-6 lg:px-10">
+    <div className="mx-auto w-full max-w-7xl space-y-5 px-4 pt-6 pb-28 md:px-6 lg:px-10">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <PageHeader
           title="History"
@@ -233,53 +255,126 @@ export default function HistoryPage() {
         <HistoryNav />
       </div>
 
-      <WorkoutHeatmap sessionsByDay={sessionsByDay} />
-
-      <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
-        <Card className="h-fit max-w-3xl">
-          <CardHeader>
-            <CardTitle>Workout Calendar</CardTitle>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <div
-              style={
-                {
-                  "--rdp-accent-color": primaryColor,
-                  "--rdp-today-color": primaryColor,
-                  "--rdp-day_button-height": "38px",
-                  "--rdp-day_button-width": "38px",
-                } as React.CSSProperties
-              }
+      <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
+        {/* ── Custom Calendar ────────────────────────────────────────── */}
+        <div className="h-fit rounded-2xl border border-border/60 bg-card/30 p-4">
+          {/* Month navigation */}
+          <div className="mb-4 flex items-center justify-between">
+            <button
+              onClick={() => setViewMonth(subMonths(viewMonth, 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-border/40"
             >
-              <DayPicker
-                mode="single"
-                selected={selectedDay}
-                onSelect={(day) => {
-                  if (day) setSelectedDay(day);
-                }}
-                modifiers={{ workedOut: workoutDays }}
-                modifiersClassNames={{
-                  workedOut: "rdp-day-worked-out",
-                }}
+              <ChevronLeft className="size-4 text-muted-foreground" />
+            </button>
+            <h3 className="text-[13px] font-bold text-foreground">
+              {format(viewMonth, "MMMM yyyy")}
+            </h3>
+            <button
+              onClick={() => setViewMonth(addMonths(viewMonth, 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-border/40"
+            >
+              <ChevronRight className="size-4 text-muted-foreground" />
+            </button>
+          </div>
 
-                classNames={{
-                  day_button:
-                    "mx-auto flex h-[38px] w-[38px] items-center justify-center rounded-full text-sm font-medium text-foreground/80 transition-all duration-300 hover:bg-border/40",
-                  weekdays: "border-b border-border/30",
-                  weekday:
-                    "py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
-                  caption_label: "text-sm font-bold text-foreground",
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
+          {/* Weekday headers */}
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {WEEKDAY_LABELS.map((label) => (
+              <div
+                key={label}
+                className="py-1.5 text-center text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
+              >
+                {label}
+              </div>
+            ))}
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{format(selectedDay, "EEEE, MMMM d")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+          {/* Day cells */}
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map((day) => {
+              const key = dayKey(day);
+              const inMonth = isSameMonth(day, viewMonth);
+              const selected = isSameDay(day, selectedDay);
+              const today = isToday(day);
+              const workoutCount = (sessionsByDay.get(key) ?? []).length;
+              const hasWorkout = workoutCount > 0;
+
+              return (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setSelectedDay(day);
+                    if (!isSameMonth(day, viewMonth)) {
+                      setViewMonth(startOfMonth(day));
+                    }
+                  }}
+                  className="relative flex flex-col items-center justify-center rounded-xl py-1.5 transition-all duration-200 hover:bg-border/30"
+                  style={
+                    selected
+                      ? {
+                          backgroundColor: primaryColor,
+                          color: "white",
+                          boxShadow: `0 0 12px 2px ${primaryColor}44`,
+                        }
+                      : hasWorkout && !selected
+                      ? {
+                          backgroundColor: `${primaryColor}18`,
+                          boxShadow: `inset 0 0 0 1.5px ${primaryColor}55`,
+                        }
+                      : undefined
+                  }
+                >
+                  <span
+                    className={`text-[13px] tabular-nums font-semibold leading-none ${
+                      selected
+                        ? "text-white"
+                        : !inMonth
+                        ? "text-muted-foreground/30"
+                        : hasWorkout
+                        ? "font-bold"
+                        : "text-foreground/80"
+                    }`}
+                    style={
+                      hasWorkout && !selected ? { color: primaryColor } : undefined
+                    }
+                  >
+                    {format(day, "d")}
+                  </span>
+
+                  {/* Workout indicator dot */}
+                  {hasWorkout && (
+                    <div
+                      className="mt-0.5 h-1.5 w-1.5 rounded-full"
+                      style={{
+                        backgroundColor: selected ? "white" : primaryColor,
+                        boxShadow: selected
+                          ? "0 0 4px rgba(255,255,255,0.6)"
+                          : `0 0 4px ${primaryColor}66`,
+                      }}
+                    />
+                  )}
+
+                  {/* Today ring (when not selected) */}
+                  {today && !selected && (
+                    <div
+                      className="pointer-events-none absolute inset-0 rounded-xl"
+                      style={{
+                        boxShadow: `inset 0 0 0 1.5px ${primaryColor}40`,
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Selected Day Details ───────────────────────────────────── */}
+        <div className="rounded-2xl border border-border/60 bg-card/30 p-5">
+          <div className="mb-4">
+            <h3 className="text-[13px] font-bold text-foreground">{format(selectedDay, "EEEE, MMMM d")}</h3>
+          </div>
+          <div className="space-y-3">
             {loading ? <p className="text-sm text-muted-foreground">Loading history...</p> : null}
 
             {!loading && sessionsForSelectedDay.length === 0 ? (
@@ -305,68 +400,79 @@ export default function HistoryPage() {
               }
 
               return (
-                <Card key={session.id} className="border-white/10 bg-card/75">
-                  <CardHeader className="pb-3">
+                <div key={session.id} className="rounded-2xl border border-border/60 bg-card/30 p-5">
+                  <div className="pb-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base">{session.name}</CardTitle>
-                        <p className="text-xs text-muted-foreground">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="truncate text-base font-semibold text-foreground">{session.name}</h4>
+                        <p className="truncate text-xs text-muted-foreground">
                           Template: {session.workout_templates?.name ?? "No template"}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          Muscle groups: {muscleGroups.length > 0 ? muscleGroups.join(", ") : "N/A"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Totals: {totalSets} sets, {totalReps} reps
-                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-xl border border-border/50 bg-card/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                            {totalSets} sets
+                          </span>
+                          <span className="rounded-xl border border-border/50 bg-card/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                            {totalReps} reps
+                          </span>
+                          <span className="max-w-[200px] truncate rounded-xl border border-border/50 bg-card/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                            {muscleGroups.length > 0 ? muscleGroups.join(", ") : "N/A"}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-1.5 shrink-0">
                         <Button
                           size="sm"
                           variant="outline"
+                          className="h-9 rounded-xl"
                           onClick={() => router.push(`/history/${session.id}/edit`)}
                         >
-                          <Pencil className="size-3.5 mr-1" />
-                          Edit
+                          <Pencil className="size-3.5" />
+                          <span className="hidden sm:inline ml-1.5">Edit</span>
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
+                          className="h-9 rounded-xl"
                           onClick={() => handleOpenDateDialog(session)}
                         >
-                          <CalendarClock className="size-3.5 mr-1" />
-                          Change Date
+                          <CalendarClock className="size-3.5" />
+                          <span className="hidden sm:inline ml-1.5">Change Date</span>
                         </Button>
                         <Button
                           size="sm"
                           variant="destructive"
+                          className="h-9 rounded-xl"
                           onClick={() => handleDeleteSession(session.id)}
                         >
-                          <Trash2 className="size-3.5 mr-1" />
-                          Delete
+                          <Trash2 className="size-3.5" />
+                          <span className="hidden sm:inline ml-1.5">Delete</span>
                         </Button>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
+                  </div>
+                  <div className="space-y-2">
                     {[...byExercise.entries()].map(([exerciseName, sets]) => (
-                      <div key={exerciseName} className="rounded-md border border-border/60 p-2 text-sm">
-                        <p className="font-medium text-foreground">{exerciseName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {sets
-                            .map((set) =>
-                              `${set.weight_kg != null ? `${toDisplayWeight(set.weight_kg)} ${unitLabel}` : "BW"} x ${set.reps ?? 0}`
-                            )
-                            .join(" | ")}
-                        </p>
+                      <div key={exerciseName} className="rounded-xl border border-border/50 bg-card/40 p-3 text-sm">
+                        <p className="min-w-0 truncate font-medium text-foreground">{exerciseName}</p>
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {sets.map((set, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex rounded-md bg-muted/40 px-2 py-0.5 text-[11px] tabular-nums font-semibold"
+                            >
+                              {set.weight_kg != null ? `${toDisplayWeight(set.weight_kg)} ${unitLabel}` : "BW"} x {set.reps ?? 0}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     ))}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <Dialog open={dateDialogOpen} onOpenChange={setDateDialogOpen}>

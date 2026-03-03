@@ -1,21 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { getDateInTimezone, toDayKeyInTimezone } from "@/lib/timezone";
 import { calculateFatigueScore, deriveRecoveryRaw } from "./calculate";
 import type { FatigueInputs, FatigueSnapshot, RecoveryCheckinInput } from "./types";
 
 const COMPOUND_CATEGORIES = new Set(["compound"]);
-
-function getDateInTimezone(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function toDayKeyInTimezone(value: string, timezone: string): string {
-  return getDateInTimezone(new Date(value), timezone);
-}
 
 function toMinutes(durationSeconds: number | null): number | null {
   if (!durationSeconds || durationSeconds <= 0) return null;

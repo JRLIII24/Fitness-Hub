@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { kgToLbs, KM_TO_MI } from "@/lib/units";
 
 type UnitPreference = "metric" | "imperial";
 
@@ -46,7 +47,7 @@ export const useUnitPreferenceStore = create<UnitPreferenceState>()(
       formatWeight: (kg: number) => {
         const state = get();
         if (state.preference === "imperial") {
-          const lbs = kg * 2.20462;
+          const lbs = kgToLbs(kg);
           return `${Math.round(lbs)} lbs`;
         }
         return `${Math.round(kg)} kg`;
@@ -64,7 +65,7 @@ export const useUnitPreferenceStore = create<UnitPreferenceState>()(
       formatDistance: (meters: number) => {
         const state = get();
         if (state.preference === "imperial") {
-          const miles = meters * 0.000621371;
+          const miles = (meters / 1000) * KM_TO_MI;
           return `${miles.toFixed(2)} mi`;
         }
         const km = meters / 1000;

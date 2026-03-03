@@ -67,11 +67,11 @@ export default async function PRsPage() {
   const muscleGroups = [...new Set(prs.map((p) => p.muscle_group))].sort();
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-4 px-4 pb-28 pt-6 md:px-6">
+    <div className="mx-auto w-full max-w-4xl space-y-5 px-4 pb-28 pt-6 md:px-6">
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Trophy className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold">Personal Records</h1>
+          <h1 className="text-[13px] font-bold text-foreground uppercase tracking-wide">Personal Records</h1>
         </div>
         <HistoryNav />
       </div>
@@ -79,8 +79,8 @@ export default async function PRsPage() {
       {prs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Medal className="h-12 w-12 text-muted-foreground/40" />
-          <p className="mt-4 text-lg font-semibold">No PRs yet</p>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-4 text-[15px] font-semibold">No PRs yet</p>
+          <p className="mt-1 text-[13px] text-muted-foreground">
             Complete workouts with weighted sets to see your all-time records here.
           </p>
         </div>

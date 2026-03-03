@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Scale, ChevronRight, Check } from "lucide-react";
 import Link from "next/link";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
+import { weightToDisplay, lbsToKg, weightUnit } from "@/lib/units";
 
 type WeightLog = {
   logged_date: string;
@@ -37,16 +38,17 @@ export function WeightLogWidget() {
   }, [fetchLatest]);
 
   const displayWeight = (kg: number) =>
-    isImperial
-      ? `${Math.round(kg * 2.20462 * 10) / 10} lbs`
-      : `${Math.round(kg * 10) / 10} kg`;
+    `${weightToDisplay(kg, isImperial, 1)} ${weightUnit(isImperial)}`;
 
   const handleSave = async () => {
     const val = parseFloat(input);
     if (!input || isNaN(val) || val <= 0) return;
     setSaving(true);
-    const weight_kg = isImperial ? val / 2.20462 : val;
-    const today = format(new Date(), "yyyy-MM-dd");
+    const weight_kg = isImperial ? lbsToKg(val) : val;
+    // Use Intl to get today in the user's local timezone (avoids server/client date mismatch)
+    const today = new Intl.DateTimeFormat("en-CA", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
     const res = await fetch("/api/body/weight", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -103,6 +105,7 @@ export function WeightLogWidget() {
         <div className="flex items-center gap-1.5">
           <input
             type="number"
+            inputMode="decimal"
             step="0.1"
             min="0"
             placeholder={isImperial ? "165" : "75"}
@@ -114,7 +117,7 @@ export function WeightLogWidget() {
           <button
             onClick={() => void handleSave()}
             disabled={saving || !input}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
           >
             {saved ? (
               <Check className="h-3.5 w-3.5" />

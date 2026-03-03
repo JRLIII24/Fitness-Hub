@@ -35,11 +35,11 @@ interface SendMessageDialogProps {
 }
 
 const PRESET_MESSAGES = [
-  "💪 Keep it up!",
-  "🔥 You got this!",
-  "👏 Great work!",
-  "🏆 Crushing it!",
-  "💯 Keep pushing!",
+  "Keep it up!",
+  "You got this!",
+  "Great work!",
+  "Crushing it!",
+  "Keep pushing!",
 ];
 
 export function SendMessageDialog({

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS } from "@/lib/constants";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
+import { weightToDisplay } from "@/lib/units";
 
 interface PreviousPerformance {
   reps: number | null;
@@ -55,10 +56,7 @@ export function ExerciseSelectionCard({
     const hasReps = previousPerformance.reps != null;
     if (!hasWeight && !hasReps) return null;
     const weight = hasWeight
-      ? `${preference === "imperial"
-        ? Math.round((previousPerformance.weight ?? 0) * 2.20462 * 10) / 10
-        : Math.round((previousPerformance.weight ?? 0) * 10) / 10
-      } ${unitLabel}`
+      ? `${weightToDisplay(previousPerformance.weight ?? 0, preference === "imperial", 1)} ${unitLabel}`
       : "BW";
     const reps = hasReps ? `${previousPerformance.reps}` : "—";
     return `${weight} × ${reps}`;

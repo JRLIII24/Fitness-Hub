@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { format, parseISO, subDays } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
+import { weightToDisplay, lbsToKg } from "@/lib/units";
 import {
   Scale,
   Plus,
@@ -37,11 +38,11 @@ type RangeOption = "30d" | "90d" | "1y" | "all";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function kgToDisplay(kg: number, isImperial: boolean) {
-  return isImperial ? Math.round(kg * 2.20462 * 10) / 10 : Math.round(kg * 10) / 10;
+  return weightToDisplay(kg, isImperial, 1);
 }
 
 function displayToKg(val: number, isImperial: boolean) {
-  return isImperial ? val / 2.20462 : val;
+  return isImperial ? lbsToKg(val) : val;
 }
 
 const WeightChart = dynamic(() => import("@/components/charts/weight-chart"), {
@@ -485,6 +486,7 @@ export default function BodyMetricsPage() {
                     <Label className="text-[11px]">Weight ({unitLabel})</Label>
                     <Input
                       type="number"
+                      inputMode="decimal"
                       step="0.1"
                       min="0"
                       placeholder={unitLabel === "kg" ? "75.0" : "165.0"}
@@ -499,6 +501,7 @@ export default function BodyMetricsPage() {
                     <Label className="text-[11px]">Body Fat % (optional)</Label>
                     <Input
                       type="number"
+                      inputMode="decimal"
                       step="0.1"
                       min="0"
                       max="100"

@@ -2,13 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { getCachedOrComputeFatigueSnapshot } from "@/lib/fatigue/server";
-
-function toDayKey(value: Date | string) {
-  const d = typeof value === "string" ? new Date(value) : value;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-}
+import { getUserTimezone, getDateInTimezone, getHourInTimezone } from "@/lib/timezone";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -24,23 +18,25 @@ export default async function DashboardPage() {
   // pg_cron (migration 039) is the primary scheduler; this is the fallback.
   void supabase.rpc("cleanup_stale_workouts");
 
-  const today = new Date();
-  const localDayStart = new Date(today);
-  localDayStart.setHours(0, 0, 0, 0);
-  const localNextDayStart = new Date(localDayStart);
-  localNextDayStart.setDate(localNextDayStart.getDate() + 1);
-  const todayStr = `${localDayStart.getFullYear()}-${String(
-    localDayStart.getMonth() + 1
-  ).padStart(2, "0")}-${String(localDayStart.getDate()).padStart(2, "0")}`;
-  const sevenDaysAgo = new Date(today.getTime() - 7 * 86400000).toISOString();
+  // ── Timezone-aware date calculations ──────────────────────────────────────
+  const timezone = await getUserTimezone(user.id);
+  const now = new Date();
+  const todayStr = getDateInTimezone(now, timezone);
+  const hourNow = getHourInTimezone(timezone);
 
+  const yesterdayDate = new Date(now.getTime() - 86400000);
+  const yesterdayStr = getDateInTimezone(yesterdayDate, timezone);
+
+  // ── Parallel data fetching ────────────────────────────────────────────────
   const [
     profileResult,
-    sessionsResult,
+    workoutSummaryResult,
     nutritionGoalResult,
-    todayFoodResult,
+    nutritionSummaryResult,
     recentFoodsResult,
     intentResult,
+    todayWorkoutResult,
+    yesterdayWorkoutResult,
   ] = await Promise.allSettled([
     supabase
       .from("profiles")
@@ -49,13 +45,7 @@ export default async function DashboardPage() {
       )
       .eq("id", user.id)
       .single(),
-    supabase
-      .from("workout_sessions")
-      .select("id, name, started_at, duration_seconds, total_volume_kg, status")
-      .eq("user_id", user.id)
-      .eq("status", "completed")
-      .order("started_at", { ascending: false })
-      .limit(60),
+    supabase.rpc("get_dashboard_workout_summary", { p_user_id: user.id }),
     supabase
       .from("nutrition_goals")
       .select("calories_target, protein_g_target, carbs_g_target, fat_g_target")
@@ -64,14 +54,10 @@ export default async function DashboardPage() {
       .order("effective_from", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
-      .from("food_log")
-      .select(
-        "calories_consumed, protein_g, carbs_g, fat_g, servings, food_items(fiber_g, sugar_g, sodium_mg)"
-      )
-      .eq("user_id", user.id)
-      .gte("logged_at", localDayStart.toISOString())
-      .lt("logged_at", localNextDayStart.toISOString()),
+    supabase.rpc("get_dashboard_nutrition_summary", {
+      p_user_id: user.id,
+      p_date_str: todayStr,
+    }),
     supabase
       .from("food_log")
       .select("logged_at, food_items(id, name, brand)")
@@ -86,8 +72,27 @@ export default async function DashboardPage() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Lightweight check: did user work out today?
+    supabase
+      .from("workout_sessions")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .gte("started_at", `${todayStr}T00:00:00`)
+      .lt("started_at", `${todayStr}T23:59:59.999`)
+      .limit(1),
+    // Lightweight check: did user work out yesterday?
+    supabase
+      .from("workout_sessions")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .gte("started_at", `${yesterdayStr}T00:00:00`)
+      .lt("started_at", `${yesterdayStr}T23:59:59.999`)
+      .limit(1),
   ]);
 
+  // ── Profile ───────────────────────────────────────────────────────────────
   const profile =
     profileResult.status === "fulfilled"
       ? (profileResult.value.data as {
@@ -101,20 +106,41 @@ export default async function DashboardPage() {
         } | null)
       : null;
 
-  type SessionRow = {
-    id: string;
-    name: string;
-    started_at: string;
-    duration_seconds: number | null;
-    total_volume_kg: number | null;
-    status: string;
+  // ── Workout summary (from RPC) ────────────────────────────────────────────
+  type WorkoutSummaryRow = {
+    total_sessions: number;
+    sessions_7d: number;
+    sessions_28d: number;
+    avg_volume_28d: number;
+    latest_id: string | null;
+    latest_name: string | null;
+    latest_started_at: string | null;
+    latest_duration: number | null;
+    latest_volume_kg: number | null;
   };
 
-  const sessions: SessionRow[] =
-    sessionsResult.status === "fulfilled"
-      ? ((sessionsResult.value.data ?? []) as SessionRow[])
-      : [];
+  const workoutSummary: WorkoutSummaryRow | null =
+    workoutSummaryResult.status === "fulfilled"
+      ? ((workoutSummaryResult.value.data as WorkoutSummaryRow[] | null)?.[0] ?? null)
+      : null;
 
+  const totalSessionCount = workoutSummary?.total_sessions ?? 0;
+  const sessions7d = workoutSummary?.sessions_7d ?? 0;
+  const sessions28d = workoutSummary?.sessions_28d ?? 0;
+  const avgVolumeKg = workoutSummary?.avg_volume_28d ?? 0;
+
+  const lastWorkout = workoutSummary?.latest_id
+    ? {
+        id: workoutSummary.latest_id,
+        name: workoutSummary.latest_name ?? "Workout",
+        started_at: workoutSummary.latest_started_at ?? "",
+        duration_seconds: workoutSummary.latest_duration,
+        total_volume_kg: workoutSummary.latest_volume_kg,
+        status: "completed" as const,
+      }
+    : null;
+
+  // ── Nutrition goal ────────────────────────────────────────────────────────
   type GoalRow = {
     calories_target: number | null;
     protein_g_target: number | null;
@@ -127,23 +153,34 @@ export default async function DashboardPage() {
       ? (nutritionGoalResult.value.data as GoalRow | null)
       : null;
 
-  type FoodRow = {
-    calories_consumed: number;
-    protein_g: number | null;
-    carbs_g: number | null;
-    fat_g: number | null;
-    servings: number;
-    food_items:
-      | { fiber_g: number | null; sugar_g: number | null; sodium_mg: number | null }
-      | { fiber_g: number | null; sugar_g: number | null; sodium_mg: number | null }[]
-      | null;
+  // ── Nutrition summary (from RPC) ──────────────────────────────────────────
+  type NutritionSummaryRow = {
+    total_calories: number;
+    total_protein_g: number;
+    total_carbs_g: number;
+    total_fat_g: number;
+    total_fiber_g: number;
+    total_sugar_g: number;
+    total_sodium_mg: number;
+    total_servings: number;
   };
 
-  const todayFood: FoodRow[] =
-    todayFoodResult.status === "fulfilled"
-      ? ((todayFoodResult.value.data ?? []) as FoodRow[])
-      : [];
+  const nutritionSummary: NutritionSummaryRow | null =
+    nutritionSummaryResult.status === "fulfilled"
+      ? ((nutritionSummaryResult.value.data as NutritionSummaryRow[] | null)?.[0] ?? null)
+      : null;
 
+  const todayCalories = Number(nutritionSummary?.total_calories ?? 0);
+  const todayProtein = Number(nutritionSummary?.total_protein_g ?? 0);
+  const todayCarbs = Number(nutritionSummary?.total_carbs_g ?? 0);
+  const todayFat = Number(nutritionSummary?.total_fat_g ?? 0);
+  const todayFiber = Number(nutritionSummary?.total_fiber_g ?? 0);
+  const todaySugar = Number(nutritionSummary?.total_sugar_g ?? 0);
+  const todaySodiumMg = Number(nutritionSummary?.total_sodium_mg ?? 0);
+  const todayServings = Number(nutritionSummary?.total_servings ?? 0);
+  const calorieGoal = nutritionGoal?.calories_target ?? null;
+
+  // ── Recent foods (for quick-add) ──────────────────────────────────────────
   type RecentFoodRow = {
     logged_at: string;
     food_items:
@@ -157,6 +194,7 @@ export default async function DashboardPage() {
       ? ((recentFoodsResult.value.data ?? []) as RecentFoodRow[])
       : [];
 
+  // ── Active intent ─────────────────────────────────────────────────────────
   type IntentRow = {
     id: string;
     intent_type: string;
@@ -170,64 +208,32 @@ export default async function DashboardPage() {
       ? (intentResult.value.data as IntentRow | null)
       : null;
 
+  // ── Derived values ────────────────────────────────────────────────────────
   const displayName = profile?.display_name ?? user.email?.split("@")[0] ?? "Athlete";
-
-  const workoutDays = new Set(
-    sessions.map((s) => new Date(s.started_at).toISOString().split("T")[0])
-  );
 
   const streak = profile?.current_streak ?? 0;
   const milestonesUnlocked = profile?.streak_milestones_unlocked ?? [];
   const freezeAvailable = profile?.streak_freeze_available ?? false;
 
-  const thisWeekSessions = sessions.filter(
-    (s) => new Date(s.started_at) >= new Date(sevenDaysAgo)
-  );
-  const lastWorkout = sessions[0] ?? null;
-  const workedOutToday = workoutDays.has(todayStr);
-  const hourNow = today.getHours();
-  const yesterday = new Date(localDayStart);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const workedOutYesterday = workoutDays.has(toDayKey(yesterday));
+  const workedOutToday =
+    todayWorkoutResult.status === "fulfilled" &&
+    (todayWorkoutResult.value.data?.length ?? 0) > 0;
+
+  const workedOutYesterday =
+    yesterdayWorkoutResult.status === "fulfilled" &&
+    (yesterdayWorkoutResult.value.data?.length ?? 0) > 0;
+
   const streakAtRisk = !workedOutToday && streak > 0;
   const momentumUrgency: "low" | "medium" | "high" =
     !streakAtRisk ? "low" : hourNow >= 20 ? "high" : hourNow >= 14 ? "medium" : "low";
   const weeklyMomentumGoal = 4;
   const weeklyProgressPct = Math.min(
     100,
-    Math.round((thisWeekSessions.length / weeklyMomentumGoal) * 100)
+    Math.round((sessions7d / weeklyMomentumGoal) * 100)
   );
-  const sessions28d = sessions.filter(
-    (s) => new Date(s.started_at).getTime() >= today.getTime() - 28 * 86400000
-  );
-  const weeklyAverageSessions = sessions28d.length / 4;
+  const weeklyAverageSessions = sessions28d / 4;
   const projectedSessions90d = Math.max(0, Math.round(weeklyAverageSessions * 13));
-  const avgVolumeKg =
-    sessions28d.length > 0
-      ? sessions28d.reduce((sum, s) => sum + (s.total_volume_kg ?? 0), 0) /
-        sessions28d.length
-      : 0;
   const projectedVolumeKg = Math.round(projectedSessions90d * avgVolumeKg);
-
-  const todayCalories = todayFood.reduce((sum, e) => sum + (e.calories_consumed ?? 0), 0);
-  const calorieGoal = nutritionGoal?.calories_target ?? null;
-
-  const todayProtein = todayFood.reduce((s, e) => s + (e.protein_g ?? 0), 0);
-  const todayCarbs = todayFood.reduce((s, e) => s + (e.carbs_g ?? 0), 0);
-  const todayFat = todayFood.reduce((s, e) => s + (e.fat_g ?? 0), 0);
-  const todayFiber = todayFood.reduce((sum, entry) => {
-    const food = Array.isArray(entry.food_items) ? entry.food_items[0] ?? null : entry.food_items;
-    return sum + (food?.fiber_g ?? 0) * (entry.servings ?? 1);
-  }, 0);
-  const todaySugar = todayFood.reduce((sum, entry) => {
-    const food = Array.isArray(entry.food_items) ? entry.food_items[0] ?? null : entry.food_items;
-    return sum + (food?.sugar_g ?? 0) * (entry.servings ?? 1);
-  }, 0);
-  const todaySodiumMg = todayFood.reduce((sum, entry) => {
-    const food = Array.isArray(entry.food_items) ? entry.food_items[0] ?? null : entry.food_items;
-    return sum + (food?.sodium_mg ?? 0) * (entry.servings ?? 1);
-  }, 0);
-  const todayServings = todayFood.reduce((sum, entry) => sum + (entry.servings ?? 0), 0);
 
   const quickAddFoods = (() => {
     const seen = new Set<string>();
@@ -242,13 +248,29 @@ export default async function DashboardPage() {
     return result;
   })();
 
-  const todayFormatted = today.toLocaleDateString("en-US", {
+  const todayFormatted = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
     weekday: "long",
     month: "long",
     day: "numeric",
-  });
+  }).format(now);
 
   const fatigueSnapshot = await getCachedOrComputeFatigueSnapshot(user.id);
+
+  // Dashboard phase state machine
+  type DashboardPhase = "morning" | "pre_workout" | "active" | "post_workout" | "evening";
+  let dashboardPhase: DashboardPhase;
+  if (workedOutToday) {
+    const lastSessionTime = lastWorkout ? new Date(lastWorkout.started_at).getTime() : 0;
+    const hoursSinceLastWorkout = (Date.now() - lastSessionTime) / (1000 * 60 * 60);
+    dashboardPhase = hoursSinceLastWorkout <= 2 ? "post_workout" : "evening";
+  } else if (hourNow < 12) {
+    dashboardPhase = "morning";
+  } else if (hourNow < 20) {
+    dashboardPhase = "pre_workout";
+  } else {
+    dashboardPhase = "evening";
+  }
 
   return (
     <DashboardContent
@@ -261,8 +283,8 @@ export default async function DashboardPage() {
       streak={streak}
       milestonesUnlocked={milestonesUnlocked}
       freezeAvailable={freezeAvailable}
-      sessions={sessions}
-      thisWeekSessions={thisWeekSessions}
+      totalSessionCount={totalSessionCount}
+      thisWeekSessionCount={sessions7d}
       lastWorkout={lastWorkout}
       workedOutToday={workedOutToday}
       workedOutYesterday={workedOutYesterday}
@@ -286,6 +308,7 @@ export default async function DashboardPage() {
       activeIntent={activeIntent}
       quickAddFoods={quickAddFoods}
       fatigueSnapshot={fatigueSnapshot}
+      dashboardPhase={dashboardPhase}
     />
   );
 }

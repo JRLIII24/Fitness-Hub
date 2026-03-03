@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Ruler } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -81,7 +82,7 @@ export function StepHeight({
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl font-bold text-foreground"
           >
-            How Tall Are You? 📏
+            How Tall Are You? <Ruler className="inline h-8 w-8 ml-1" />
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}

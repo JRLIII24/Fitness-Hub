@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { StreakSection } from "@/components/dashboard/streak-section";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
+import { kgToLbs } from "@/lib/units";
 
 import { SmartLauncherWidget } from "@/components/workout/smart-launcher-widget";
 import { FatigueLevelCard } from "@/components/dashboard/fatigue-level-card";
@@ -28,11 +29,15 @@ import { PodsDashboardCard } from "@/components/pods/pods-dashboard-card";
 import { XpProgressBar } from "@/components/profile/xp-progress-bar";
 import { RecoveryAICard } from "@/components/ai/recovery-ai-card";
 import { WeightLogWidget } from "@/components/dashboard/weight-log-widget";
-
+import { MuscleRecoveryCard } from "@/components/dashboard/muscle-recovery-card";
+import { SwipeableCardCarousel } from "@/components/ui/swipeable-card-carousel";
+import { WeeklyReviewModal } from "@/components/dashboard/weekly-review-modal";
 
 import type { FatigueSnapshot } from "@/lib/fatigue/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+export type DashboardPhase = "morning" | "pre_workout" | "active" | "post_workout" | "evening";
 
 type SessionRow = {
   id: string;
@@ -61,8 +66,8 @@ export interface DashboardContentProps {
   streak: number;
   milestonesUnlocked: number[];
   freezeAvailable: boolean;
-  sessions: SessionRow[];
-  thisWeekSessions: SessionRow[];
+  totalSessionCount: number;
+  thisWeekSessionCount: number;
   lastWorkout: SessionRow | null;
   workedOutToday: boolean;
   workedOutYesterday: boolean;
@@ -91,6 +96,7 @@ export interface DashboardContentProps {
   activeIntent: IntentRow | null;
   quickAddFoods: Array<{ id: string; name: string; brand: string | null }>;
   fatigueSnapshot: FatigueSnapshot;
+  dashboardPhase: DashboardPhase;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -145,12 +151,14 @@ function MacroBar({
   goal,
   textColorClass,
   barColorClass,
+  trackHeight = "h-1",
 }: {
   label: string;
   value: number;
   goal: number | null;
   textColorClass: string;
   barColorClass: string;
+  trackHeight?: string;
 }) {
   const pct = goal ? Math.min(100, (value / goal) * 100) : 0;
   return (
@@ -164,7 +172,7 @@ function MacroBar({
           )}
         </span>
       </div>
-      <div className="h-1 overflow-hidden rounded-full bg-border/40">
+      <div className={cn("overflow-hidden rounded-full bg-border/40", trackHeight)}>
         <div
           className={cn("h-full rounded-full transition-all duration-700", barColorClass)}
           style={{ width: `${pct}%` }}
@@ -235,6 +243,48 @@ function CalorieRing({ consumed, goal }: { consumed: number; goal: number }) {
   );
 }
 
+// ─── ProteinRing ─────────────────────────────────────────────────────────────
+
+function ProteinRing({ consumed, goal }: { consumed: number; goal: number }) {
+  const R = 30;
+  const CIRC = 2 * Math.PI * R;
+  const pct = Math.min(1, consumed / goal);
+  const offset = CIRC * (1 - pct);
+  const remaining = Math.max(0, goal - consumed);
+  const isOver = consumed > goal;
+
+  return (
+    <div className="relative flex shrink-0 items-center justify-center">
+      <svg width="76" height="76" viewBox="0 0 76 76" style={{ transform: "rotate(-90deg)" }}>
+        <circle cx="38" cy="38" r={R} strokeWidth="5" fill="none" className="stroke-border" />
+        <circle
+          cx="38"
+          cy="38"
+          r={R}
+          strokeWidth="5"
+          fill="none"
+          stroke="rgb(96 165 250)"
+          strokeLinecap="round"
+          strokeDasharray={`${CIRC}`}
+          strokeDashoffset={`${offset}`}
+          style={{ transition: "stroke-dashoffset 0.8s ease" }}
+        />
+      </svg>
+      <div className="absolute flex flex-col items-center justify-center">
+        <span className="tabular-nums text-[16px] font-black leading-none text-blue-400">
+          {Math.round(consumed)}
+        </span>
+        <span className="text-[8px] font-semibold text-muted-foreground">
+          {isOver ? "over" : "left"}
+        </span>
+        <span className={cn("tabular-nums text-[8px] font-bold", isOver ? "text-rose-400" : "text-blue-400")}>
+          {Math.round(isOver ? consumed - goal : remaining)}g
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── SectionCard ─────────────────────────────────────────────────────────────
 
 function SectionCard({
@@ -295,8 +345,8 @@ export function DashboardContent({
   streak,
   milestonesUnlocked,
   freezeAvailable,
-  sessions,
-  thisWeekSessions,
+  totalSessionCount,
+  thisWeekSessionCount,
   lastWorkout,
   workedOutToday,
   workedOutYesterday,
@@ -320,11 +370,12 @@ export function DashboardContent({
   activeIntent,
   quickAddFoods,
   fatigueSnapshot,
+  dashboardPhase,
 }: DashboardContentProps) {
   const { preference, unitLabel } = useUnitPreferenceStore();
   const toDisplayVolume = (kgVolume: number) =>
     preference === "imperial"
-      ? Math.round(kgVolume * 2.20462)
+      ? Math.round(kgToLbs(kgVolume))
       : Math.round(kgVolume);
 
   return (
@@ -363,6 +414,19 @@ export function DashboardContent({
                 </div>
                 {/* XP progress bar */}
                 <XpProgressBar level={level} xp={xp} />
+                {/* Weekly Review */}
+                <WeeklyReviewModal
+                  streak={streak}
+                  weeklySessionCount={thisWeekSessionCount}
+                  weeklyMomentumGoal={weeklyMomentumGoal}
+                  weeklyProgressPct={weeklyProgressPct}
+                  weeklyAverageSessions={weeklyAverageSessions}
+                  projectedSessions90d={projectedSessions90d}
+                  projectedVolumeKg={projectedVolumeKg}
+                  totalSessions={totalSessionCount}
+                  unitLabel={unitLabel}
+                  toDisplayVolume={toDisplayVolume}
+                />
               </div>
 
               {/* Heading */}
@@ -410,12 +474,12 @@ export function DashboardContent({
             />
             <StatPill
               icon={<Dumbbell className="h-4 w-4 text-primary" />}
-              value={thisWeekSessions.length}
+              value={thisWeekSessionCount}
               label="This Week"
             />
             <StatPill
               icon={<Trophy className="h-4 w-4 text-amber-400" />}
-              value={sessions.length}
+              value={totalSessionCount}
               label="Total"
             />
           </div>
@@ -455,198 +519,263 @@ export function DashboardContent({
       {/* ── Main content grid ─────────────────────────────────────────────── */}
       <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
 
-        {/* Left column */}
+        {/* Left column – phase-ordered cards */}
         <div className="space-y-5">
-          <SmartLauncherWidget />
-          <FatigueLevelCard initialSnapshot={fatigueSnapshot} />
-          <RecoveryAICard />
-          <WeightLogWidget />
-
-          {/* 90-Day Path */}
-          <SectionCard>
-            <DashboardCardHeader
-              icon={<Target className="h-3.5 w-3.5 text-primary" />}
-              title="Future Self · 90-Day Path"
-              action={
-                <span className="rounded-full border border-primary/30 bg-primary/15 px-2.5 py-0.5 text-[10px] font-bold text-primary">
-                  {Math.round(weeklyAverageSessions * 10) / 10}/wk avg
-                </span>
-              }
-            />
-            <CardDivider />
-            <div className="space-y-4 p-5">
-              {/* Projection headline */}
-              <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
-                <p className="text-[12px] leading-relaxed text-muted-foreground">
-                  Stay on this path to complete
-                </p>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="tabular-nums text-[40px] font-black leading-none text-primary">
-                    {projectedSessions90d}
-                  </span>
-                  <span className="text-[13px] font-medium text-muted-foreground">
-                    workouts in 90 days
-                  </span>
-                </div>
-              </div>
-
-              {/* Stat grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-3">
-                  <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
-                    7-Day Goal
-                  </p>
-                  <div className="flex items-baseline gap-0.5">
-                    <span className="tabular-nums text-[22px] font-black leading-none text-foreground">
-                      {thisWeekSessions.length}
+          {(() => {
+            const ninetyDayCard = (
+              <SectionCard key="ninetyDay">
+                <DashboardCardHeader
+                  icon={<Target className="h-3.5 w-3.5 text-primary" />}
+                  title="Future Self · 90-Day Path"
+                  action={
+                    <span className="rounded-full border border-primary/30 bg-primary/15 px-2.5 py-0.5 text-[10px] font-bold text-primary">
+                      {Math.round(weeklyAverageSessions * 10) / 10}/wk avg
                     </span>
-                    <span className="text-[12px] font-medium text-muted-foreground">
-                      /{weeklyMomentumGoal}
-                    </span>
+                  }
+                />
+                <CardDivider />
+                <div className="space-y-4 p-5">
+                  <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
+                    <p className="text-[12px] leading-relaxed text-muted-foreground">
+                      Stay on this path to complete
+                    </p>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <span className="tabular-nums text-[40px] font-black leading-none text-primary">
+                        {projectedSessions90d}
+                      </span>
+                      <span className="text-[13px] font-medium text-muted-foreground">
+                        workouts in 90 days
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-3">
-                  <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
-                    Proj. Volume
-                  </p>
-                  <div className="flex items-baseline gap-0.5">
-                    <span className="tabular-nums text-[18px] font-black leading-none text-foreground">
-                      {toDisplayVolume(projectedVolumeKg).toLocaleString()}
-                    </span>
-                    <span className="text-[11px] font-medium text-muted-foreground">{unitLabel}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Animated progress bar */}
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground">
-                    Weekly momentum progress
-                  </span>
-                  <span className="text-[10px] font-bold text-primary">
-                    {weeklyProgressPct}%
-                  </span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-border/40">
-                  <motion.div
-                    className="h-full rounded-full bg-primary"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${weeklyProgressPct}%` }}
-                    transition={{ duration: 1, ease: "easeOut" }}
-                  />
-                </div>
-              </div>
-
-              <p className="text-[11px] leading-relaxed text-muted-foreground/70">
-                Consistency compounds. Keep stacking sessions to shift this curve up.
-              </p>
-            </div>
-          </SectionCard>
-
-
-
-          {/* Nutrition */}
-          <SectionCard>
-            <DashboardCardHeader
-              icon={<Apple className="h-3.5 w-3.5 text-emerald-400" />}
-              title="Today's Nutrition"
-              action={
-                <Link href="/nutrition">
-                  <button className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-opacity hover:opacity-80">
-                    Log food
-                    <ChevronRight className="h-3 w-3" />
-                  </button>
-                </Link>
-              }
-            />
-            <CardDivider />
-            <div className="space-y-5 p-5">
-              {calorieGoal ? (
-                <>
-                  {/* Calorie ring + remaining */}
-                  <div className="flex items-center gap-5">
-                    <CalorieRing consumed={todayCalories} goal={calorieGoal} />
-                    <div className="flex-1 space-y-2">
-                      <div>
-                        <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
-                          Goal
-                        </p>
-                        <p className="tabular-nums text-[20px] font-black leading-none text-foreground">
-                          {calorieGoal.toLocaleString()}
-                          <span className="text-[11px] font-normal text-muted-foreground">
-                            {" "}kcal
-                          </span>
-                        </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-3">
+                      <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
+                        7-Day Goal
+                      </p>
+                      <div className="flex items-baseline gap-0.5">
+                        <span className="tabular-nums text-[22px] font-black leading-none text-foreground">
+                          {thisWeekSessionCount}
+                        </span>
+                        <span className="text-[12px] font-medium text-muted-foreground">
+                          /{weeklyMomentumGoal}
+                        </span>
                       </div>
-                      <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2">
-                        <p className="mb-0.5 text-[10px] text-muted-foreground">Remaining</p>
-                        <p className="tabular-nums text-[18px] font-black leading-none text-emerald-400">
-                          {Math.max(0, calorieGoal - todayCalories).toLocaleString()}
-                          <span className="text-[11px] font-normal text-muted-foreground">
-                            {" "}kcal
-                          </span>
-                        </p>
+                    </div>
+                    <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-3">
+                      <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Proj. Volume
+                      </p>
+                      <div className="flex items-baseline gap-0.5">
+                        <span className="tabular-nums text-[18px] font-black leading-none text-foreground">
+                          {toDisplayVolume(projectedVolumeKg).toLocaleString()}
+                        </span>
+                        <span className="text-[11px] font-medium text-muted-foreground">{unitLabel}</span>
                       </div>
                     </div>
                   </div>
-
-                  {/* Macro bars */}
-                  <div className="space-y-3">
-                    <MacroBar
-                      label="Protein"
-                      value={todayProtein}
-                      goal={nutritionGoal?.protein_g_target ?? null}
-                      textColorClass="text-blue-400"
-                      barColorClass="bg-blue-400"
-                    />
-                    <MacroBar
-                      label="Carbs"
-                      value={todayCarbs}
-                      goal={nutritionGoal?.carbs_g_target ?? null}
-                      textColorClass="text-amber-400"
-                      barColorClass="bg-amber-400"
-                    />
-                    <MacroBar
-                      label="Fat"
-                      value={todayFat}
-                      goal={nutritionGoal?.fat_g_target ?? null}
-                      textColorClass="text-rose-400"
-                      barColorClass="bg-rose-400"
-                    />
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[10px] text-muted-foreground">
+                        Weekly momentum progress
+                      </span>
+                      <span className="text-[10px] font-bold text-primary">
+                        {weeklyProgressPct}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-border/40">
+                      <motion.div
+                        className="h-full rounded-full bg-primary"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${weeklyProgressPct}%` }}
+                        transition={{ duration: 1, ease: "easeOut" }}
+                      />
+                    </div>
                   </div>
-
-                  {/* Micro nutrients */}
-                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/50 bg-card/30 p-3 sm:grid-cols-4">
-                    {[
-                      { label: "Fiber", value: `${Math.round(todayFiber)}g`, colorClass: "text-emerald-400" },
-                      { label: "Sugar", value: `${Math.round(todaySugar)}g`, colorClass: "text-rose-400" },
-                      { label: "Sodium", value: `${Math.round(todaySodiumMg / 100) / 10}g`, colorClass: "text-cyan-400" },
-                      { label: "Servings", value: `${Math.round(todayServings * 10) / 10}`, colorClass: "text-violet-400" },
-                    ].map(({ label, value, colorClass }) => (
-                      <div key={label} className="text-center">
-                        <p className={cn("tabular-nums text-[14px] font-black leading-none", colorClass)}>
-                          {value}
-                        </p>
-                        <p className="mt-0.5 text-[9px] font-semibold text-muted-foreground">
-                          {label}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-2 py-4 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Set your daily calorie goal to track nutrition here.
+                  <p className="text-[11px] leading-relaxed text-muted-foreground/70">
+                    Consistency compounds. Keep stacking sessions to shift this curve up.
                   </p>
-                  <Link href="/nutrition/goals">
-                    <Button variant="outline" size="sm">Set Goals</Button>
-                  </Link>
                 </div>
-              )}
-            </div>
-          </SectionCard>
+              </SectionCard>
+            );
+
+            const nutritionCard = (
+              <SectionCard key="nutrition">
+                <DashboardCardHeader
+                  icon={<Apple className="h-3.5 w-3.5 text-emerald-400" />}
+                  title="Today's Nutrition"
+                  action={
+                    <Link href="/nutrition">
+                      <button className="flex min-h-[44px] items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground transition-opacity hover:opacity-80">
+                        Log food
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </Link>
+                  }
+                />
+                <CardDivider />
+                <div className="space-y-5 p-5">
+                  {calorieGoal ? (
+                    <>
+                      {/* Calorie ring + protein ring + remaining */}
+                      <div className="flex items-center gap-4">
+                        <CalorieRing consumed={todayCalories} goal={calorieGoal} />
+                        {nutritionGoal?.protein_g_target ? (
+                          <ProteinRing consumed={todayProtein} goal={nutritionGoal.protein_g_target} />
+                        ) : null}
+                        <div className="flex-1 space-y-2">
+                          <div>
+                            <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
+                              Goal
+                            </p>
+                            <p className="tabular-nums text-[20px] font-black leading-none text-foreground">
+                              {calorieGoal.toLocaleString()}
+                              <span className="text-[11px] font-normal text-muted-foreground">
+                                {" "}kcal
+                              </span>
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2">
+                            <p className="mb-0.5 text-[10px] text-muted-foreground">Remaining</p>
+                            <p className="tabular-nums text-[18px] font-black leading-none text-emerald-400">
+                              {Math.max(0, calorieGoal - todayCalories).toLocaleString()}
+                              <span className="text-[11px] font-normal text-muted-foreground">
+                                {" "}kcal
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Post-workout protein emphasis */}
+                      {dashboardPhase === "post_workout" && nutritionGoal?.protein_g_target && (
+                        <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-[11px] text-primary font-semibold">
+                          Recovery window — {Math.max(0, (nutritionGoal.protein_g_target ?? 0) - todayProtein)}g protein remaining
+                        </div>
+                      )}
+
+                      {/* Macro bars */}
+                      <div className="space-y-3">
+                        <MacroBar
+                          label="Protein"
+                          value={todayProtein}
+                          goal={nutritionGoal?.protein_g_target ?? null}
+                          textColorClass="text-blue-400"
+                          barColorClass="bg-blue-400"
+                          trackHeight="h-2"
+                        />
+                        <MacroBar
+                          label="Carbs"
+                          value={todayCarbs}
+                          goal={nutritionGoal?.carbs_g_target ?? null}
+                          textColorClass="text-amber-400"
+                          barColorClass="bg-amber-400"
+                        />
+                        <MacroBar
+                          label="Fat"
+                          value={todayFat}
+                          goal={nutritionGoal?.fat_g_target ?? null}
+                          textColorClass="text-rose-400"
+                          barColorClass="bg-rose-400"
+                        />
+                      </div>
+
+                      {/* Micro nutrients */}
+                      <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/50 bg-card/30 p-3 sm:grid-cols-4">
+                        {[
+                          { label: "Fiber", value: `${Math.round(todayFiber)}g`, colorClass: "text-emerald-400" },
+                          { label: "Sugar", value: `${Math.round(todaySugar)}g`, colorClass: "text-rose-400" },
+                          { label: "Sodium", value: `${Math.round(todaySodiumMg / 100) / 10}g`, colorClass: "text-cyan-400" },
+                          { label: "Servings", value: `${Math.round(todayServings * 10) / 10}`, colorClass: "text-violet-400" },
+                        ].map(({ label, value, colorClass }) => (
+                          <div key={label} className="text-center">
+                            <p className={cn("tabular-nums text-[14px] font-black leading-none", colorClass)}>
+                              {value}
+                            </p>
+                            <p className="mt-0.5 text-[9px] font-semibold text-muted-foreground">
+                              {label}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2 py-4 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Set your daily calorie goal to track nutrition here.
+                      </p>
+                      <Link href="/nutrition/goals">
+                        <Button variant="outline" size="sm">Set Goals</Button>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </SectionCard>
+            );
+
+            const cards = {
+              launcher: <SmartLauncherWidget key="launcher" />,
+              fatigue: <FatigueLevelCard key="fatigue" initialSnapshot={fatigueSnapshot} />,
+              muscleRecovery: <MuscleRecoveryCard key="muscleRecovery" />,
+              recovery: <RecoveryAICard key="recovery" />,
+              weight: <WeightLogWidget key="weight" />,
+              ninetyDay: ninetyDayCard,
+              nutrition: nutritionCard,
+            };
+
+            const phaseOrder: Record<DashboardPhase, (keyof typeof cards)[]> = {
+              morning: ["fatigue", "muscleRecovery", "weight", "nutrition", "launcher", "recovery", "ninetyDay"],
+              pre_workout: ["launcher", "fatigue", "muscleRecovery", "recovery", "weight", "nutrition"],
+              post_workout: ["nutrition", "recovery", "muscleRecovery", "weight", "fatigue", "launcher"],
+              active: ["launcher", "fatigue"],
+              evening: ["launcher", "fatigue", "muscleRecovery", "recovery", "weight", "ninetyDay", "nutrition"],
+            };
+
+            // Mobile: wrap secondary cards in swipeable carousel
+            const orderedKeys = phaseOrder[dashboardPhase];
+            const secondaryKeys = new Set<string>(["fatigue", "muscleRecovery", "recovery", "weight"]);
+            const primaryCards: React.ReactNode[] = [];
+            const secondaryCards: React.ReactNode[] = [];
+
+            for (const id of orderedKeys) {
+              if (secondaryKeys.has(id)) {
+                secondaryCards.push(cards[id]);
+              } else {
+                if (secondaryCards.length > 0) {
+                  primaryCards.push(
+                    <React.Fragment key={`secondary-group-${primaryCards.length}`}>
+                      <div className="lg:hidden">
+                        <SwipeableCardCarousel>
+                          {secondaryCards.map((c) => c)}
+                        </SwipeableCardCarousel>
+                      </div>
+                      <div className="hidden lg:flex lg:flex-col lg:gap-5">
+                        {secondaryCards.map((c) => c)}
+                      </div>
+                    </React.Fragment>
+                  );
+                  secondaryCards.length = 0;
+                }
+                primaryCards.push(cards[id]);
+              }
+            }
+            if (secondaryCards.length > 0) {
+              primaryCards.push(
+                <React.Fragment key={`secondary-group-${primaryCards.length}`}>
+                  <div className="lg:hidden">
+                    <SwipeableCardCarousel>
+                      {secondaryCards.map((c) => c)}
+                    </SwipeableCardCarousel>
+                  </div>
+                  <div className="hidden lg:flex lg:flex-col lg:gap-5">
+                    {secondaryCards.map((c) => c)}
+                  </div>
+                </React.Fragment>
+              );
+            }
+
+            return primaryCards;
+          })()}
 
           {/* Last Workout */}
           <SectionCard>
@@ -655,9 +784,9 @@ export function DashboardContent({
               title="Last Workout"
               action={
                 <Link href="/history">
-                  <button className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-opacity hover:opacity-80">
+                  <button className="flex min-h-[44px] items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground transition-opacity hover:opacity-80">
                     View all
-                    <ChevronRight className="h-3 w-3" />
+                    <ChevronRight className="h-3.5 w-3.5" />
                   </button>
                 </Link>
               }

@@ -82,7 +82,7 @@ export function HealthGuard() {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-sm p-6">
       <div className="w-full max-w-sm space-y-4 text-center">
-        <div className="text-4xl">🔧</div>
+        <div className="flex justify-center"><RefreshCw className="h-10 w-10 text-muted-foreground" /></div>
         <h1 className="text-lg font-bold text-foreground">FitHub needs attention</h1>
         <p className="text-sm text-muted-foreground">
           The app couldn&apos;t load properly. Try the options below to recover.

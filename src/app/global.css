@@ -312,32 +312,3 @@
   }
 }
 
-@keyframes calendar-glow {
-
-  0%,
-  100% {
-    opacity: 0.7;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
-
-/* Worked-out day glow — targets the inner circular button, not the td wrapper.
-   Guarded with :not(.rdp-selected) so the selected-day border still wins. */
-.rdp-day-worked-out:not(.rdp-selected) .rdp-day_button {
-  color: var(--primary) !important;
-  font-weight: 700 !important;
-  background-color: color-mix(in oklch, var(--primary) 12%, transparent) !important;
-  box-shadow:
-    inset 0 0 0 1.5px color-mix(in oklch, var(--primary) 55%, transparent),
-    0 0 8px 2px color-mix(in oklch, var(--primary) 22%, transparent) !important;
-  border-radius: 9999px !important;
-  animation: calendar-glow 2.8s ease-in-out infinite;
-}
-
-/* Also tint the number on selected+worked-out days without removing the ring */
-.rdp-day-worked-out.rdp-selected .rdp-day_button {
-  color: var(--primary-foreground) !important;
-}

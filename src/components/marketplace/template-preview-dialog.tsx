@@ -7,6 +7,7 @@ import {
   Dumbbell, BarChart3, Clock, Zap, Play, Library, AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { weightToDisplay } from "@/lib/units";
 import { getMuscleColor } from "./muscle-colors";
 import { stripImportFingerprint, getDifficultyInfo } from "@/lib/template-utils";
 import { StarRatingInput } from "./star-rating-input";
@@ -187,7 +188,7 @@ function PreviewSheet({
 
         {/* ── Scrollable body ──────────────────────────────────────────── */}
         {/* min-h-0 is critical for flex-1 + overflow-y-auto to work properly */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
 
           {/* Stats row */}
           <div className="mb-5 grid grid-cols-3 gap-2.5">
@@ -268,10 +269,7 @@ function PreviewSheet({
                       </span>
                       <span className="text-right text-[11px] text-muted-foreground">
                         {te.target_weight_kg != null
-                          ? `${preference === "imperial"
-                            ? Math.round(te.target_weight_kg * 2.20462 * 10) / 10
-                            : Math.round(te.target_weight_kg * 10) / 10
-                         } ${unitLabel}`
+                          ? `${weightToDisplay(te.target_weight_kg, preference === "imperial", 1)} ${unitLabel}`
                           : "BW"}
                       </span>
                     </motion.div>

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { calcSuggestedWeight } from "./progressive-overload";
+import { kgToLbs } from "./units";
 
 describe("calcSuggestedWeight", () => {
   describe("metric", () => {
@@ -32,7 +33,7 @@ describe("calcSuggestedWeight", () => {
     it("bumps by 2.5lbs for weights under 100lbs", () => {
       const ghostKg = 40; // ~88 lbs
       const result = calcSuggestedWeight(ghostKg, "imperial");
-      const resultLbs = result * 2.20462;
+      const resultLbs = kgToLbs(result);
       // Should be ~90.5 lbs, snapped to nearest 2.5 → 90
       expect(resultLbs).toBeGreaterThan(88);
     });
@@ -40,13 +41,13 @@ describe("calcSuggestedWeight", () => {
     it("bumps by 5lbs for weights at or above 100lbs", () => {
       const ghostKg = 50; // ~110 lbs
       const result = calcSuggestedWeight(ghostKg, "imperial");
-      const resultLbs = result * 2.20462;
+      const resultLbs = kgToLbs(result);
       expect(resultLbs).toBeGreaterThan(110);
     });
 
     it("snaps to nearest 2.5lbs", () => {
       const result = calcSuggestedWeight(45, "imperial");
-      const resultLbs = result * 2.20462;
+      const resultLbs = kgToLbs(result);
       const remainder = resultLbs % 2.5;
       expect(Math.min(remainder, 2.5 - remainder)).toBeLessThan(0.01);
     });

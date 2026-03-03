@@ -148,6 +148,7 @@ export interface Database {
           save_count: number;
           primary_muscle_group: string | null;
           training_block: string | null;
+          difficulty_level: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -162,6 +163,7 @@ export interface Database {
           save_count?: number;
           primary_muscle_group?: string | null;
           training_block?: string | null;
+          difficulty_level?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -173,6 +175,7 @@ export interface Database {
           is_public?: boolean;
           primary_muscle_group?: string | null;
           training_block?: string | null;
+          difficulty_level?: string | null;
           updated_at?: string;
         };
       };
@@ -588,6 +591,44 @@ export interface Database {
           exercise_id: string;
           session_rank: number;
           top_set_weight_kg: number;
+        }>;
+      };
+      get_dashboard_nutrition_summary: {
+        Args: { p_user_id: string; p_date_str: string };
+        Returns: Array<{
+          total_calories: number;
+          total_protein_g: number;
+          total_carbs_g: number;
+          total_fat_g: number;
+          total_fiber_g: number;
+          total_sugar_g: number;
+          total_sodium_mg: number;
+          total_servings: number;
+        }>;
+      };
+      get_dashboard_workout_summary: {
+        Args: { p_user_id: string; p_days_back?: number };
+        Returns: Array<{
+          total_sessions: number;
+          sessions_7d: number;
+          sessions_28d: number;
+          avg_volume_28d: number;
+          latest_id: string | null;
+          latest_name: string | null;
+          latest_started_at: string | null;
+          latest_duration: number | null;
+          latest_volume_kg: number | null;
+        }>;
+      };
+      get_muscle_group_recovery: {
+        Args: { p_user_id: string; p_lookback_days?: number };
+        Returns: Array<{
+          muscle_group: string;
+          last_trained_at: string | null;
+          hours_since_trained: number | null;
+          total_sets: number;
+          total_volume_kg: number;
+          avg_rpe: number | null;
         }>;
       };
     };

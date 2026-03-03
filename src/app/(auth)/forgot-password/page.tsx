@@ -72,7 +72,7 @@ export default function ForgotPasswordPage() {
             <CardContent className="space-y-4">
               <div className="p-4 rounded-lg bg-muted">
                 <p className="text-sm text-muted-foreground">
-                  📧 Click the link in the email to reset your password. The link will expire in 1 hour.
+                  <Mail className="inline h-4 w-4 mr-1" /> Click the link in the email to reset your password. The link will expire in 1 hour.
                 </p>
               </div>
               <Link href="/login">

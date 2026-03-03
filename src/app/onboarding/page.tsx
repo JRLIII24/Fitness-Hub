@@ -82,12 +82,12 @@ export default function OnboardingPage() {
   const handleNext = () => {
     // Show affirmation toast
     const affirmations = [
-      "Great choice! 💙",
-      "You've got this! 🔥",
-      "Excellent! ⚡",
-      "Perfect! ✨",
-      "Amazing! 🌟",
-      "Nice! 👏",
+      "Great choice!",
+      "You've got this!",
+      "Excellent!",
+      "Perfect!",
+      "Amazing!",
+      "Nice!",
     ];
     toast.success(affirmations[Math.floor(Math.random() * affirmations.length)]);
     nextStep();

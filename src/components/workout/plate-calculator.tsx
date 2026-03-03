@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { motionDurations, motionEasings } from "@/lib/motion";
+import { kgToDisplayValue } from "@/lib/units";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -119,7 +120,7 @@ export function PlateCalculator({ weightKg }: PlateCalculatorProps) {
 
   const displayWeight =
     preference === "imperial"
-      ? Math.round(weightKg * 2.20462 * 10) / 10
+      ? kgToDisplayValue(weightKg, 1)
       : weightKg;
 
   if (weightKg <= 0) return null;
@@ -160,7 +161,7 @@ export function PlateCalculator({ weightKg }: PlateCalculatorProps) {
       {!isAtOrBelowBar && (
         <>
           {/* CSS barbell visualization (one side) */}
-          <div className="flex items-center gap-0.5 overflow-x-auto py-2">
+          <div className="flex items-center gap-0.5 overflow-x-auto py-2" style={{ WebkitOverflowScrolling: "touch" }}>
             {/* Bar sleeve */}
             <div
               className="h-3 w-10 rounded-l-full"

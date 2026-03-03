@@ -226,10 +226,10 @@ export default async function AnalyticsPage() {
           <Progress value={overallAcceptanceRate} className="h-2" />
           <p className="text-xs text-muted-foreground">
             {overallAcceptanceRate >= 70
-              ? "🎯 Excellent! Your launcher is highly accurate."
+              ? "Excellent! Your launcher is highly accurate."
               : overallAcceptanceRate >= 50
-              ? "👍 Good performance. Keep tracking patterns."
-              : "📊 Still learning your patterns. More data will improve predictions."
+              ? "Good performance. Keep tracking patterns."
+              : "Still learning your patterns. More data will improve predictions."
             }
           </p>
         </CardContent>

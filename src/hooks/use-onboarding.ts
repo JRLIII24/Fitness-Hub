@@ -401,7 +401,7 @@ export function useOnboarding() {
         colors: ["#3b82f6", "#ec4899", "#f59e0b", "#10b981"],
       });
 
-      toast.success("Welcome to Fit-Hub! 🎉");
+      toast.success("Welcome to Fit-Hub!");
 
       // Redirect to dashboard
       setTimeout(() => {

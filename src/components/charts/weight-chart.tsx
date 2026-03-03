@@ -9,9 +9,10 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { weightToDisplay } from "@/lib/units";
 
 function kgToDisplay(kg: number, isImperial: boolean) {
-  return isImperial ? Math.round(kg * 2.20462 * 10) / 10 : Math.round(kg * 10) / 10;
+  return weightToDisplay(kg, isImperial, 1);
 }
 
 function WeightTooltip({ active, payload, label, isImperial }: {

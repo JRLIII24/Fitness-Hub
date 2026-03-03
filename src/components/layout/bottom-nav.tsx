@@ -12,14 +12,13 @@ import {
   Plus,
   Settings,
   Store,
-  Route,
 } from "lucide-react";
 import type { ElementType } from "react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkoutStore } from "@/stores/workout-store";
-import { MARKETPLACE_ENABLED, RUN_FEATURE_ENABLED } from "@/lib/features";
+import { MARKETPLACE_ENABLED } from "@/lib/features";
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -109,8 +108,7 @@ export function BottomNav() {
     { href: "/nutrition", label: "Nutrition", icon: Apple },
     { href: "/social", label: "Social", icon: Users, badge: unreadCount },
     ...(MARKETPLACE_ENABLED ? [{ href: "/marketplace", label: "Marketplace", icon: Store }] : []),
-    ...(RUN_FEATURE_ENABLED ? [{ href: "/run", label: "Run", icon: Route }] : []),
-    { href: "/settings", label: "Settings", icon: Settings },
+{ href: "/settings", label: "Settings", icon: Settings },
   ];
 
   const isTabActive = (href: string) => {
@@ -123,16 +121,16 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-card/90 backdrop-blur-[20px]">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-center px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <LayoutGroup id="bottom-nav">
-          <div className="flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background/60 p-1">
+          <div className="flex max-w-full items-center gap-0.5 overflow-x-auto scrollbar-none rounded-full border border-border/70 bg-background/60 p-1 sm:gap-1">
             {tabs.map((tab) => {
               const isActive = isTabActive(tab.href);
               const Icon = tab.icon;
               return (
-                <Link key={tab.href} href={tab.href} className="block" aria-label={tab.label}>
+                <Link key={tab.href} href={tab.href} className="block shrink-0" aria-label={tab.label}>
                   <motion.span
                     whileTap={{ scale: 0.94 }}
                     className={cn(
-                      "relative flex items-center gap-1.5 rounded-full px-2.5 py-2 text-[12px] sm:px-3.5",
+                      "relative flex items-center gap-1 rounded-full px-2 py-2 text-[12px] sm:gap-1.5 sm:px-3.5",
                       isActive ? "text-background" : "text-muted-foreground"
                     )}
                   >

@@ -1,4 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { uuid } from '@/lib/uuid';
 import { SyncMutationPayload } from './queue.types';
 
 interface SyncQueueDB extends DBSchema {
@@ -25,7 +26,7 @@ function getDB() {
     return dbPromise;
 }
 
-export async function enqueueMutation(type: string, payload: unknown, idempotencyKey: string = crypto.randomUUID()) {
+export async function enqueueMutation(type: string, payload: unknown, idempotencyKey: string = uuid()) {
     const db = await getDB();
     if (!db) return;
     await db.put('mutations', {

@@ -57,9 +57,9 @@ export function ProUpgradeCard({ userId }: ProUpgradeCardProps) {
             <span>Adaptive fueling recommendations</span>
           </div>
         </div>
-        <Link href="/settings" className="block">
+        <Link href="/upgrade" className="block">
           <Button className="motion-press w-full" size="sm">
-            Unlock Pro Preview
+            View Pro Features
           </Button>
         </Link>
       </CardContent>

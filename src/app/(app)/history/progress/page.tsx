@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,19 +10,6 @@ import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from "recharts";
 import {
   TrendingUp,
   BarChart3,
@@ -33,6 +21,35 @@ import {
 import { cn } from "@/lib/utils";
 import { HistoryNav } from "@/components/history/history-nav";
 import { generateProgressPDF } from "@/lib/pdf-export";
+import { ProgressInsightCard } from "@/components/ai/progress-insight-card";
+
+const ProgressCharts = {
+  SparklineChart: dynamic(
+    () => import("@/components/charts/progress-charts").then((m) => m.SparklineChart),
+    { ssr: false }
+  ),
+  StrengthLineChart: dynamic(
+    () => import("@/components/charts/progress-charts").then((m) => m.StrengthLineChart),
+    {
+      loading: () => <Skeleton className="h-[260px] w-full rounded-2xl" />,
+      ssr: false,
+    }
+  ),
+  StackedVolumeBarChart: dynamic(
+    () => import("@/components/charts/progress-charts").then((m) => m.StackedVolumeBarChart),
+    {
+      loading: () => <Skeleton className="h-[260px] w-full rounded-2xl" />,
+      ssr: false,
+    }
+  ),
+  CategoryMiniBarChart: dynamic(
+    () => import("@/components/charts/progress-charts").then((m) => m.CategoryMiniBarChart),
+    {
+      loading: () => <Skeleton className="h-[140px] w-full rounded-2xl" />,
+      ssr: false,
+    }
+  ),
+};
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -129,7 +146,7 @@ function PillToggle({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="inline-flex gap-0.5 rounded-full border border-border/60 bg-muted/40 p-1 backdrop-blur-sm">
+    <div className="flex max-w-full gap-0.5 overflow-x-auto scrollbar-none rounded-full border border-border/60 bg-muted/40 p-1 backdrop-blur-sm">
       {opts.map((o) => {
         const on = active === o;
         return (
@@ -138,7 +155,7 @@ function PillToggle({
             whileTap={{ scale: 0.95 }}
             onClick={() => onChange(o)}
             className={cn(
-              "whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
+              "shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
               on
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -182,25 +199,7 @@ function SparklineCard({
       </p>
 
       <div className="mt-1.5 h-[60px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={dataPoints} margin={{ top: 3, right: 3, bottom: 3, left: 3 }}>
-            <defs>
-              <linearGradient id={`sg-${name.replace(/\s/g, "")}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.28} />
-                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area
-              type="monotone"
-              dataKey="value"
-              stroke="var(--primary)"
-              strokeWidth={1.8}
-              fill={`url(#sg-${name.replace(/\s/g, "")})`}
-              dot={false}
-              isAnimationActive={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        <ProgressCharts.SparklineChart name={name} dataPoints={dataPoints} />
       </div>
 
       <div className="mt-1 flex justify-end">
@@ -218,97 +217,6 @@ function SparklineCard({
         </span>
       </div>
     </motion.button>
-  );
-}
-
-// ─── Custom Tooltips ─────────────────────────────────────────────────────────
-
-function SingleTooltip({
-  active,
-  payload,
-  unitLabel = "kg",
-}: {
-  active?: boolean;
-  payload?: { payload: { date: string; topWeight: number; topWeightReps: number; topSetWeight: number; topSetReps: number; topSetScore: number } }[];
-  unitLabel?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  return (
-    <div className="rounded-xl border border-primary/25 bg-card px-3.5 py-2.5 text-xs shadow-xl">
-      <p className="mb-1.5 text-[10px] text-muted-foreground">{d.date}</p>
-      <p className="text-sm font-bold text-foreground">
-        {d.topWeight} {unitLabel}
-      </p>
-      <p className="mt-0.5 text-primary">
-        {d.topSetReps} reps × {d.topSetWeight} ={" "}
-        <span className="font-bold">
-          {Math.round(d.topSetScore).toLocaleString()}
-        </span>{" "}
-        pts
-      </p>
-    </div>
-  );
-}
-
-function StackedVolumeTooltip({
-  active,
-  payload,
-  label,
-  unitLabel = "kg",
-}: {
-  active?: boolean;
-  payload?: { name: string; value: number; fill: string }[];
-  label?: string;
-  unitLabel?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  const total = payload.reduce((s, p) => s + (p.value || 0), 0);
-  return (
-    <div className="min-w-[150px] rounded-xl border border-border/60 bg-card px-3.5 py-2.5 text-xs shadow-xl">
-      <p className="mb-2 text-[10px] text-muted-foreground">{label}</p>
-      {payload
-        .filter((p) => p.value > 0)
-        .map((p) => (
-          <div key={p.name} className="mb-0.5 flex items-center gap-1.5">
-            <div
-              className="h-[7px] w-[7px] shrink-0 rounded-full"
-              style={{ background: p.fill }}
-            />
-            <span className="flex-1 text-muted-foreground">{p.name}</span>
-            <span className="font-semibold text-foreground">
-              {(p.value / 1000).toFixed(1)}k
-            </span>
-          </div>
-        ))}
-      <div className="mt-1.5 flex justify-between border-t border-border/40 pt-1.5">
-        <span className="text-muted-foreground">Total</span>
-        <span className="font-bold text-foreground">
-          {(total / 1000).toFixed(1)}k {unitLabel}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function MiniVolumeTooltip({
-  active,
-  payload,
-  color,
-  unitLabel = "kg",
-}: {
-  active?: boolean;
-  payload?: { value: number }[];
-  color: string;
-  unitLabel?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border border-border/60 bg-card px-2.5 py-1.5 text-xs shadow-xl">
-      <span style={{ color }} className="font-bold">
-        {(payload[0].value / 1000).toFixed(1)}k {unitLabel}
-      </span>
-    </div>
   );
 }
 
@@ -343,11 +251,6 @@ function SparklineSkeleton() {
     </div>
   );
 }
-
-// ─── Chart theme ─────────────────────────────────────────────────────────────
-
-const GRID_STROKE = "rgba(255,255,255,0.05)";
-const TICK_STYLE = { fill: "rgba(255,255,255,0.4)", fontSize: 10 };
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -811,6 +714,11 @@ export default function ProgressPage() {
           <TabBar active={tab} onChange={setTab} />
         </div>
 
+        {/* AI Progress Insight */}
+        <div className="px-4 pb-4">
+          <ProgressInsightCard />
+        </div>
+
         {/* Content */}
         <div className="px-4">
           <AnimatePresence mode="wait">
@@ -920,32 +828,7 @@ export default function ProgressPage() {
                               <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                                 {strengthMetric === "score" ? "Top Set Score" : `Max Weight (${unitLabel})`}
                               </p>
-                              <ResponsiveContainer width="100%" height={260}>
-                                <LineChart data={strengthData} margin={{ top: 6, right: 16, bottom: 4, left: 0 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
-                                  <XAxis
-                                    dataKey="date"
-                                    tick={TICK_STYLE}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    interval="preserveStartEnd"
-                                  />
-                                  <YAxis tick={TICK_STYLE} axisLine={false} tickLine={false} width={40} />
-                                  <Tooltip
-                                    content={<SingleTooltip unitLabel={unitLabel} />}
-                                    cursor={{ stroke: "rgba(129,140,248,0.25)", strokeWidth: 1, strokeDasharray: "4 3" }}
-                                  />
-                                  <Line
-                                    type="monotone"
-                                    dataKey="displayValue"
-                                    stroke="var(--primary)"
-                                    strokeWidth={2}
-                                    dot={{ r: 3.5, fill: "var(--primary)", strokeWidth: 0 }}
-                                    activeDot={{ r: 5.5, fill: "var(--primary)", stroke: "rgba(129,140,248,0.35)", strokeWidth: 5 }}
-                                    isAnimationActive={false}
-                                  />
-                                </LineChart>
-                              </ResponsiveContainer>
+                              <ProgressCharts.StrengthLineChart strengthData={strengthData} unitLabel={unitLabel} />
                             </div>
 
                             {/* Best stats pills */}
@@ -1029,34 +912,12 @@ export default function ProgressPage() {
                           <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                             Session Volume ({unitLabel})
                           </p>
-                          <ResponsiveContainer width="100%" height={260}>
-                            <BarChart data={categoryVolumeData} margin={{ top: 4, right: 12, bottom: 4, left: 0 }} barCategoryGap="30%">
-                              <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
-                              <XAxis dataKey="date" tick={TICK_STYLE} axisLine={false} tickLine={false} />
-                              <YAxis
-                                tick={TICK_STYLE}
-                                axisLine={false}
-                                tickLine={false}
-                                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                                width={30}
-                              />
-                              <Tooltip
-                                content={<StackedVolumeTooltip unitLabel={unitLabel} />}
-                                cursor={{ fill: "rgba(255,255,255,0.03)" }}
-                              />
-                              {VOLUME_CATEGORY_ORDER.map((cat, i) => (
-                                <Bar
-                                  key={cat}
-                                  dataKey={cat}
-                                  name={cat}
-                                  stackId="a"
-                                  fill={VOLUME_CATEGORY_COLORS[cat]}
-                                  radius={i === VOLUME_CATEGORY_ORDER.length - 1 ? [4, 4, 0, 0] : undefined}
-                                  isAnimationActive={false}
-                                />
-                              ))}
-                            </BarChart>
-                          </ResponsiveContainer>
+                          <ProgressCharts.StackedVolumeBarChart
+                            categoryVolumeData={categoryVolumeData}
+                            unitLabel={unitLabel}
+                            volumeCategoryOrder={VOLUME_CATEGORY_ORDER}
+                            volumeCategoryColors={VOLUME_CATEGORY_COLORS}
+                          />
                         </div>
 
                         {/* Volume summary */}
@@ -1118,24 +979,12 @@ export default function ProgressPage() {
                                 {!hasData ? (
                                   <p className="py-8 text-center text-[10px] text-muted-foreground">No data</p>
                                 ) : (
-                                  <ResponsiveContainer width="100%" height={140}>
-                                    <BarChart data={categoryVolumeData} margin={{ top: 2, right: 4, bottom: 2, left: 4 }} barCategoryGap="20%">
-                                      <CartesianGrid strokeDasharray="2 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                                      <XAxis dataKey="date" tick={false} axisLine={false} tickLine={false} />
-                                      <YAxis
-                                        tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 8 }}
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                                        width={24}
-                                      />
-                                      <Tooltip
-                                        content={<MiniVolumeTooltip color={color} unitLabel={unitLabel} />}
-                                        cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                                      />
-                                      <Bar dataKey={cat} fill={color} radius={[3, 3, 0, 0]} isAnimationActive={false} opacity={0.85} />
-                                    </BarChart>
-                                  </ResponsiveContainer>
+                                  <ProgressCharts.CategoryMiniBarChart
+                                    categoryVolumeData={categoryVolumeData}
+                                    category={cat}
+                                    color={color}
+                                    unitLabel={unitLabel}
+                                  />
                                 )}
                               </div>
                             );

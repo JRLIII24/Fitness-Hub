@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Trophy, Flame, Route } from "lucide-react";
+import { Trophy, Flame } from "lucide-react";
 import type { ChallengeType, CreateChallengeInput } from "@/types/pods";
 
 interface CreateChallengeDialogProps {
@@ -40,16 +40,9 @@ const CHALLENGE_TYPES: {
   {
     key: "consistency",
     label: "Consistency",
-    description: "Workouts + runs completed",
+    description: "Workouts completed",
     unit: "sessions target",
     icon: <Flame className="h-4 w-4" />,
-  },
-  {
-    key: "distance",
-    label: "Distance",
-    description: "Total km run",
-    unit: "km target",
-    icon: <Route className="h-4 w-4" />,
   },
 ];
 
@@ -149,7 +142,7 @@ export function CreateChallengeDialog({
           {/* Type */}
           <div className="space-y-1.5">
             <Label>Challenge type</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {CHALLENGE_TYPES.map((t) => (
                 <button
                   key={t.key}
@@ -216,7 +209,7 @@ export function CreateChallengeDialog({
               step="any"
               value={targetValue}
               onChange={(e) => setTargetValue(e.target.value)}
-              placeholder={`e.g. ${challengeType === "volume" ? "10000" : challengeType === "distance" ? "50" : "5"}`}
+              placeholder={`e.g. ${challengeType === "volume" ? "10000" : "5"}`}
             />
           </div>
 

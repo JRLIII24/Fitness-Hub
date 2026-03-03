@@ -8,11 +8,11 @@
  */
 
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { getAIClient, AI_MODEL } from "@/lib/ai-client";
 
 export interface AISuggestion {
   reasoning: string;
@@ -26,23 +26,18 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function GET() {
   try {
-    // Require auth
+    const ai = getAIClient();
+    if (!ai) return NextResponse.json(null);
+
     const supabase = await createClient();
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
-    // Graceful no-op if API key not configured
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(null);
-    }
-
-    // Rate limit: 5 AI calls per user per day
-    const allowed = rateLimit(`ai:suggest:${user.id}`, DAILY_LIMIT, ONE_DAY_MS);
+    const allowed = await rateLimit(`ai:suggest:${user.id}`, DAILY_LIMIT, ONE_DAY_MS);
     if (!allowed) {
-      return NextResponse.json(null); // Silent — caller falls back to unenriched suggestion
+      return NextResponse.json({ limitReached: true }, { status: 429 });
     }
 
-    // Gather user context
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const [{ data: recentSessions }, { data: profile }] = await Promise.all([
@@ -64,7 +59,6 @@ export async function GET() {
         .single(),
     ]);
 
-    // Build muscle group frequency from recent sessions
     const muscleFrequency: Record<string, number> = {};
     (recentSessions ?? []).forEach((session) => {
       const sets = (session.workout_sets as unknown) as Array<{
@@ -95,38 +89,36 @@ export async function GET() {
       }`,
     ].join("\n");
 
-    // Call Anthropic
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 256,
-      system: `You are a concise, evidence-based fitness coach.
-Given a user's training context, respond with a JSON object only (no markdown, no explanation):
-{
-  "reasoning": "1 sentence: why this workout makes sense today based on their history",
-  "muscle_focus": "primary muscle group to target today (one word)",
-  "intensity_recommendation": "high" | "moderate" | "recovery",
-  "coaching_note": "1 short motivational or tactical tip (max 12 words)"
-}
-Base your answer on muscle balance, recovery needs, and training frequency. Be direct.`,
+    const completion = await ai.chat.completions.create({
+      model: AI_MODEL,
+      response_format: { type: "json_object" },
       messages: [
         {
+          role: "system",
+          content: `You are a concise, evidence-based fitness coach.
+Given a user's training context, provide today's coaching note.
+Base your answer on muscle balance, recovery needs, and training frequency. Be direct.
+Respond with JSON containing exactly these fields:
+- reasoning: 1 sentence on why this workout makes sense today
+- muscle_focus: primary muscle group to target (one word)
+- intensity_recommendation: "high", "moderate", or "recovery"
+- coaching_note: 1 short motivational or tactical tip (max 12 words)`,
+        },
+        {
           role: "user",
-          content: `User training context:\n${contextSummary}\n\nProvide today's coaching note as JSON.`,
+          content: `User training context:\n${contextSummary}\n\nProvide today's coaching note.`,
         },
       ],
     });
 
-    const rawText =
-      message.content[0].type === "text" ? message.content[0].text.trim() : null;
-
-    if (!rawText) return NextResponse.json(null);
-
-    const suggestion = JSON.parse(rawText) as AISuggestion;
+    const suggestion = JSON.parse(completion.choices[0].message.content ?? "null") as AISuggestion;
     return NextResponse.json(suggestion);
   } catch (error) {
     logger.error("AI suggest error:", error);
-    return NextResponse.json(null); // Always fall back gracefully
+    const msg = error instanceof Error ? error.message : "";
+    if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("rate")) {
+      return NextResponse.json({ limitReached: true }, { status: 429 });
+    }
+    return NextResponse.json(null);
   }
 }

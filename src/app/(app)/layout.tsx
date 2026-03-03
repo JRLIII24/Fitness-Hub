@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ThemeApplier } from "@/components/theme-applier";
 import { PageTransition } from "@/components/layout/page-transition";
+import { OfflineBanner } from "@/components/layout/offline-banner";
+import { SplashDismisser } from "@/components/layout/splash-dismisser";
+import { HealthGuard } from "@/components/layout/health-guard";
 
 export default async function AppLayout({
   children,
@@ -21,6 +24,7 @@ export default async function AppLayout({
   return (
     <div className="min-h-svh bg-background">
       <ThemeApplier />
+      <OfflineBanner />
       {/* pb accounts for bottom-nav height (6rem) + device safe-area inset.
           env(safe-area-inset-bottom,0px) is 0 on Android/desktop and up to
           34px on iPhone 14 Pro+, ensuring content is never hidden behind the
@@ -29,6 +33,8 @@ export default async function AppLayout({
         <PageTransition>{children}</PageTransition>
       </main>
       <BottomNav />
+      <SplashDismisser />
+      <HealthGuard />
     </div>
   );
 }

@@ -215,6 +215,8 @@ function startAnimationLoop(get: () => TimerState, set: (partial: Partial<TimerS
         playBeep(timer.exerciseName); // passes name for fallback event on iOS
         triggerHaptic();
         showNotification(timer.exerciseName);
+        import("@/lib/native/live-activity").then((m) => m.stopRestTimerActivity()).catch(() => {});
+        import("@/lib/native/android-timer-notification").then((m) => m.cancelAndroidTimerNotification()).catch(() => {});
         return { ...timer, isRunning: false };
       }
 
@@ -274,6 +276,14 @@ export const useTimerStore = create<TimerState>()(
           isRunning: true,
         };
 
+        // Fire-and-forget native timer (iOS Live Activity / Android notification)
+        import("@/lib/native/live-activity").then((m) =>
+          m.startRestTimerActivity(exerciseName, endTime)
+        ).catch(() => {});
+        import("@/lib/native/android-timer-notification").then((m) =>
+          m.showAndroidTimerNotification(exerciseName, seconds)
+        ).catch(() => {});
+
         // Global timer rule: starting a timer clears/replaces any existing timers.
         set(() => ({
           timers: [newTimer],
@@ -307,6 +317,8 @@ export const useTimerStore = create<TimerState>()(
       },
 
       stopTimer: (timerId: string) => {
+        import("@/lib/native/live-activity").then((m) => m.stopRestTimerActivity()).catch(() => {});
+        import("@/lib/native/android-timer-notification").then((m) => m.cancelAndroidTimerNotification()).catch(() => {});
         set((state) => ({
           timers: state.timers.filter((t) => t.id !== timerId),
         }));

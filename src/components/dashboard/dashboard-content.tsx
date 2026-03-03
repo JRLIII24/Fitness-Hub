@@ -26,6 +26,8 @@ import { SmartLauncherWidget } from "@/components/workout/smart-launcher-widget"
 import { FatigueLevelCard } from "@/components/dashboard/fatigue-level-card";
 import { PodsDashboardCard } from "@/components/pods/pods-dashboard-card";
 import { XpProgressBar } from "@/components/profile/xp-progress-bar";
+import { RecoveryAICard } from "@/components/ai/recovery-ai-card";
+import { WeightLogWidget } from "@/components/dashboard/weight-log-widget";
 
 
 import type { FatigueSnapshot } from "@/lib/fatigue/types";
@@ -121,14 +123,14 @@ function StatPill({
   label: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-border/60 bg-card/40 px-3 py-4 text-center">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-border/60 bg-card/40 px-2 py-4 text-center sm:px-3">
       <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-xl bg-card/70">
         {icon}
       </div>
-      <span className="tabular-nums text-[26px] font-black leading-none text-foreground">
+      <span className="tabular-nums text-[22px] font-black leading-none text-foreground sm:text-[26px]">
         {value}
       </span>
-      <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <span className="mt-0.5 truncate text-[8px] font-semibold uppercase tracking-widest text-muted-foreground sm:text-[9px]">
         {label}
       </span>
     </div>
@@ -266,14 +268,14 @@ function DashboardCardHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between px-5 py-4">
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-card/70">
+    <div className="flex items-center justify-between gap-2 px-5 py-4">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-card/70">
           {icon}
         </div>
-        <span className="text-[13px] font-bold text-foreground">{title}</span>
+        <span className="truncate text-[13px] font-bold text-foreground">{title}</span>
       </div>
-      {action}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -419,29 +421,29 @@ export function DashboardContent({
           </div>
 
           {/* Action buttons */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <Link href="/workout">
-              <Button className="motion-press h-12 w-full justify-center gap-2 rounded-xl text-xs font-bold sm:text-sm">
-                <Play className="h-3.5 w-3.5" />
-                Start Workout
+              <Button className="motion-press h-12 w-full justify-center gap-1.5 rounded-xl text-xs font-bold sm:gap-2 sm:text-sm">
+                <Play className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Workout</span>
               </Button>
             </Link>
             <Link href="/nutrition">
               <Button
                 variant="secondary"
-                className="motion-press h-12 w-full justify-center gap-2 rounded-xl text-xs font-semibold sm:text-sm"
+                className="motion-press h-12 w-full justify-center gap-1.5 rounded-xl text-xs font-semibold sm:gap-2 sm:text-sm"
               >
-                <Apple className="h-3.5 w-3.5" />
-                Log Nutrition
+                <Apple className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Nutrition</span>
               </Button>
             </Link>
             <Link href="/history/progress">
               <Button
                 variant="secondary"
-                className="motion-press h-12 w-full justify-center gap-2 rounded-xl text-xs font-semibold sm:text-sm"
+                className="motion-press h-12 w-full justify-center gap-1.5 rounded-xl text-xs font-semibold sm:gap-2 sm:text-sm"
               >
-                <TrendingUp className="h-3.5 w-3.5" />
-                Progress
+                <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Progress</span>
               </Button>
             </Link>
           </div>
@@ -457,6 +459,8 @@ export function DashboardContent({
         <div className="space-y-5">
           <SmartLauncherWidget />
           <FatigueLevelCard initialSnapshot={fatigueSnapshot} />
+          <RecoveryAICard />
+          <WeightLogWidget />
 
           {/* 90-Day Path */}
           <SectionCard>
@@ -613,7 +617,7 @@ export function DashboardContent({
                   </div>
 
                   {/* Micro nutrients */}
-                  <div className="grid grid-cols-4 gap-2 rounded-xl border border-border/50 bg-card/30 p-3">
+                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/50 bg-card/30 p-3 sm:grid-cols-4">
                     {[
                       { label: "Fiber", value: `${Math.round(todayFiber)}g`, colorClass: "text-emerald-400" },
                       { label: "Sugar", value: `${Math.round(todaySugar)}g`, colorClass: "text-rose-400" },
@@ -663,8 +667,8 @@ export function DashboardContent({
               {lastWorkout ? (
                 <>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <p className="text-[15px] font-black text-foreground">{lastWorkout.name}</p>
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="truncate text-[15px] font-black text-foreground">{lastWorkout.name}</p>
                       <p className="text-[11px] text-muted-foreground">
                         {formatDate(lastWorkout.started_at)}
                       </p>

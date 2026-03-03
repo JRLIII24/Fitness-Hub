@@ -28,7 +28,6 @@ function formatChallengeDate(dateStr: string) {
 
 function ChallengeTypeIcon({ type }: { type: PodChallenge["challenge_type"] }) {
   if (type === "volume") return <Trophy className="h-3.5 w-3.5" />;
-  if (type === "distance") return <span className="text-xs">🏃</span>;
   return <span className="text-xs">🔥</span>;
 }
 
@@ -109,7 +108,7 @@ function ChallengesSection({ podId, currentUserId }: { podId: string; currentUse
                         <Calendar className="h-3 w-3" />
                         {formatChallengeDate(challenge.start_date)} – {formatChallengeDate(challenge.end_date)}
                         {challenge.target_value && (
-                          <> · target: {challenge.target_value} {challenge.challenge_type === "volume" ? "kg" : challenge.challenge_type === "distance" ? "km" : "sessions"}</>
+                          <> · target: {challenge.target_value} {challenge.challenge_type === "volume" ? "kg" : "sessions"}</>
                         )}
                       </p>
                     </div>

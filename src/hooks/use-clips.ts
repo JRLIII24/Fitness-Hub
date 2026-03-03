@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { uuid } from "@/lib/uuid";
 import { useSupabase } from "./use-supabase";
 import {
   trackClipCommentPosted,
@@ -351,7 +352,7 @@ export function useClips(userId: string | null, mode: ClipFeedMode = "discover")
       }
 
       const ext = videoFile.name.split(".").pop() ?? "mp4";
-      const clipId = crypto.randomUUID();
+      const clipId = uuid();
       const path = `${userId}/${clipId}.${ext}`;
 
       const { error: uploadError } = await supabase.storage

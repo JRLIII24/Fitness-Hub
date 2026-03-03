@@ -24,7 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AccentColorPicker } from "@/components/ui/accent-color-picker";
-import { SignOutButton } from "./sign-out-button";
+import { validateUsernameComplete } from "@/lib/username-validation";
 import type { Database } from "@/types/database";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -234,6 +234,15 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
         return;
       }
       parsedHeight = parsedHeightCm;
+    }
+
+    if (username.trim()) {
+      const usernameResult = await validateUsernameComplete(username.trim(), userId);
+      if (!usernameResult.isValid) {
+        toast.error(usernameResult.error ?? "Invalid username");
+        setIsSaving(false);
+        return;
+      }
     }
 
     const updates = {
@@ -620,39 +629,6 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
         </CardContent>
       </Card>
 
-      {/* Account Card */}
-      <Card className="border-border/60">
-        <CardHeader>
-          <CardTitle className="text-base">Account</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Email address</span>
-            <span className="text-sm font-medium">{email}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Danger Zone */}
-      <Card className="border-destructive/40">
-        <CardHeader>
-          <CardTitle className="text-base text-destructive">
-            Danger Zone
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Separator className="bg-destructive/20" />
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Sign out</p>
-              <p className="text-xs text-muted-foreground">
-                Sign out of your account on this device.
-              </p>
-            </div>
-            <SignOutButton />
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

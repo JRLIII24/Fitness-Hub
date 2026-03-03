@@ -76,7 +76,7 @@ export interface PodDetail extends PodWithMembers {
 
 // ── Pod Challenges ────────────────────────────────────────────────────────────
 
-export type ChallengeType = 'volume' | 'consistency' | 'distance';
+export type ChallengeType = 'volume' | 'consistency';
 
 export interface PodChallenge {
   id: string;
@@ -94,17 +94,16 @@ export interface LeaderboardEntry {
   user_id: string;
   display_name: string | null;
   avatar_url: string | null;
-  /** Score in natural units: kg (volume), sessions (consistency), km (distance) */
+  /** Score in natural units: kg (volume), sessions (consistency) */
   score: number;
   rank: number;
   workouts_cnt: number;
-  runs_cnt: number;
 }
 
 export interface ChallengeLeaderboard {
   challenge: PodChallenge;
   entries: LeaderboardEntry[];
-  score_unit: 'kg' | 'sessions' | 'km';
+  score_unit: 'kg' | 'sessions';
   is_active: boolean;
 }
 

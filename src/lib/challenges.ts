@@ -20,10 +20,9 @@ import type {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function scoreUnit(type: PodChallenge['challenge_type']): 'kg' | 'sessions' | 'km' {
-  if (type === 'volume')      return 'kg';
-  if (type === 'consistency') return 'sessions';
-  return 'km';
+function scoreUnit(type: PodChallenge['challenge_type']): 'kg' | 'sessions' {
+  if (type === 'volume') return 'kg';
+  return 'sessions';
 }
 
 function isChallengeActive(challenge: PodChallenge): boolean {
@@ -123,7 +122,6 @@ export async function getPodChallengeLeaderboard(
     score:        Number(row.score),
     rank:         Number(row.rank),
     workouts_cnt: row.workouts_cnt,
-    runs_cnt:     row.runs_cnt,
   }));
 
   return {

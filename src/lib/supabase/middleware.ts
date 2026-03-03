@@ -65,13 +65,20 @@ export async function updateSession(request: NextRequest) {
 
   // Handle onboarding flow for authenticated users
   if (user) {
+    const onboardedCookie = request.cookies.get("fh_onboarded")?.value;
+    const isOnOnboardingPage = request.nextUrl.pathname.startsWith("/onboarding");
+
+    // If cookie confirms onboarding is done, skip the profile query entirely
+    if (onboardedCookie === "1") {
+      return supabaseResponse;
+    }
+
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("onboarding_completed")
       .eq("id", user.id)
       .maybeSingle();
 
-    const isOnOnboardingPage = request.nextUrl.pathname.startsWith("/onboarding");
     const isApiPath = request.nextUrl.pathname.startsWith("/api/");
     const profileMissing = !profile && !profileError;
 
@@ -96,6 +103,17 @@ export async function updateSession(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);
+    }
+
+    // Cache onboarding status to skip future profile queries
+    if (profile?.onboarding_completed) {
+      supabaseResponse.cookies.set("fh_onboarded", "1", {
+        maxAge: 3600,
+        path: "/",
+        sameSite: "lax" as const,
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+      });
     }
   }
 

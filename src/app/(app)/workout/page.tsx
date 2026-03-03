@@ -269,11 +269,10 @@ function makeCustomExercise(name: string, muscleGroup: MuscleGroup, equipment: s
 
 /** Returns true when viewport width ≤ 639 px (Tailwind `sm` breakpoint). */
 function useIsSmallScreen(): boolean {
-  const [isSmall, setIsSmall] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(max-width: 639px)").matches : false
-  );
+  const [isSmall, setIsSmall] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
+    setIsSmall(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsSmall(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);

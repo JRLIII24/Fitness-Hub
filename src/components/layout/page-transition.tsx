@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { motionDurations, motionEasings } from "@/lib/motion";
@@ -7,6 +8,16 @@ import { motionDurations, motionEasings } from "@/lib/motion";
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const prefersReducedMotion = useReducedMotion();
+  const isHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
+  // Keep first render deterministic between server and client.
+  if (!isHydrated) {
+    return <>{children}</>;
+  }
 
   return (
     <AnimatePresence mode="wait" initial={false}>

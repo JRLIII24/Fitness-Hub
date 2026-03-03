@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
+import { uuid } from "@/lib/uuid";
 
 interface OFFSearchProduct {
   product_name?: string;
@@ -181,7 +182,7 @@ function normalizeOFFProduct(product: OFFSearchProduct): NormalizedFoodItem | nu
   }
 
   return {
-    id: `off-${product.code ?? crypto.randomUUID()}`,
+    id: `off-${product.code ?? uuid()}`,
     barcode: product.code ?? null,
     name,
     brand,

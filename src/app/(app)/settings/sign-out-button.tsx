@@ -1,12 +1,23 @@
 "use client";
 
+import type { ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
-export function SignOutButton() {
+type SignOutButtonProps = {
+  label?: string;
+  variant?: ComponentProps<typeof Button>["variant"];
+  className?: string;
+};
+
+export function SignOutButton({
+  label = "Sign Out",
+  variant = "destructive",
+  className,
+}: SignOutButtonProps = {}) {
   const router = useRouter();
 
   async function handleSignOut() {
@@ -23,9 +34,14 @@ export function SignOutButton() {
   }
 
   return (
-    <Button type="button" variant="destructive" onClick={handleSignOut}>
+    <Button
+      type="button"
+      variant={variant}
+      onClick={handleSignOut}
+      className={className}
+    >
       <LogOut className="mr-2 size-4" />
-      Sign Out
+      {label}
     </Button>
   );
 }

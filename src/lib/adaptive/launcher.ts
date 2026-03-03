@@ -290,6 +290,10 @@ export async function enrichWithAI(
   baseUrl: string
 ): Promise<LauncherPrediction> {
   try {
+    if (!process.env.GEMINI_API_KEY) {
+      return prediction;
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
 

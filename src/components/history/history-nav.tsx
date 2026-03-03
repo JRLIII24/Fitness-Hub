@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGroup, motion } from "framer-motion";
-import { CalendarDays, TrendingUp } from "lucide-react";
+import { CalendarDays, TrendingUp, Trophy, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/history", label: "Calendar", icon: CalendarDays },
   { href: "/history/progress", label: "Progress", icon: TrendingUp },
+  { href: "/history/prs", label: "PRs", icon: Trophy },
+  { href: "/history/stats", label: "Stats", icon: BarChart3 },
 ] as const;
 
 export function HistoryNav() {
@@ -23,7 +25,7 @@ export function HistoryNav() {
     <LayoutGroup id="history-nav">
       <nav
         aria-label="History sections"
-        className="inline-flex items-center gap-1 rounded-xl border border-border/60 bg-card/50 p-1"
+        className="flex max-w-full items-center gap-1 overflow-x-auto scrollbar-none rounded-xl border border-border/60 bg-card/50 p-1"
       >
         {TABS.map(({ href, label, icon: Icon }) => {
           const active = isActive(href);
@@ -32,12 +34,12 @@ export function HistoryNav() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className="block"
+              className="block shrink-0"
             >
               <motion.span
                 whileTap={{ scale: 0.95 }}
                 className={cn(
-                  "relative flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors",
+                  "relative flex items-center gap-1 rounded-lg px-2.5 py-2 text-[12px] font-semibold transition-colors sm:gap-1.5 sm:px-3.5 sm:text-[13px]",
                   active ? "text-background" : "text-muted-foreground hover:text-foreground"
                 )}
               >

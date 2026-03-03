@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/page-header";
 import { HistoryNav } from "@/components/history/history-nav";
+import { WorkoutHeatmap } from "@/components/history/workout-heatmap";
 import {
   Dialog,
   DialogContent,
@@ -231,6 +232,8 @@ export default function HistoryPage() {
         />
         <HistoryNav />
       </div>
+
+      <WorkoutHeatmap sessionsByDay={sessionsByDay} />
 
       <div className="grid gap-4 lg:grid-cols-[22rem_minmax(0,1fr)]">
         <Card className="h-fit max-w-3xl">

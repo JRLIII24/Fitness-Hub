@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Trophy, Flame, Route } from 'lucide-react';
+import { Loader2, Trophy, Flame } from 'lucide-react';
 import { useUnitPreferenceStore } from '@/stores/unit-preference-store';
 import type { ChallengeLeaderboard, LeaderboardEntry } from '@/types/pods';
 
@@ -18,7 +18,7 @@ interface PodLeaderboardProps {
 export function PodLeaderboard({ podId }: PodLeaderboardProps) {
     const { leaderboards, loading, error } = usePodLeaderboard(podId);
     const unitPreference = useUnitPreferenceStore((state) => state.preference);
-    const [activeTab, setActiveTab] = useState<'volume' | 'consistency' | 'distance'>('volume');
+    const [activeTab, setActiveTab] = useState<'volume' | 'consistency'>('volume');
 
     if (loading) {
         return (
@@ -50,7 +50,6 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
 
     const volumeLeaderboard = leaderboards.volume;
     const consistencyLeaderboard = leaderboards.consistency;
-    const distanceLeaderboard = leaderboards.distance;
 
     return (
         <Card className="w-full shadow-md border-border/50 bg-background/50 backdrop-blur-sm">
@@ -66,12 +65,12 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                     defaultValue="volume"
                     value={activeTab}
                     onValueChange={(v) => {
-                        if (v === 'volume' || v === 'consistency' || v === 'distance') {
+                        if (v === 'volume' || v === 'consistency') {
                             setActiveTab(v);
                         }
                     }}
                 >
-                    <TabsList className="grid w-full grid-cols-3 mb-6">
+                    <TabsList className="grid w-full grid-cols-2 mb-6">
                         <TabsTrigger value="volume" className="flex items-center gap-1.5">
                             <Trophy className="h-4 w-4" />
                             <span className="hidden sm:inline">Volume</span>
@@ -79,10 +78,6 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                         <TabsTrigger value="consistency" className="flex items-center gap-1.5">
                             <Flame className="h-4 w-4" />
                             <span className="hidden sm:inline">Consistency</span>
-                        </TabsTrigger>
-                        <TabsTrigger value="distance" className="flex items-center gap-1.5">
-                            <Route className="h-4 w-4" />
-                            <span className="hidden sm:inline">Distance</span>
                         </TabsTrigger>
                     </TabsList>
 
@@ -99,14 +94,6 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                             leaderboard={consistencyLeaderboard}
                             emptyMessage="No Consistency challenge active or no data yet."
                             icon={<Flame className="h-4 w-4 text-orange-500" />}
-                            unitPreference={unitPreference}
-                        />
-                    </TabsContent>
-                    <TabsContent value="distance" className="mt-0">
-                        <LeaderboardList
-                            leaderboard={distanceLeaderboard}
-                            emptyMessage="No Distance challenge active or no data yet."
-                            icon={<Route className="h-4 w-4 text-blue-500" />}
                             unitPreference={unitPreference}
                         />
                     </TabsContent>
@@ -169,9 +156,7 @@ function LeaderboardRow({
     const convertedScore =
         isImperial && unit === "kg"
             ? entry.score * 2.20462
-            : isImperial && unit === "km"
-              ? entry.score * 0.621371
-              : entry.score;
+            : entry.score;
 
     const roundedScore = Math.round(convertedScore * 10) / 10;
     const formattedScore = Number.isInteger(roundedScore)
@@ -184,18 +169,16 @@ function LeaderboardRow({
     const displayUnit =
         isImperial && unit === "kg"
             ? "lbs"
-            : isImperial && unit === "km"
-              ? "mi"
-              : unit;
+            : unit;
 
     const getRankBadgeContent = (rank: number) => {
         switch (rank) {
             case 1:
-                return '🥇 1st';
+                return '1st';
             case 2:
-                return '🥈 2nd';
+                return '2nd';
             case 3:
-                return '🥉 3rd';
+                return '3rd';
             default:
                 return `${rank}th`;
         }
@@ -254,10 +237,8 @@ function LeaderboardRow({
                     </Avatar>
                     <div className="flex flex-col">
                         <span className="font-medium text-sm leading-none">{entry.display_name || 'Unknown User'}</span>
-                        <span className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
-                            <span>{entry.workouts_cnt} workouts</span>
-                            <span className="w-1 h-1 rounded-full bg-border"></span>
-                            <span>{entry.runs_cnt} runs</span>
+                        <span className="text-xs text-muted-foreground mt-1.5">
+                            {entry.workouts_cnt} workouts
                         </span>
                     </div>
                 </div>

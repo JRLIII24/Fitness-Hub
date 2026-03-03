@@ -1,12 +1,15 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { Exercise, WorkoutExercise, WorkoutSet, ActiveWorkout } from "@/types/workout";
+import { idbStorage } from "@/lib/idb-storage";
 import { createClient } from "@/lib/supabase/client";
+import { uuid } from "@/lib/uuid";
 
 interface WorkoutState {
   activeWorkout: ActiveWorkout | null;
   isWorkoutActive: boolean;
   editingWorkoutId: string | null;
+  _isHydrated: boolean;
 
   // Actions
   startWorkout: (name: string, templateId?: string) => Promise<void>;
@@ -40,7 +43,7 @@ interface WorkoutState {
 }
 
 function generateId() {
-  return crypto.randomUUID();
+  return uuid();
 }
 
 function createEmptySet(exerciseId: string, setNumber: number): WorkoutSet {
@@ -66,6 +69,7 @@ export const useWorkoutStore = create<WorkoutState>()(
       activeWorkout: null,
       isWorkoutActive: false,
       editingWorkoutId: null,
+      _isHydrated: false,
 
       startWorkout: async (name: string, templateId?: string) => {
         const workoutId = generateId();
@@ -352,6 +356,10 @@ export const useWorkoutStore = create<WorkoutState>()(
     }),
     {
       name: "fit-hub-workout",
+      storage: createJSONStorage(() => idbStorage),
+      onRehydrateStorage: () => () => {
+        useWorkoutStore.setState({ _isHydrated: true });
+      },
     }
   )
 );

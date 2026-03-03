@@ -27,6 +27,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
+import { rateLimit } from "@/lib/rate-limit";
 
 const VALID_SORTS = new Set(['save_count', 'trending', 'newest', 'rating']);
 const MAX_PAGE_SIZE = 50;
@@ -38,6 +39,15 @@ export async function GET(request: NextRequest) {
     // ── Auth ────────────────────────────────────────────────────────────────
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
+
+    // ── Rate limit: 30 requests per minute per user ──────────────────────────
+    const rlAllowed = await rateLimit(`discover:${user.id}`, 30, 60_000);
+    if (!rlAllowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded" },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
 
     // ── Parse & validate query params ───────────────────────────────────────
     const sp = request.nextUrl.searchParams;

@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# capacitor native projects (regenerated via `npx cap add`)
+/ios
+/android
+
+# sentry
+.sentryclirc

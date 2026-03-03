@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
 
 const createChallengeSchema = z.object({
   name: z.string().trim().min(2).max(100),
-  challenge_type: z.enum(["volume", "consistency", "distance"]),
+  challenge_type: z.enum(["volume", "consistency"]),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
   target_value: z.number().positive().nullable().optional(),

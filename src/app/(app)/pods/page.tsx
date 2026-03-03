@@ -89,9 +89,9 @@ export default function PodsPage() {
               onClick={() => router.push(`/pods/${pod.id}`)}
             >
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-base">{pod.name}</CardTitle>
-                  <Badge variant="secondary" className="text-xs">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="min-w-0 truncate text-base">{pod.name}</CardTitle>
+                  <Badge variant="secondary" className="shrink-0 text-xs">
                     {pod.member_count} {pod.member_count === 1 ? "member" : "members"}
                   </Badge>
                 </div>

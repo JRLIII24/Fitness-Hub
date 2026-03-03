@@ -25,6 +25,7 @@ import {
   trackNutritionCatchupNudgeShown,
 } from "@/lib/retention-events";
 import { FoodLogCard } from "@/components/nutrition/food-log-card";
+import { NutritionAICard } from "@/components/ai/nutrition-ai-card";
 import { SendMealDialog } from "@/components/social/send-meal-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { MacroRing } from "@/components/ui/macro-ring";
@@ -633,6 +634,8 @@ export default function NutritionPage() {
           </div>
         </div>
       </section>
+
+      <NutritionAICard />
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">

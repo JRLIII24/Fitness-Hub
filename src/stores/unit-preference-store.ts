@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { kgToLbs, KM_TO_MI } from "@/lib/units";
+import { kgToLbs, KM_TO_MI, CM_TO_INCHES, MI_TO_KM, M_TO_FT } from "@/lib/units";
 
 type UnitPreference = "metric" | "imperial";
 
@@ -56,7 +56,7 @@ export const useUnitPreferenceStore = create<UnitPreferenceState>()(
       formatHeight: (cm: number) => {
         const state = get();
         if (state.preference === "imperial") {
-          const inches = cm * 0.3937;
+          const inches = cm * CM_TO_INCHES;
           return `${Math.round(inches * 10) / 10} inches`;
         }
         return `${Math.round(cm)} cm`;
@@ -75,7 +75,7 @@ export const useUnitPreferenceStore = create<UnitPreferenceState>()(
       formatPace: (secPerKm: number) => {
         if (secPerKm <= 0) return "--:--";
         const state = get();
-        const totalSec = state.preference === "imperial" ? secPerKm * 1.60934 : secPerKm;
+        const totalSec = state.preference === "imperial" ? secPerKm * MI_TO_KM : secPerKm;
         const min = Math.floor(totalSec / 60);
         const sec = Math.round(totalSec % 60);
         const label = state.preference === "imperial" ? "/mi" : "/km";
@@ -85,7 +85,7 @@ export const useUnitPreferenceStore = create<UnitPreferenceState>()(
       formatElevation: (meters: number) => {
         const state = get();
         if (state.preference === "imperial") {
-          const ft = meters * 3.28084;
+          const ft = meters * M_TO_FT;
           return `${Math.round(ft)} ft`;
         }
         return `${Math.round(meters)} m`;

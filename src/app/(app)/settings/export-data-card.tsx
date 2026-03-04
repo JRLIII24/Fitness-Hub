@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { format, formatDuration, intervalToDuration } from "date-fns";
+import { format } from "date-fns";
 import { DateRange } from "react-day-picker";
-import { KG_TO_LBS } from "@/lib/units";
 import {
     Download,
     FileSpreadsheet,
@@ -17,8 +16,6 @@ import {
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { generateProgressPDF, type PDFReportData } from "@/lib/pdf-export";
-import { createClient } from "@/lib/supabase/client";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { cn } from "@/lib/utils";
 
@@ -49,11 +46,7 @@ export function ExportDataCard() {
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [loading, setLoading] = useState<"csv" | "pdf" | null>(null);
     const [status, setStatus] = useState<Status>(null);
-    const { preference, unitLabel } = useUnitPreferenceStore();
-
-    const volumeFactor = preference === "imperial" ? KG_TO_LBS : 1;
-    const toDisplayWeight = (kg: number) => Math.round(kg * volumeFactor * 10) / 10;
-    const toDisplayVolumeValue = (kgVolume: number) => kgVolume * volumeFactor;
+    const { preference } = useUnitPreferenceStore();
 
     const rangeLabel = dateRange?.from
         ? dateRange.to
@@ -83,154 +76,33 @@ export function ExportDataCard() {
     };
 
     const handleExportPdf = async () => {
-        const supabase = createClient();
+        const body: Record<string, string> = { unitPreference: preference };
+        if (dateRange?.from) body.start = dateRange.from.toISOString();
+        if (dateRange?.to) body.end = dateRange.to.toISOString();
 
-        // ── 1. Get authenticated user ─────────────────────────────────────────
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Not logged in.");
-
-        // ── 2. Fetch completed sessions ───────────────────────────────────────
-        let sessionsQuery = supabase
-            .from("workout_sessions")
-            .select("id, name, started_at, completed_at, duration_seconds, total_volume_kg")
-            .eq("user_id", user.id)
-            .eq("status", "completed")
-            .order("started_at", { ascending: false });
-
-        if (dateRange?.from) sessionsQuery = sessionsQuery.gte("started_at", dateRange.from.toISOString());
-        if (dateRange?.to) sessionsQuery = sessionsQuery.lte("started_at", dateRange.to.toISOString());
-
-        const { data: sessions, error: sessErr } = await sessionsQuery;
-        if (sessErr) throw new Error("Failed to load sessions.");
-        if (!sessions?.length) throw new Error("No completed workouts found in this date range.");
-
-        // ── 3. Fetch sets with exercise names for all sessions ─────────────────
-        const sessionIds = sessions.map((s) => s.id);
-        const { data: sets, error: setsErr } = await supabase
-            .from("workout_sets")
-            .select("session_id, reps, weight_kg, set_type, exercises(name, muscle_group)")
-            .in("session_id", sessionIds)
-            .order("sort_order", { ascending: true });
-
-        if (setsErr) throw new Error("Failed to load set data.");
-
-        // ── 4. Group sets by session, build exercise summaries ─────────────────
-        type ExSummary = { name: string; group: string; sets: { w: number; r: number }[] };
-        const setsBySession = new Map<string, Map<string, ExSummary>>();
-
-        for (const set of sets ?? []) {
-            const exName = (set.exercises as any)?.name ?? "Unknown Exercise";
-            const exGroup = (set.exercises as any)?.muscle_group ?? "";
-            if (!setsBySession.has(set.session_id)) setsBySession.set(set.session_id, new Map());
-            const exMap = setsBySession.get(set.session_id)!;
-            if (!exMap.has(exName)) exMap.set(exName, { name: exName, group: exGroup, sets: [] });
-            if (set.weight_kg != null) {
-                exMap.get(exName)!.sets.push({ w: set.weight_kg, r: set.reps ?? 0 });
-            }
-        }
-
-        // ── 5. Build strength chart sparklines from all set data ───────────────
-        const prMap = new Map<string, {
-            name: string; group: string;
-            sessionData: Map<string, number>; // session_id → best score
-        }>();
-
-        for (const set of sets ?? []) {
-            const exName = (set.exercises as any)?.name;
-            if (!exName || set.weight_kg == null) continue;
-            const score = (set.weight_kg * volumeFactor) * (set.reps ?? 1);
-            if (!prMap.has(exName)) {
-                prMap.set(exName, {
-                    name: exName,
-                    group: (set.exercises as any)?.muscle_group ?? "",
-                    sessionData: new Map(),
-                });
-            }
-            const ex = prMap.get(exName)!;
-            const cur = ex.sessionData.get(set.session_id) ?? 0;
-            if (score > cur) ex.sessionData.set(set.session_id, score);
-        }
-
-        // Build sparklines (session index as x-axis)
-        const strengthCharts: PDFReportData["strengthCharts"] = [...prMap.values()]
-            .map((ex) => {
-                // Order by session date using the sessions array
-                const ordered = sessions
-                    .filter((s) => ex.sessionData.has(s.id))
-                    .map((s) => ({ date: format(new Date(s.started_at), "MMM d"), value: Math.round(ex.sessionData.get(s.id)!) }));
-                const first = ordered[0]?.value ?? 0;
-                const last = ordered[ordered.length - 1]?.value ?? 0;
-                const trend = first > 0 ? ((last - first) / first) * 100 : 0;
-                return { name: ex.name, muscleGroup: ex.group, dataPoints: ordered, trend, unitLabel };
-            })
-            .filter((c) => c.dataPoints.length >= 2)
-            .sort((a, b) => Math.abs(b.trend) - Math.abs(a.trend))
-            .slice(0, 6);
-
-        // ── 6. Build personal records ──────────────────────────────────────────
-        const personalRecords: PDFReportData["personalRecords"] = [...prMap.values()]
-            .map((ex) => {
-                let bestScore = 0;
-                let bestW = 0, bestR = 0;
-                let bestDate = "";
-                for (const set of sets ?? []) {
-                    if ((set.exercises as any)?.name !== ex.name || set.weight_kg == null) continue;
-                    const score = (set.weight_kg * volumeFactor) * (set.reps ?? 1);
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestW = toDisplayWeight(set.weight_kg);
-                        bestR = set.reps ?? 0;
-                        // find session date
-                        const sess = sessions.find((s) => s.id === set.session_id);
-                        bestDate = sess ? format(new Date(sess.started_at), "MMM d, yyyy") : "";
-                    }
-                }
-                return { name: ex.name, muscleGroup: ex.group, bestWeight: bestW, bestReps: bestR, date: bestDate };
-            })
-            .filter((pr) => pr.bestWeight > 0)
-            .sort((a, b) => b.bestWeight * b.bestReps - a.bestWeight * a.bestReps)
-            .slice(0, 15);
-
-        // ── 7. Build session summaries for the PDF ─────────────────────────────
-        const sessionSummaries = sessions.slice(0, 20).map((s) => {
-            const exMap = setsBySession.get(s.id);
-            const exercises = exMap
-                ? [...exMap.values()].map((ex) => {
-                    const maxW = Math.max(...ex.sets.map((st) => st.w));
-                    return `${ex.name}: ${ex.sets.length} set${ex.sets.length !== 1 ? "s" : ""} · up to ${toDisplayWeight(maxW)} ${unitLabel}`;
-                })
-                : [];
-
-            let durationStr = "";
-            if (s.duration_seconds) {
-                const dur = intervalToDuration({ start: 0, end: s.duration_seconds * 1000 });
-                durationStr = formatDuration(dur, { format: ["hours", "minutes"] }) || `${s.duration_seconds}s`;
-            }
-
-            return {
-                name: s.name || "Unnamed Workout",
-                date: format(new Date(s.started_at), "EEEE, MMM d, yyyy"),
-                time: format(new Date(s.started_at), "h:mm a"),
-                duration: durationStr,
-                volume: s.total_volume_kg
-                    ? `${Math.round(toDisplayVolumeValue(s.total_volume_kg)).toLocaleString()} ${unitLabel} total`
-                    : null,
-                exercises,
-            };
+        const response = await fetch("/api/export/pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
         });
 
-        await generateProgressPDF({
-            userName: user.email?.split("@")[0] ?? "Athlete",
-            reportDate: new Date(),
-            totalSessions: sessions.length,
-            totalPRs: personalRecords.length,
-            avgVolume: toDisplayVolumeValue(
-                sessions.reduce((s, r) => s + (r.total_volume_kg ?? 0), 0) / sessions.length
-            ),
-            strengthCharts,
-            personalRecords,
-            sessionSummaries,
-        });
+        if (response.status === 404) {
+            const data = await response.json();
+            throw new Error(data.error || "No completed workouts found in this date range.");
+        }
+        if (!response.ok) throw new Error("Server error — please try again.");
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const dateStr =
+            dateRange?.from && dateRange?.to
+                ? `${format(dateRange.from, "yyyy-MM-dd")}_to_${format(dateRange.to, "yyyy-MM-dd")}`
+                : "all_time";
+        a.download = `fithub_progress_${dateStr}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
     const handleExport = async (formatType: "csv" | "pdf") => {

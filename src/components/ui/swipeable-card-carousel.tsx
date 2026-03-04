@@ -78,7 +78,7 @@ export function SwipeableCardCarousel({ children, className }: SwipeableCardCaro
             onClick={() => snapTo(i)}
             className={cn(
               "h-1.5 rounded-full transition-all duration-300",
-              i === activeIndex ? "w-5 bg-primary" : "w-1.5 bg-border"
+              i === activeIndex ? "w-5 bg-[var(--phase-current-accent,var(--primary))] shadow-[0_0_6px_var(--phase-current-glow,transparent)]" : "w-1.5 bg-border/60"
             )}
             aria-label={`Go to card ${i + 1}`}
           />

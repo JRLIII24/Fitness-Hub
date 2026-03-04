@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -12,8 +12,11 @@ import { StepHeight } from "@/components/onboarding/step-height";
 import { StepWeight } from "@/components/onboarding/step-weight";
 import { StepDob } from "@/components/onboarding/step-dob";
 import { StepGender } from "@/components/onboarding/step-gender";
+import { StepEquipment } from "@/components/onboarding/step-equipment";
+import { StepExperience } from "@/components/onboarding/step-experience";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 function isUserMissingFromJwtError(error: unknown): boolean {
   const e = (error ?? {}) as { message?: string };
@@ -33,6 +36,7 @@ export default function OnboardingPage() {
     updateData,
     nextStep,
     prevStep,
+    canProceed,
     submit,
     loading,
     progress,
@@ -196,9 +200,66 @@ export default function OnboardingPage() {
             key="gender"
             selected={data.gender}
             onSelect={(gender) => updateData({ gender })}
-            onSubmit={submit}
-            loading={loading}
+            onSubmit={handleNext}
+            loading={false}
           />
+        )}
+
+        {currentStep === 6 && (
+          <motion.div
+            key="equipment"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col items-center justify-center min-h-screen px-4 py-24"
+          >
+            <div className="max-w-md w-full space-y-8">
+              <StepEquipment
+                selected={data.equipmentAvailable}
+                onChange={(val) => updateData({ equipmentAvailable: val })}
+              />
+              <Button
+                onClick={handleNext}
+                size="lg"
+                className="w-full text-base font-semibold"
+                disabled={!canProceed()}
+              >
+                Continue
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
+        {currentStep === 7 && (
+          <motion.div
+            key="experience"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col items-center justify-center min-h-screen px-4 py-24"
+          >
+            <div className="max-w-md w-full space-y-8">
+              <StepExperience
+                selected={data.experienceLevel}
+                onChange={(val) => updateData({ experienceLevel: val })}
+              />
+              <div className="space-y-4">
+                <Button
+                  onClick={submit}
+                  size="lg"
+                  className="w-full text-base font-semibold"
+                  disabled={!canProceed() || loading}
+                >
+                  {loading ? "Setting up your profile..." : "Complete Setup"}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  By continuing, you agree to our Terms of Service and Privacy Policy
+                </p>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

@@ -13,6 +13,16 @@ interface SyncQueueDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<SyncQueueDB>> | null = null;
 
+/** Exponential backoff with jitter: base 1s, max 5min */
+export function getBackoffMs(attempt: number): number {
+    const baseMs = 1000;
+    const maxMs = 5 * 60 * 1000;
+    const exponential = Math.min(maxMs, baseMs * Math.pow(2, attempt - 1));
+    // Add ±25% jitter
+    const jitter = exponential * (0.75 + Math.random() * 0.5);
+    return Math.round(jitter);
+}
+
 function getDB() {
     if (!dbPromise && typeof window !== 'undefined') {
         dbPromise = openDB<SyncQueueDB>('AppOfflineQueue', 1, {
@@ -56,6 +66,14 @@ export async function triggerSync() {
             // Unknown type — remove stale entry
             await db.delete('mutations', mutation.id);
             continue;
+        }
+
+        // Exponential backoff: skip if not enough time has passed since last attempt
+        if (mutation.attempts > 0 && mutation.lastAttemptAt) {
+            const backoffMs = getBackoffMs(mutation.attempts);
+            if (Date.now() - mutation.lastAttemptAt < backoffMs) {
+                continue; // Not ready for retry yet
+            }
         }
 
         try {

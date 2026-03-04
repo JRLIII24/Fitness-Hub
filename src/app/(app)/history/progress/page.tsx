@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HistoryNav } from "@/components/history/history-nav";
-import { generateProgressPDF } from "@/lib/pdf-export";
+// pdf-export loaded dynamically in handleExportPDF to reduce bundle
 import { ProgressInsightCard } from "@/components/ai/progress-insight-card";
 
 const ProgressCharts = {
@@ -559,6 +559,7 @@ export default function ProgressPage() {
   const handleExportPDF = async () => {
     try {
       setIsExporting(true);
+      const { generateProgressPDF } = await import("@/lib/pdf-export");
       await generateProgressPDF({
         userName: "Athlete",
         reportDate: new Date(),

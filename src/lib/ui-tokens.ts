@@ -19,3 +19,9 @@ export const ELEVATION_SHADOWS = {
   elev2: "0 8px 24px rgba(0,0,0,0.28)",
   elev3: "0 16px 40px rgba(0,0,0,0.36)",
 } as const;
+
+export const GLASS_SURFACES = {
+  card: "glass-surface glass-highlight rounded-2xl",
+  elevated: "glass-surface-elevated glass-highlight rounded-2xl",
+  modal: "glass-surface-modal glass-highlight rounded-2xl",
+} as const;

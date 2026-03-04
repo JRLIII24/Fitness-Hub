@@ -19,6 +19,8 @@ export interface OnboardingData {
   dateOfBirth: Date | null;
   gender: "male" | "female" | "prefer_not_to_say" | null;
   showWeight: boolean;
+  equipmentAvailable: string[];
+  experienceLevel: "beginner" | "intermediate" | "advanced" | null;
 }
 
 const initialData: OnboardingData = {
@@ -32,6 +34,8 @@ const initialData: OnboardingData = {
   dateOfBirth: null,
   gender: null,
   showWeight: true,
+  equipmentAvailable: [],
+  experienceLevel: null,
 };
 
 const APP_THEME_STORAGE_KEY = "fithub-color-theme";
@@ -120,7 +124,7 @@ export function useOnboarding() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
-  const totalSteps = 6;
+  const totalSteps = 8;
 
   const ensureProfileExists = useCallback(async () => {
     const response = await fetch("/api/auth/ensure-profile", {
@@ -221,6 +225,10 @@ export function useOnboarding() {
         return age >= 13 && age <= 120;
       case 5: // Gender
         return !!data.gender;
+      case 6: // Equipment
+        return data.equipmentAvailable.length > 0;
+      case 7: // Experience level
+        return data.experienceLevel !== null;
       default:
         return false;
     }
@@ -324,6 +332,8 @@ export function useOnboarding() {
         show_weight: data.showWeight,
         onboarding_completed: true,
         theme_preference: accentSelection.themePreference,
+        equipment_available: data.equipmentAvailable,
+        experience_level: data.experienceLevel,
       };
 
       if (accentSelection.customHex) {

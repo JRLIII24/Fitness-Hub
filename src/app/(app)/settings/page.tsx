@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, ChevronRight, Scale, Dumbbell, LayoutList } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { ExportDataCard } from "./export-data-card";
+import { NotificationPreferencesCard } from "./notification-preferences-card";
 import { SignOutButton } from "./sign-out-button";
 
 const QUICK_ACCESS_LINKS = [
@@ -114,6 +115,8 @@ export default async function SettingsPage() {
       </Card>
 
       <ExportDataCard />
+
+      <NotificationPreferencesCard />
 
       <div className="border-t border-border/50 pt-2">
         <div className="flex justify-center">

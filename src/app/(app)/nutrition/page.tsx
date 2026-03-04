@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Share2,
+  BookmarkPlus,
 } from "lucide-react";
 import { addDays, subDays, format } from "date-fns";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ import {
   trackNutritionCatchupNudgeShown,
 } from "@/lib/retention-events";
 import { FoodLogCard } from "@/components/nutrition/food-log-card";
+import { MealTemplateSheet } from "@/components/nutrition/meal-template-sheet";
 import { NutritionAICard } from "@/components/ai/nutrition-ai-card";
 import { SendMealDialog } from "@/components/social/send-meal-dialog";
 import { PageHeader } from "@/components/shared/page-header";
@@ -34,24 +36,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-type MealType = "breakfast" | "lunch" | "dinner" | "snack";
-
-interface FoodItem {
-  id: string;
-  name: string;
-  brand: string | null;
-  calories_per_serving: number;
-  protein_g: number | null;
-  carbs_g: number | null;
-  fat_g: number | null;
-  fiber_g: number | null;
-  sugar_g: number | null;
-  sodium_mg: number | null;
-  serving_description: string | null;
-  serving_size_g: number | null;
-  source: string | null;
-  barcode: string | null;
-}
+import type { FoodItem, MealType, MealTemplateItem } from "@/types/nutrition";
 
 interface FoodLogEntry {
   id: string;
@@ -232,6 +217,7 @@ export default function NutritionPage() {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [sendMealDialogOpen, setSendMealDialogOpen] = useState(false);
+  const [mealSheetOpen, setMealSheetOpen] = useState(false);
 
   const { sendMealDay } = useSharedItems(currentUserId);
 
@@ -451,6 +437,48 @@ export default function NutritionPage() {
     });
   }, [currentUserId, isToday, proteinGoal, selectedDate, supabase, totalCalories, totalProtein]);
 
+  const handleLoadTemplate = async (items: MealTemplateItem[]) => {
+    if (!currentUserId) return;
+    const now = new Date();
+    try {
+      for (const item of items) {
+        const { error } = await supabase.from("food_log").insert({
+          user_id: currentUserId,
+          food_item_id: item.food_item_id,
+          meal_type: "snack",
+          servings: item.servings,
+          calories_consumed: item.calories * item.servings,
+          protein_g: item.protein_g != null ? item.protein_g * item.servings : null,
+          carbs_g: item.carbs_g != null ? item.carbs_g * item.servings : null,
+          fat_g: item.fat_g != null ? item.fat_g * item.servings : null,
+          logged_at: now.toISOString(),
+        });
+        if (error) throw error;
+      }
+      // Re-fetch entries to show the newly added items
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const localDayStart = new Date(selectedDate);
+      localDayStart.setHours(0, 0, 0, 0);
+      const localNextDayStart = new Date(localDayStart);
+      localNextDayStart.setDate(localNextDayStart.getDate() + 1);
+
+      const { data: rawEntries } = await supabase
+        .from("food_log")
+        .select(
+          "id, meal_type, servings, calories_consumed, protein_g, carbs_g, fat_g, logged_at, food_items(id, name, brand, barcode, source, calories_per_serving, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg, serving_description, serving_size_g)"
+        )
+        .eq("user_id", currentUserId)
+        .gte("logged_at", localDayStart.toISOString())
+        .lt("logged_at", localNextDayStart.toISOString())
+        .order("logged_at", { ascending: true });
+
+      setEntries((rawEntries ?? []) as unknown as FoodLogEntry[]);
+    } catch (err) {
+      console.error("Failed to load template items:", err);
+      toast.error("Failed to add template items to log");
+    }
+  };
+
   const mealEntryToSnapshot = (entry: FoodLogEntry) => {
     const nutrition = getEntryNutrition(entry);
     return {
@@ -466,15 +494,25 @@ export default function NutritionPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 pb-28 pt-4 md:px-6 lg:px-8">
-      <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/90 p-5 sm:p-6">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
-        <div className="pointer-events-none absolute -left-14 bottom-0 h-36 w-36 rounded-full bg-accent/20 blur-3xl" />
+      <section className="relative overflow-hidden rounded-3xl glass-surface-elevated glass-highlight p-5 sm:p-6">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
+        <div className="pointer-events-none absolute -left-14 bottom-0 h-36 w-36 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
         <div className="relative space-y-4">
           <PageHeader
             eyebrow={displayDate}
             title="Nutrition"
             actions={
               <>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-9"
+                  onClick={() => setMealSheetOpen(true)}
+                  title="Saved Meals"
+                >
+                  <BookmarkPlus className="size-4" />
+                  <span className="sr-only">Saved Meals</span>
+                </Button>
                 <Button
                   size="icon"
                   variant="ghost"
@@ -662,6 +700,13 @@ export default function NutritionPage() {
           </div>
         )}
       </section>
+
+      <MealTemplateSheet
+        open={mealSheetOpen}
+        onOpenChange={setMealSheetOpen}
+        currentEntries={entries}
+        onLoadTemplate={handleLoadTemplate}
+      />
 
       <SendMealDialog
         open={sendMealDialogOpen}

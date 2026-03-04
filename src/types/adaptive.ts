@@ -131,12 +131,34 @@ export interface AdaptiveExercise {
   target_weight_kg: number | null;
 }
 
+export interface ExerciseSwapResult {
+  originalExerciseId: string;
+  originalExerciseName: string;
+  originalMuscleGroup: string;
+  swappedExerciseId: string;
+  swappedExerciseName: string;
+  swappedMuscleGroup: string;
+  reason: string;
+  fatigueStatus: { recoveryPct: number; status: string };
+}
+
+export interface MuscleRecoverySnapshot {
+  [muscleGroup: string]: {
+    status: string;
+    recoveryPct: number;
+    hoursSinceTrained: number | null;
+    totalSets: number;
+  };
+}
+
 export interface GeneratedWorkout {
   exercises: AdaptiveExercise[];
   total_estimated_duration_mins: number;
   focus: WorkoutFocus;
   confidence: number; // 0-100
   explanation: string;
+  swaps?: ExerciseSwapResult[];
+  muscleRecoverySnapshot?: MuscleRecoverySnapshot;
 }
 
 export interface AdaptiveWorkoutCache {
@@ -148,61 +170,6 @@ export interface AdaptiveWorkoutCache {
   generation_reason: string | null;
   accepted: boolean | null;
   created_at: string;
-}
-
-// =============================================================================
-// ACCOUNTABILITY PODS
-// =============================================================================
-
-export interface AccountabilityPod {
-  id: string;
-  name: string;
-  created_by: string;
-  max_members: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PodMember {
-  id: string;
-  pod_id: string;
-  user_id: string;
-  joined_at: string;
-  is_active: boolean;
-}
-
-export interface PodCommitment {
-  id: string;
-  pod_id: string;
-  user_id: string;
-  week_start_date: string;
-  target_sessions: number;
-  actual_sessions: number;
-  commitment_text: string | null;
-  created_at: string;
-}
-
-export interface PodMemberWithProfile {
-  user: {
-    id: string;
-    display_name: string | null;
-    username: string | null;
-  };
-  this_week_commitment: PodCommitment | null;
-  this_week_sessions: number;
-  streak: number;
-  is_at_risk: boolean;
-}
-
-export interface PodDashboard {
-  pod: AccountabilityPod;
-  members: PodMemberWithProfile[];
-  recent_activity: WorkoutEvent[];
-  weekly_stats: {
-    total_workouts: number;
-    avg_completion_rate: number;
-    members_on_track: number;
-  };
 }
 
 // =============================================================================

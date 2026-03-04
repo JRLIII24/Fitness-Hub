@@ -1,18 +1,14 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { toast } from "sonner";
-import { ChevronDown, Clock3, NotebookPen, Plus, Save, X, LayoutList, Dumbbell, Layers, CircleCheck, Activity, Zap, Send, Pencil, Copy, Trash2, Heart, ArrowLeftRight, Loader2 } from "lucide-react";
+import { ChevronDown, Clock3, NotebookPen, Plus, Save, Dumbbell, Zap, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
-import { fireConfetti } from "@/lib/celebrations";
 import {
-  logRetentionEvent,
-  trackSessionIntentCompleted,
   trackSessionIntentSet,
 } from "@/lib/retention-events";
 import { useWorkoutStore } from "@/stores/workout-store";
@@ -21,12 +17,9 @@ import type { ActiveWorkout, Exercise, WorkoutSet } from "@/types/workout";
 import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS, MUSCLE_GROUPS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -37,249 +30,46 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SetRow } from "@/components/workout/set-row";
 import { ExerciseSwapSheet } from "@/components/workout/exercise-swap-sheet";
-import { ExerciseSparkline } from "@/components/workout/exercise-sparkline";
 import { useExerciseTrendlines } from "@/hooks/use-exercise-trendlines";
-import { calcSuggestedWeight } from "@/lib/progressive-overload";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { weightToDisplay, kgToLbs } from "@/lib/units";
+import { POPULAR_WORKOUTS, type WorkoutPresetId } from "@/lib/workout-presets";
+import {
+  isMissingTableError,
+  slugify,
+  normalizeEquipment,
+  resolveExerciseMediaUrl,
+  makeCustomExercise,
+} from "@/lib/workout/exercise-resolver";
+import { calcSuggestedWeight } from "@/lib/progressive-overload";
 import { RestTimerPill } from "@/components/workout/rest-timer-pill";
-import { FormTipsPanel } from "@/components/workout/form-tips-panel";
 import { SaveTemplateDialog } from "@/components/workout/save-template-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { SendTemplateDialog } from "@/components/social/send-template-dialog";
 import { useSharedItems, type TemplateSnapshot } from "@/hooks/use-shared-items";
 import { ExerciseSelectionCard } from "@/components/workout/exercise-selection-card";
 import { WorkoutCompleteCelebration } from "@/components/workout/workout-complete-celebration";
-import type { WorkoutStats } from "@/components/workout/workout-complete-celebration";
 import { LevelUpCelebration } from "@/components/dashboard/level-up-celebration";
+
+// Extracted hooks
+import { useGhostSession } from "@/hooks/workout/use-ghost-session";
+import { useExerciseSwap } from "@/hooks/workout/use-exercise-swap";
+import { useWorkoutCompletion } from "@/hooks/workout/use-workout-completion";
+import { useTemplateActions, type WorkoutTemplate } from "@/hooks/workout/use-template-actions";
+
+// Extracted components
+import { WorkoutHeader, ElapsedTime } from "@/components/workout/workout-header";
+import { ExerciseCard } from "@/components/workout/exercise-card";
+import { WorkoutCompletionDialog } from "@/components/workout/workout-completion-dialog";
+import { TemplateManagerPanel } from "@/components/workout/template-manager-panel";
+import { QuickStartPanel } from "@/components/workout/quick-start-panel";
 
 type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 
-type WorkoutTemplate = {
-  id: string;
-  name: string;
-  primary_muscle_group: string | null;
-};
-
-type WorkoutPresetId =
-  | "upper-body-strength"
-  | "push-day"
-  | "pull-day"
-  | "leg-day"
-  | "full-body"
-  | "arms-shoulders"
-  | "custom";
-
-type PresetLift = { name: string; sets: number; reps: string };
-
-const POPULAR_WORKOUTS: Array<{
-  id: Exclude<WorkoutPresetId, "custom">;
-  label: string;
-  defaultName: string;
-  category: string;
-  lifts: PresetLift[];
-  /** Derived for display — kept in sync with lifts */
-  liftNames: string[];
-}> = [
-    {
-      id: "upper-body-strength",
-      label: "Upper Body Strength",
-      defaultName: "Upper Body Strength",
-      category: "chest",
-      lifts: [
-        { name: "Barbell Bench Press", sets: 4, reps: "8" },
-        { name: "Barbell Bent-Over Row", sets: 4, reps: "8" },
-        { name: "Seated Dumbbell Press", sets: 3, reps: "10" },
-        { name: "Lat Pulldown (Wide Grip)", sets: 3, reps: "10" },
-        { name: "Close-Grip Bench Press", sets: 3, reps: "10" },
-        { name: "EZ-Bar Curl", sets: 3, reps: "12" },
-      ],
-      get liftNames() { return this.lifts.map(l => l.name); },
-    },
-    {
-      id: "push-day",
-      label: "Push Day (Chest/Shoulders/Triceps)",
-      defaultName: "Push Day",
-      category: "chest",
-      lifts: [
-        { name: "Incline Barbell Bench Press", sets: 4, reps: "8" },
-        { name: "Seated Chest Press Machine", sets: 3, reps: "10" },
-        { name: "Arnold Press", sets: 3, reps: "10" },
-        { name: "Dumbbell Lateral Raise", sets: 3, reps: "15" },
-        { name: "Rope Pushdown", sets: 3, reps: "12" },
-        { name: "Overhead Dumbbell Extension", sets: 3, reps: "12" },
-      ],
-      get liftNames() { return this.lifts.map(l => l.name); },
-    },
-    {
-      id: "pull-day",
-      label: "Pull Day (Back/Biceps)",
-      defaultName: "Pull Day",
-      category: "back",
-      lifts: [
-        { name: "Conventional Deadlift", sets: 4, reps: "5" },
-        { name: "Weighted Pull-Ups", sets: 4, reps: "8" },
-        { name: "Seated Cable Row", sets: 3, reps: "10" },
-        { name: "Face Pulls", sets: 3, reps: "15" },
-        { name: "Hammer Curl", sets: 3, reps: "12" },
-        { name: "Cable Curl", sets: 3, reps: "12" },
-      ],
-      get liftNames() { return this.lifts.map(l => l.name); },
-    },
-    {
-      id: "leg-day",
-      label: "Leg Day (Quads/Glutes/Hams)",
-      defaultName: "Leg Day",
-      category: "legs",
-      lifts: [
-        { name: "Barbell Back Squat", sets: 4, reps: "6" },
-        { name: "Leg Press", sets: 4, reps: "10" },
-        { name: "Romanian Deadlift", sets: 3, reps: "10" },
-        { name: "Bulgarian Split Squat", sets: 3, reps: "10" },
-        { name: "Leg Extension", sets: 3, reps: "12" },
-        { name: "Seated Leg Curl", sets: 3, reps: "12" },
-      ],
-      get liftNames() { return this.lifts.map(l => l.name); },
-    },
-    {
-      id: "full-body",
-      label: "Full Body Compound",
-      defaultName: "Full Body",
-      category: "full body",
-      lifts: [
-        { name: "Trap Bar Deadlift", sets: 4, reps: "6" },
-        { name: "Barbell Bench Press", sets: 4, reps: "8" },
-        { name: "Barbell Bent-Over Row", sets: 4, reps: "8" },
-        { name: "Barbell Overhead Press", sets: 3, reps: "8" },
-        { name: "Farmer's Carry", sets: 3, reps: "1" },
-      ],
-      get liftNames() { return this.lifts.map(l => l.name); },
-    },
-    {
-      id: "arms-shoulders",
-      label: "Arms + Delts",
-      defaultName: "Arms & Delts",
-      category: "arms",
-      lifts: [
-        { name: "EZ-Bar Curl", sets: 3, reps: "10" },
-        { name: "Incline Dumbbell Curl", sets: 3, reps: "12" },
-        { name: "Rope Pushdown", sets: 3, reps: "12" },
-        { name: "Skull Crushers", sets: 3, reps: "10" },
-        { name: "Dumbbell Lateral Raise", sets: 3, reps: "15" },
-        { name: "Rear Delt Fly", sets: 3, reps: "15" },
-      ],
-      get liftNames() { return this.lifts.map(l => l.name); },
-    },
-  ];
-
-const DB_ALLOWED_EQUIPMENT = new Set([
-  "barbell",
-  "dumbbell",
-  "cable",
-  "machine",
-  "bodyweight",
-  "band",
-]);
 const TEMPLATE_LIKES_KEY = "workout_template_likes_v1";
 
-function isMissingTableError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-
-  const candidate = error as { code?: string; message?: string; details?: string };
-  const text = `${candidate.message ?? ""} ${candidate.details ?? ""}`.toLowerCase();
-
-  return (
-    candidate.code === "PGRST205" ||
-    text.includes("could not find the table") ||
-    text.includes("relation") && text.includes("does not exist")
-  );
-}
-
-/**
- * ElapsedTime — memo-isolated so its 1-second tick does NOT cause the parent
- * WorkoutPage to re-render. startedAt is a stable string for the lifetime of
- * a session, so memo's shallow prop comparison will always bail out.
- *
- * DEV: To verify isolation, uncomment the line below and confirm it does NOT
- * increment in the parent's render count:
- *   if (process.env.NODE_ENV === 'development') console.count('[ElapsedTime] render');
- */
-const ElapsedTime = memo(function ElapsedTime({
-  startedAt,
-  className,
-}: {
-  startedAt: string;
-  className?: string;
-}) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const elapsedMs = now - new Date(startedAt).getTime();
-  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
-  const hrs = Math.floor(totalSeconds / 3600);
-  const mins = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-  const pad = (n: number) => n.toString().padStart(2, "0");
-
-  return <span className={className}>{`${pad(hrs)}:${pad(mins)}:${pad(secs)}`}</span>;
-});
-
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function normalizeEquipment(equipment: string | null): string {
-  if (!equipment) return "bodyweight";
-  return DB_ALLOWED_EQUIPMENT.has(equipment) ? equipment : "bodyweight";
-}
-
-function resolveExerciseMediaUrl(
-  mediaUrl: string | null | undefined,
-  source?: string | null
-): string | null {
-  if (!mediaUrl) return null;
-  const trimmed = mediaUrl.trim();
-  if (!trimmed) return null;
-
-  if (trimmed.startsWith("//")) return `https:${trimmed}`;
-  if (trimmed.startsWith("http://")) return `https://${trimmed.slice("http://".length)}`;
-  if (trimmed.startsWith("https://")) return trimmed;
-
-  if (source === "free-exercise-db") {
-    const clean = trimmed.replace(/^\/+/, "");
-    return `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${clean}`;
-  }
-
-  return null;
-}
-
-function makeCustomExercise(name: string, muscleGroup: MuscleGroup, equipment: string): Exercise {
-  const slugBase = slugify(name);
-  return {
-    id: `custom-${slugBase}-${Date.now()}`,
-    name,
-    slug: `${slugBase}-${muscleGroup}`,
-    muscle_group: muscleGroup,
-    equipment,
-    category: "isolation",
-    instructions: null,
-    form_tips: null,
-    image_url: null,
-  };
-}
-
-/** Returns true when viewport width ≤ 639 px (Tailwind `sm` breakpoint). */
+/** Returns true when viewport width <= 639 px (Tailwind `sm` breakpoint). */
 function useIsSmallScreen(): boolean {
   const [isSmall, setIsSmall] = useState(false);
   useEffect(() => {
@@ -308,7 +98,6 @@ export default function WorkoutPage() {
   const [setupTab, setSetupTab] = useState<"templates" | "quick">("templates");
   const [quickFilter, setQuickFilter] = useState<string>("All");
   const [showTemplateManager, setShowTemplateManager] = useState(false);
-  const [templateActionBusyId, setTemplateActionBusyId] = useState<string | null>(null);
   const [likedTemplateIds, setLikedTemplateIds] = useState<Set<string>>(new Set());
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [sendingTemplate, setSendingTemplate] = useState<{
@@ -338,40 +127,17 @@ export default function WorkoutPage() {
   const [previousByExerciseId, setPreviousByExerciseId] = useState<
     Record<string, Array<{ reps: number | null; weight: number | null }>>
   >({});
-  const [ghostWorkoutData, setGhostWorkoutData] = useState<{
-    sessionDate: string;
-    exercises: Record<
-      string,
-      Array<{ setNumber: number; reps: number | null; weight: number | null }>
-    >;
-  } | null>(null);
   const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
   const [exerciseLastPerformance, setExerciseLastPerformance] = useState<
     Record<string, { reps: number | null; weight: number | null; performedAt: string | null }>
   >({});
-  const [celebrationStats, setCelebrationStats] = useState<WorkoutStats | null>(null);
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [levelUpData, setLevelUpData] = useState<{ newLevel: number } | null>(null);
-  const [sessionRpePromptOpen, setSessionRpePromptOpen] = useState(false);
-  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
-  const [sessionRpeValue, setSessionRpeValue] = useState(7);
-  const [savingSessionRpe, setSavingSessionRpe] = useState(false);
-
-  // Race-condition guard: disable "Start Workout" while ghost data is fetching
-  const [ghostIsLoading, setGhostIsLoading] = useState(false);
-
-  // Exercise swap sheet
-  const [swapSheetIndex, setSwapSheetIndex] = useState<number | null>(null);
 
   // DEV: Uncomment to verify WorkoutPage render frequency.
-  // Should NOT increment every second — only on user interactions.
+  // Should NOT increment every second -- only on user interactions.
   // if (process.env.NODE_ENV === 'development') console.count('[WorkoutPage] render');
 
-  // Scoped selectors prevent re-renders from unrelated store slices (e.g.
-  // editingWorkoutId) and from any future state fields added to WorkoutState.
-  // Actions are stable references in Zustand and are included here for
-  // explicitness — they never change so they never cause a re-render.
+  // Scoped selectors prevent re-renders from unrelated store slices
   const {
     activeWorkout,
     isWorkoutActive,
@@ -416,13 +182,18 @@ export default function WorkoutPage() {
   const { sendTemplate } = useSharedItems(userId);
   const { preference, unitLabel } = useUnitPreferenceStore();
 
-  const toDisplayWeight = (kg: number) =>
-    weightToDisplay(kg, preference === "imperial", 1);
+  const toDisplayWeight = useCallback(
+    (kg: number) => weightToDisplay(kg, preference === "imperial", 1),
+    [preference]
+  );
 
-  const toDisplayVolume = (kgVolume: number) =>
-    preference === "imperial"
-      ? Math.round(kgToLbs(kgVolume))
-      : Math.round(kgVolume);
+  const toDisplayVolume = useCallback(
+    (kgVolume: number) =>
+      preference === "imperial"
+        ? Math.round(kgToLbs(kgVolume))
+        : Math.round(kgVolume),
+    [preference]
+  );
 
   const allExercises = useMemo(
     () => [...customExercises, ...apiExercises],
@@ -453,18 +224,6 @@ export default function WorkoutPage() {
     [allExercises, selectedExerciseId]
   );
 
-  const selectedExerciseMediaUrl = useMemo(() => {
-    if (!selectedExercise) return null;
-    return resolveExerciseMediaUrl(
-      ("gif_url" in selectedExercise && selectedExercise.gif_url)
-        ? selectedExercise.gif_url
-        : selectedExercise.image_url,
-      ("source" in selectedExercise
-        ? (selectedExercise as { source?: string | null }).source
-        : null) ?? null
-    );
-  }, [selectedExercise]);
-
   const plannerStats = useMemo(() => {
     if (!activeWorkout) {
       return { exercises: 0, totalSets: 0, completedSets: 0, totalVolumeKg: 0 };
@@ -489,20 +248,50 @@ export default function WorkoutPage() {
       ? Math.min(100, Math.round((plannerStats.completedSets / plannerStats.totalSets) * 100))
       : 0;
 
-  // Derived: suggested weights from ghost data — always in kg; SetRow converts for display
-  const suggestedWeightsByKey = useMemo(() => {
-    const map: Record<string, Record<number, number>> = {}; // exerciseId → setIndex → kg
-    if (!ghostWorkoutData) return map;
-    for (const [exId, sets] of Object.entries(ghostWorkoutData.exercises)) {
-      map[exId] = {};
-      sets.forEach((s, idx) => {
-        if (s.weight != null) {
-          map[exId][idx] = calcSuggestedWeight(s.weight, preference);
-        }
-      });
-    }
-    return map;
-  }, [ghostWorkoutData, preference]);
+  // --- Extracted hooks ---
+
+  // Ghost session: loads ghost data for selected template
+  const {
+    ghostWorkoutData,
+    ghostIsLoading,
+    suggestedWeightsByKey,
+    patchGhostForExercise,
+  } = useGhostSession(supabase, userId, selectedTemplateId, preference);
+
+  // Exercise swap: manages swap sheet state + targeted ghost refetch
+  const {
+    swapSheetIndex,
+    setSwapSheetIndex,
+    handleSwapExercise,
+  } = useExerciseSwap(swapExercise, patchGhostForExercise);
+
+  // Workout completion: finish, cancel, celebration, RPE
+  const {
+    celebrationStats,
+    showCelebration,
+    levelUpData,
+    sessionRpePromptOpen,
+    setSessionRpePromptOpen,
+    sessionRpeValue,
+    setSessionRpeValue,
+    savingSessionRpe,
+    handleFinishWorkout,
+    handleCancelWorkout,
+    handleCloseWorkoutCelebration,
+    handleCloseLevelUp,
+    handleSaveSessionRpe,
+  } = useWorkoutCompletion({
+    supabase,
+    userId,
+    finishWorkout,
+    cancelWorkout,
+    previousByExerciseId,
+    ghostWorkoutData,
+    toDisplayWeight,
+    toDisplayVolume,
+    unitLabel,
+    setDbFeaturesAvailable,
+  });
 
   // Stable list of active exercise IDs for sparklines
   const activeExerciseIds = useMemo(
@@ -510,7 +299,7 @@ export default function WorkoutPage() {
     [activeWorkout]
   );
 
-  // Sparkline trendlines — only fetches when workout is active
+  // Sparkline trendlines -- only fetches when workout is active
   const exerciseTrendlines = useExerciseTrendlines(activeExerciseIds, userId, isWorkoutActive);
 
   const loadTemplates = useCallback(async (currentUserId: string) => {
@@ -536,15 +325,13 @@ export default function WorkoutPage() {
     setLoadingTemplates(false);
   }, [supabase]);
 
-  // iOS Safari fallback: AudioContext cannot beep without a prior user gesture,
-  // so timer-store dispatches 'rest-timer-complete' when audio is unavailable.
-  // We show a toast here so the user always gets feedback on rest completion.
+  // iOS Safari fallback: AudioContext cannot beep without a prior user gesture
   useEffect(() => {
     function handleRestComplete(e: Event) {
       const { exerciseName } =
         (e as CustomEvent<{ exerciseName: string }>).detail ?? {};
       toast(
-        exerciseName ? `Rest complete — ${exerciseName}` : "Rest period complete",
+        exerciseName ? `Rest complete -- ${exerciseName}` : "Rest period complete",
         { description: "Time to get back to it!", duration: 5000 }
       );
     }
@@ -614,7 +401,6 @@ export default function WorkoutPage() {
 
         const data = await response.json();
 
-        // Prevent stale responses from older requests from overwriting fresh data.
         if (seq !== searchRequestSeq.current) return;
         setApiExercises(data.exercises ?? []);
       } catch (error) {
@@ -642,79 +428,6 @@ export default function WorkoutPage() {
     }
   }, [selectedTemplateId, templates]);
 
-  // Fetch ghost workout data when template is selected
-  useEffect(() => {
-    async function loadGhostWorkout() {
-      if (selectedTemplateId === "none" || !userId) {
-        setGhostWorkoutData(null);
-        return;
-      }
-
-      setGhostIsLoading(true);
-      try {
-        // Get the most recent completed session with this template
-        const { data: ghostSession, error: sessionError } = await supabase
-          .from("workout_sessions")
-          .select("id, started_at")
-          .eq("user_id", userId)
-          .eq("template_id", selectedTemplateId)
-          .eq("status", "completed")
-          .order("started_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (sessionError || !ghostSession) {
-          setGhostWorkoutData(null);
-          return;
-        }
-
-        // Fetch all sets from that session
-        const { data: ghostSets, error: setsError } = await supabase
-          .from("workout_sets")
-          .select("exercise_id, set_number, reps, weight_kg")
-          .eq("session_id", ghostSession.id)
-          .order("set_number", { ascending: true });
-
-        if (setsError || !ghostSets) {
-          setGhostWorkoutData(null);
-          return;
-        }
-
-        // Group sets by exercise_id
-        const exerciseMap: Record<
-          string,
-          Array<{ setNumber: number; reps: number | null; weight: number | null }>
-        > = {};
-        for (const set of ghostSets) {
-          if (!exerciseMap[set.exercise_id]) {
-            exerciseMap[set.exercise_id] = [];
-          }
-          exerciseMap[set.exercise_id].push({
-            setNumber: set.set_number,
-            reps: set.reps,
-            weight: set.weight_kg,
-          });
-        }
-
-        for (const exerciseId of Object.keys(exerciseMap)) {
-          exerciseMap[exerciseId].sort((a, b) => a.setNumber - b.setNumber);
-        }
-
-        setGhostWorkoutData({
-          sessionDate: ghostSession.started_at,
-          exercises: exerciseMap,
-        });
-      } catch (err) {
-        console.error("Failed to load ghost workout:", err);
-        setGhostWorkoutData(null);
-      } finally {
-        setGhostIsLoading(false);
-      }
-    }
-
-    void loadGhostWorkout();
-  }, [selectedTemplateId, userId, supabase]);
-
   useEffect(() => {
     async function loadPreviousPerformance() {
       if (!userId || !activeWorkout) {
@@ -722,15 +435,12 @@ export default function WorkoutPage() {
         return;
       }
 
-      // Get all exercise IDs from current workout
       const exerciseIds = activeWorkout.exercises.map(e => e.exercise.id);
       if (exerciseIds.length === 0) {
         setPreviousByExerciseId({});
         return;
       }
 
-      // Load all completed sets, then keep only the most recent completed session per exercise.
-      // This supports true set-by-set ghosting instead of a single "best set" only.
       const { data: completedSets, error } = await supabase
         .from("workout_sets")
         .select(
@@ -778,7 +488,6 @@ export default function WorkoutPage() {
           return (a.set_number ?? 0) - (b.set_number ?? 0);
         });
 
-      // Pick the latest session id for each exercise
       const latestSessionByExercise = new Map<string, string>();
       for (const row of rows) {
         if (!latestSessionByExercise.has(row.exercise_id)) {
@@ -786,7 +495,6 @@ export default function WorkoutPage() {
         }
       }
 
-      // Convert to expected format: { exerciseId: [{ reps, weight }, ...] } from latest session only
       const detailedByExercise: Record<
         string,
         Array<{ setNumber: number; reps: number | null; weight: number | null }>
@@ -879,11 +587,9 @@ export default function WorkoutPage() {
     if (!fromLauncher && !fromAdaptive) return;
 
     const templateId = searchParams.get('template_id');
-    // Auto-start the workout
     async function autoStart() {
       setHasAutoStarted(true);
 
-      // Case 1: Saved template (from suggestion or alternative)
       if (templateId && templates.length > 0) {
         const template = templates.find(t => t.id === templateId);
         if (!template) {
@@ -894,9 +600,8 @@ export default function WorkoutPage() {
 
         setSelectedTemplateId(templateId);
         setWorkoutName(template.name);
-        await startWorkout(template.name, templateId);
+        startWorkout(template.name, userId!, templateId);
 
-        // Load template exercises from database
         try {
           const { data: templateExercises, error } = await supabase
             .from("template_exercises")
@@ -947,7 +652,6 @@ export default function WorkoutPage() {
         return;
       }
 
-      // Case 2: Preset workout (no template_id)
       const storageKey = fromAdaptive ? 'adaptive_workout' : 'launcher_prediction';
       const workoutDataRaw = sessionStorage.getItem(storageKey);
       if (!workoutDataRaw) return;
@@ -957,9 +661,8 @@ export default function WorkoutPage() {
         sessionStorage.removeItem(storageKey);
 
         setWorkoutName(launcherData.template_name);
-        await startWorkout(launcherData.template_name, undefined);
+        startWorkout(launcherData.template_name, userId!, undefined);
 
-        // Add exercises from launcher prediction
         for (const launcherEx of launcherData.exercises ?? []) {
           const exerciseData = launcherEx.exercise;
           if (!exerciseData) continue;
@@ -1027,201 +730,41 @@ export default function WorkoutPage() {
     });
   }
 
-  async function handleSendTemplate(template: WorkoutTemplate) {
-    if (!userId) return;
-    setTemplateActionBusyId(template.id);
-    try {
-      const { data: templateExercises, error } = await supabase
-        .from("template_exercises")
-        .select("exercise_id,target_sets,target_reps,target_weight_kg,exercises(name,muscle_group)")
-        .eq("template_id", template.id)
-        .order("sort_order", { ascending: true });
+  // Template CRUD actions (extracted hook)
+  const {
+    templateActionBusyId,
+    handleSendTemplate,
+    handleEditTemplate,
+    handleCopyTemplate,
+    handleDeleteTemplate,
+  } = useTemplateActions({
+    supabase,
+    userId,
+    loadTemplates,
+    selectedTemplateId,
+    setSelectedTemplateId,
+    setLikedTemplateIds,
+    loadWorkoutForEdit,
+    addExercise,
+    updateSet,
+    addSet,
+    setSendingTemplate,
+    setSendDialogOpen,
+  });
 
-      if (error) throw error;
+  const EXERCISE_SELECT_COLS =
+    "id,name,slug,muscle_group,equipment,category,instructions,form_tips,image_url";
 
-      const exercises: TemplateSnapshot["exercises"] = (templateExercises ?? []).map((row) => {
-        const exercise = row.exercises as { name?: string; muscle_group?: string } | null;
-        const setCount = Math.max(1, row.target_sets ?? 1);
-        const reps = row.target_reps ? Number.parseInt(row.target_reps, 10) : null;
-        return {
-          exercise_id: row.exercise_id ?? null,
-          name: exercise?.name ?? "Exercise",
-          muscle_group: exercise?.muscle_group ?? "full_body",
-          sets: Array.from({ length: setCount }, () => ({
-            reps: Number.isFinite(reps as number) ? reps : null,
-            weight_kg: row.target_weight_kg ?? null,
-          })),
-        };
-      });
-
-      setSendingTemplate({
-        id: template.id,
-        name: template.name,
-        description: null,
-        exercises,
-      });
-      setSendDialogOpen(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to prepare template send.";
-      toast.error(message);
-    } finally {
-      setTemplateActionBusyId(null);
-    }
-  }
-
-  async function handleEditTemplate(template: WorkoutTemplate) {
-    if (!userId) return;
-    setTemplateActionBusyId(template.id);
-    try {
-      const { data: templateExercises, error } = await supabase
-        .from("template_exercises")
-        .select(
-          "sort_order,target_sets,target_reps,target_weight_kg,rest_seconds,exercise_id,exercises(id,name,slug,muscle_group,equipment,category,instructions,form_tips,image_url)"
-        )
-        .eq("template_id", template.id)
-        .order("sort_order", { ascending: true });
-
-      if (error) throw error;
-
-      const designWorkout: ActiveWorkout = {
-        id: `template-design-${template.id}`,
-        name: template.name,
-        template_id: template.id,
-        started_at: new Date().toISOString(),
-        exercises: [],
-        notes: "",
-      };
-
-      loadWorkoutForEdit(designWorkout, `template-design-${template.id}`);
-
-      for (const row of templateExercises ?? []) {
-        const exercise = row.exercises as unknown as Exercise | null;
-        if (!exercise) continue;
-
-        addExercise(exercise);
-        const exerciseIndex = useWorkoutStore.getState().activeWorkout?.exercises.length;
-        if (!exerciseIndex) continue;
-        const index = exerciseIndex - 1;
-        const setsToCreate = Math.max(1, row.target_sets ?? 1);
-        const parsedReps = row.target_reps ? Number.parseInt(row.target_reps, 10) : null;
-
-        updateSet(index, 0, {
-          reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
-          weight_kg: row.target_weight_kg ?? null,
-          rest_seconds: row.rest_seconds ?? 90,
-        });
-
-        for (let i = 1; i < setsToCreate; i += 1) {
-          addSet(index);
-          updateSet(index, i, {
-            reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
-            weight_kg: row.target_weight_kg ?? null,
-            rest_seconds: row.rest_seconds ?? 90,
-          });
-        }
-      }
-
-      toast.success(`Editing ${template.name} in design mode`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to open template editor.";
-      toast.error(message);
-    } finally {
-      setTemplateActionBusyId(null);
-    }
-  }
-
-  async function handleCopyTemplate(template: WorkoutTemplate) {
-    if (!userId) return;
-    setTemplateActionBusyId(template.id);
-    try {
-      const { data: sourceRows, error: sourceError } = await supabase
-        .from("template_exercises")
-        .select("exercise_id,sort_order,target_sets,target_reps,target_weight_kg,rest_seconds")
-        .eq("template_id", template.id)
-        .order("sort_order", { ascending: true });
-
-      if (sourceError) throw sourceError;
-
-      const { data: createdTemplate, error: createError } = await supabase
-        .from("workout_templates")
-        .insert({
-          user_id: userId,
-          name: `${template.name} Copy`,
-          description: `Copied from ${template.name}`,
-        })
-        .select("id")
-        .single();
-
-      if (createError || !createdTemplate) throw createError ?? new Error("Template copy failed.");
-
-      if ((sourceRows ?? []).length > 0) {
-        const copiedRows = (sourceRows ?? []).map((row) => ({
-          template_id: createdTemplate.id,
-          exercise_id: row.exercise_id,
-          sort_order: row.sort_order,
-          target_sets: row.target_sets,
-          target_reps: row.target_reps,
-          target_weight_kg: row.target_weight_kg,
-          rest_seconds: row.rest_seconds,
-        }));
-
-        const { error: copyRowsError } = await supabase.from("template_exercises").insert(copiedRows);
-        if (copyRowsError) throw copyRowsError;
-      }
-
-      await loadTemplates(userId);
-      toast.success("Template copied.");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to copy template.";
-      toast.error(message);
-    } finally {
-      setTemplateActionBusyId(null);
-    }
-  }
-
-  async function handleDeleteTemplate(template: WorkoutTemplate) {
-    if (!userId) return;
-    if (!window.confirm(`Delete "${template.name}"? This cannot be undone.`)) return;
-
-    setTemplateActionBusyId(template.id);
-    try {
-      await supabase.from("template_exercises").delete().eq("template_id", template.id);
-
-      const { error } = await supabase
-        .from("workout_templates")
-        .delete()
-        .eq("id", template.id)
-        .eq("user_id", userId);
-      if (error) throw error;
-
-      if (selectedTemplateId === template.id) {
-        setSelectedTemplateId("none");
-      }
-      setLikedTemplateIds((prev) => {
-        const next = new Set(prev);
-        next.delete(template.id);
-        return next;
-      });
-
-      await loadTemplates(userId);
-      toast.success("Template deleted.");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to delete template.";
-      toast.error(message);
-    } finally {
-      setTemplateActionBusyId(null);
-    }
+  function exerciseKey(ex: Exercise) {
+    return `${ex.name}::${ex.muscle_group}`;
   }
 
   async function ensureExerciseRecord(exercise: Exercise) {
-    const SELECT_COLS =
-      "id,name,slug,muscle_group,equipment,category,instructions,form_tips,image_url";
     const candidateSlug = `${slugify(exercise.name)}-${exercise.muscle_group}`;
 
-    // 1. Look up by slug first (the unique constraint column) — covers any prior creator
     const { data: bySlug, error: slugError } = await supabase
       .from("exercises")
-      .select(SELECT_COLS)
+      .select(EXERCISE_SELECT_COLS)
       .eq("slug", candidateSlug)
       .maybeSingle();
 
@@ -1230,15 +773,13 @@ export default function WorkoutPage() {
         setDbFeaturesAvailable(false);
         return exercise;
       }
-      // non-fatal — fall through to name lookup
     }
 
     if (bySlug) return bySlug as unknown as Exercise;
 
-    // 2. Fallback lookup by name + muscle_group (handles slug mismatch edge cases)
     const { data: byName } = await supabase
       .from("exercises")
-      .select(SELECT_COLS)
+      .select(EXERCISE_SELECT_COLS)
       .eq("name", exercise.name)
       .eq("muscle_group", exercise.muscle_group)
       .limit(1)
@@ -1246,7 +787,6 @@ export default function WorkoutPage() {
 
     if (byName) return byName as unknown as Exercise;
 
-    // 3. Not found — insert once, with no onConflict to avoid the RLS-blocked UPDATE path
     if (!userId) throw new Error("No user found.");
 
     const { data: inserted, error: insertError } = await supabase
@@ -1263,7 +803,7 @@ export default function WorkoutPage() {
         is_custom: true,
         created_by: userId,
       })
-      .select(SELECT_COLS)
+      .select(EXERCISE_SELECT_COLS)
       .single();
 
     if (insertError) {
@@ -1271,10 +811,9 @@ export default function WorkoutPage() {
         setDbFeaturesAvailable(false);
         return exercise;
       }
-      // Race condition or another constraint — re-fetch by slug as last resort
       const { data: reFetch } = await supabase
         .from("exercises")
-        .select(SELECT_COLS)
+        .select(EXERCISE_SELECT_COLS)
         .eq("slug", candidateSlug)
         .maybeSingle();
       if (reFetch) return reFetch as unknown as Exercise;
@@ -1282,6 +821,112 @@ export default function WorkoutPage() {
     }
 
     return inserted as unknown as Exercise;
+  }
+
+  /** Batch-resolve exercises: 2-3 DB queries instead of N*2 sequential. */
+  async function ensureExerciseRecordsBatch(
+    exercises: Exercise[]
+  ): Promise<Map<string, Exercise>> {
+    const results = new Map<string, Exercise>();
+    if (!exercises.length) return results;
+
+    // Build slug → original exercise mapping
+    const slugToOriginal = new Map<string, Exercise>();
+    for (const ex of exercises) {
+      slugToOriginal.set(`${slugify(ex.name)}-${ex.muscle_group}`, ex);
+    }
+
+    // Step 1: Batch lookup by slug (single query)
+    const slugs = [...slugToOriginal.keys()];
+    const { data: bySlug, error: slugError } = await supabase
+      .from("exercises")
+      .select(EXERCISE_SELECT_COLS)
+      .in("slug", slugs);
+
+    if (slugError && isMissingTableError(slugError)) {
+      setDbFeaturesAvailable(false);
+      for (const ex of exercises) results.set(exerciseKey(ex), ex);
+      return results;
+    }
+
+    for (const row of bySlug ?? []) {
+      const original = slugToOriginal.get((row as any).slug);
+      if (original) results.set(exerciseKey(original), row as unknown as Exercise);
+    }
+
+    // Step 2: For unfound, batch lookup by name (single query)
+    const unfound = exercises.filter((ex) => !results.has(exerciseKey(ex)));
+    if (unfound.length) {
+      const names = [...new Set(unfound.map((ex) => ex.name))];
+      const { data: byName } = await supabase
+        .from("exercises")
+        .select(EXERCISE_SELECT_COLS)
+        .in("name", names);
+
+      const nameGroupIndex = new Map<string, Exercise>();
+      for (const row of byName ?? []) {
+        const r = row as unknown as Exercise;
+        nameGroupIndex.set(`${r.name}::${r.muscle_group}`, r);
+      }
+      for (const ex of unfound) {
+        const found = nameGroupIndex.get(exerciseKey(ex));
+        if (found) results.set(exerciseKey(ex), found);
+      }
+    }
+
+    // Step 3: For still unfound, batch insert
+    const stillUnfound = exercises.filter((ex) => !results.has(exerciseKey(ex)));
+    if (stillUnfound.length && userId) {
+      const toInsert = stillUnfound.map((ex) => ({
+        name: ex.name,
+        slug: `${slugify(ex.name)}-${ex.muscle_group}`,
+        muscle_group: ex.muscle_group,
+        equipment: normalizeEquipment(ex.equipment),
+        category: ex.category,
+        instructions: ex.instructions,
+        form_tips: ex.form_tips,
+        image_url: ex.image_url,
+        is_custom: true,
+        created_by: userId,
+      }));
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("exercises")
+        .insert(toInsert)
+        .select(EXERCISE_SELECT_COLS);
+
+      if (insertError) {
+        if (isMissingTableError(insertError)) {
+          setDbFeaturesAvailable(false);
+          for (const ex of stillUnfound) results.set(exerciseKey(ex), ex);
+          return results;
+        }
+        // Race condition: re-fetch by slugs
+        const conflictSlugs = stillUnfound.map(
+          (ex) => `${slugify(ex.name)}-${ex.muscle_group}`
+        );
+        const { data: reFetched } = await supabase
+          .from("exercises")
+          .select(EXERCISE_SELECT_COLS)
+          .in("slug", conflictSlugs);
+        for (const row of reFetched ?? []) {
+          const original = slugToOriginal.get((row as any).slug);
+          if (original) results.set(exerciseKey(original), row as unknown as Exercise);
+        }
+        for (const ex of stillUnfound) {
+          if (!results.has(exerciseKey(ex))) results.set(exerciseKey(ex), ex);
+        }
+      } else {
+        for (const row of inserted ?? []) {
+          const original = slugToOriginal.get((row as any).slug);
+          if (original) results.set(exerciseKey(original), row as unknown as Exercise);
+        }
+      }
+    } else {
+      for (const ex of stillUnfound) results.set(exerciseKey(ex), ex);
+    }
+
+    return results;
   }
 
   async function addExerciseToWorkout(
@@ -1381,7 +1026,6 @@ export default function WorkoutPage() {
           : String(b.session_id).localeCompare(String(a.session_id));
       });
 
-    // Keep only the latest session per exercise
     const latestSession = new Map<string, string>();
     for (const r of rows) {
       if (!latestSession.has(r.exercise_id)) latestSession.set(r.exercise_id, r.session_id);
@@ -1418,7 +1062,6 @@ export default function WorkoutPage() {
     const name = workoutName.trim() || "Workout";
     const activeTemplateId = selectedTemplateId === "none" ? undefined : selectedTemplateId;
 
-    // Require workout type when starting from the Templates tab
     if (setupTab === "templates") {
       if (activeTemplateId) {
         const tpl = templates.find((t) => t.id === activeTemplateId);
@@ -1427,7 +1070,6 @@ export default function WorkoutPage() {
           toast.error("Please select a workout type before starting.");
           return;
         }
-        // Persist the pending categories to DB if it wasn't already saved on the template
         if (!tpl?.primary_muscle_group && pendingCategories.length > 0) {
           const joined = pendingCategories.join(",");
           await supabase
@@ -1439,7 +1081,6 @@ export default function WorkoutPage() {
           );
         }
       } else {
-        // Start Fresh — require a category too
         if (pendingCategories.length === 0) {
           toast.error("Please select a workout type before starting.");
           return;
@@ -1447,7 +1088,8 @@ export default function WorkoutPage() {
       }
     }
 
-    await startWorkout(name, activeTemplateId);
+    if (!userId) return;
+    startWorkout(name, userId, activeTemplateId);
     if (userId) {
       void trackSessionIntentSet(supabase, userId, {
         workout_name: name,
@@ -1477,17 +1119,38 @@ export default function WorkoutPage() {
           throw error;
         }
 
-        for (const row of templateExercises ?? []) {
-          const exercise = row.exercises as unknown as Exercise | null;
-          if (!exercise) continue;
+        const rawExercises = (templateExercises ?? [])
+          .map((row) => ({ exercise: row.exercises as unknown as Exercise | null, row }))
+          .filter((r): r is { exercise: Exercise; row: typeof templateExercises extends (infer T)[] | null ? T : never } => r.exercise != null);
 
-          await addExerciseToWorkout(exercise, {
-            targetSets: row.target_sets,
-            targetReps: row.target_reps,
-            targetWeight: row.target_weight_kg,
-            restSeconds: row.rest_seconds,
-            silent: true,
+        const resolved = await ensureExerciseRecordsBatch(rawExercises.map((r) => r.exercise));
+
+        for (const { exercise, row } of rawExercises) {
+          const source = resolved.get(exerciseKey(exercise)) ?? exercise;
+          if (selectedExerciseIds.has(source.id)) continue;
+
+          addExercise(source);
+          const exerciseIndex = useWorkoutStore.getState().activeWorkout?.exercises.length;
+          if (!exerciseIndex) continue;
+          const index = exerciseIndex - 1;
+
+          const setsToCreate = Math.max(1, row.target_sets ?? 1);
+          const parsedReps = row.target_reps ? Number.parseInt(row.target_reps, 10) : null;
+
+          updateSet(index, 0, {
+            reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+            weight_kg: row.target_weight_kg ?? null,
+            rest_seconds: row.rest_seconds ?? 90,
           });
+
+          for (let i = 1; i < setsToCreate; i += 1) {
+            addSet(index);
+            updateSet(index, i, {
+              reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+              weight_kg: row.target_weight_kg ?? null,
+              rest_seconds: row.rest_seconds ?? 90,
+            });
+          }
         }
 
         await applyAutofillFromHistory();
@@ -1497,15 +1160,38 @@ export default function WorkoutPage() {
 
       if (presetId !== "custom") {
         const preset = POPULAR_WORKOUTS.find((item) => item.id === presetId);
+        const liftsWithExercises = (preset?.lifts ?? [])
+          .map((lift) => ({ lift, exercise: allExercises.find((item) => item.name === lift.name) }))
+          .filter((r): r is { lift: typeof r.lift; exercise: Exercise } => r.exercise != null);
 
-        for (const lift of preset?.lifts ?? []) {
-          const exercise = allExercises.find((item) => item.name === lift.name);
-          if (!exercise) continue;
-          await addExerciseToWorkout(exercise, {
-            targetSets: lift.sets,
-            targetReps: lift.reps,
-            silent: true,
+        const resolved = await ensureExerciseRecordsBatch(liftsWithExercises.map((r) => r.exercise));
+
+        for (const { lift, exercise } of liftsWithExercises) {
+          const source = resolved.get(exerciseKey(exercise)) ?? exercise;
+          if (selectedExerciseIds.has(source.id)) continue;
+
+          addExercise(source);
+          const exerciseIndex = useWorkoutStore.getState().activeWorkout?.exercises.length;
+          if (!exerciseIndex) continue;
+          const index = exerciseIndex - 1;
+
+          const setsToCreate = Math.max(1, lift.sets ?? 1);
+          const parsedReps = lift.reps ? Number.parseInt(lift.reps, 10) : null;
+
+          updateSet(index, 0, {
+            reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+            weight_kg: null,
+            rest_seconds: 90,
           });
+
+          for (let i = 1; i < setsToCreate; i += 1) {
+            addSet(index);
+            updateSet(index, i, {
+              reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+              weight_kg: null,
+              rest_seconds: 90,
+            });
+          }
         }
       }
 
@@ -1565,47 +1251,6 @@ export default function WorkoutPage() {
     }
   }
 
-  async function handleSwapExercise(exerciseIndex: number, newExercise: Exercise) {
-    // 1. Swap in the store (resets weights, keeps set structure)
-    swapExercise(exerciseIndex, newExercise);
-
-    // 2. Targeted ghost re-fetch for the new exercise only
-    if (userId && ghostWorkoutData) {
-      const { data: ghostSets } = await supabase
-        .from("workout_sets")
-        .select("exercise_id, set_number, reps, weight_kg, session_id")
-        .eq("exercise_id", newExercise.id)
-        .order("set_number", { ascending: true });
-
-      if (ghostSets && ghostSets.length > 0) {
-        // Group into a partial ghost patch by setNumber
-        const patchSets = ghostSets.map((s) => ({
-          setNumber: s.set_number,
-          reps: s.reps,
-          weight: s.weight_kg,
-        }));
-        setGhostWorkoutData((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            exercises: {
-              ...prev.exercises,
-              [newExercise.id]: patchSets,
-            },
-          };
-        });
-      } else {
-        // No ghost data for new exercise — clear its entry
-        setGhostWorkoutData((prev) => {
-          if (!prev) return prev;
-          const next = { ...prev, exercises: { ...prev.exercises } };
-          delete next.exercises[newExercise.id];
-          return next;
-        });
-      }
-    }
-  }
-
   function handleOpenSaveTemplate() {
     if (!activeWorkout || !userId) {
       toast.error("Start a workout first.");
@@ -1620,7 +1265,6 @@ export default function WorkoutPage() {
       return;
     }
 
-    // Ensure user profile exists (in case the auto-create trigger didn't fire)
     try {
       await fetch("/api/auth/ensure-profile", {
         method: "POST",
@@ -1628,7 +1272,6 @@ export default function WorkoutPage() {
       });
     } catch (err) {
       console.error("Failed to ensure profile exists:", err);
-      // Continue anyway — it might already exist
     }
 
     const { data: createdTemplate, error: templateError } = await supabase
@@ -1683,357 +1326,19 @@ export default function WorkoutPage() {
     await loadTemplates(userId);
   }
 
-  async function handleFinishWorkout() {
-    const workout = await finishWorkout();
-    if (!workout || !userId) return;
-
-    // Ensure user profile exists (in case the auto-create trigger didn't fire)
-    try {
-      await fetch("/api/auth/ensure-profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch (err) {
-      console.error("Failed to ensure profile exists:", err);
-      // Continue anyway — it might already exist
-    }
-
-    const allSets = workout.exercises.flatMap((exerciseBlock) => exerciseBlock.sets);
-    const totalVolume = allSets.reduce((acc, set) => acc + (set.weight_kg ?? 0) * (set.reps ?? 0), 0);
-
-    // Calculate PRs and build exercise recap data
-    let prCount = 0;
-    let beatGhostCount = 0;
-    const exerciseRecap = workout.exercises.map((exerciseBlock) => {
-      const previousSets = previousByExerciseId[exerciseBlock.exercise.id] ?? [];
-      const previousBest = previousSets.reduce<{ reps: number | null; weight: number | null } | null>(
-        (best, set) => {
-          const setScore =
-            set.weight != null && set.reps != null ? set.weight * set.reps : -1;
-          const bestScore =
-            best && best.weight != null && best.reps != null ? best.weight * best.reps : -1;
-          return setScore > bestScore ? set : best;
-        },
-        null
-      );
-      const ghostSets = ghostWorkoutData?.exercises[exerciseBlock.exercise.id] ?? [];
-      const ghostSetByNumber = new Map(ghostSets.map((gs) => [gs.setNumber, gs]));
-      let beatGhostForExercise = false;
-
-      const setsWithPRFlags = exerciseBlock.sets.map((set) => {
-        let isPR = false;
-
-        if (set.completed && previousBest) {
-          const currentWeight = set.weight_kg ?? 0;
-          const currentReps = set.reps ?? 0;
-          const previousWeight = previousBest.weight ?? 0;
-          const previousReps = previousBest.reps ?? 0;
-
-          // PR if: (same reps + more weight) OR (same weight + more reps) OR (more weight + more reps)
-          isPR =
-            (currentReps === previousReps && currentWeight > previousWeight) ||
-            (currentWeight === previousWeight && currentReps > previousReps) ||
-            (currentWeight > previousWeight && currentReps > previousReps);
-
-          if (isPR) {
-            prCount++;
-          }
-        }
-
-        // Ghost comparison for this specific set
-        const ghostSet = ghostSetByNumber.get(set.set_number);
-        if (
-          set.completed &&
-          ghostSet &&
-          ghostSet.weight != null &&
-          ghostSet.reps != null &&
-          set.weight_kg != null &&
-          set.reps != null
-        ) {
-          const currentScore = (set.weight_kg ?? 0) * (set.reps ?? 0);
-          const ghostScore = (ghostSet.weight ?? 0) * (ghostSet.reps ?? 0);
-          if (currentScore > ghostScore) {
-            beatGhostForExercise = true;
-          }
-        }
-
-        return {
-          reps: set.reps,
-          weight: set.weight_kg != null ? toDisplayWeight(set.weight_kg) : null,
-          completed: set.completed,
-          isPR,
-        };
-      });
-
-      if (beatGhostForExercise) {
-        beatGhostCount++;
+  // Rest timer handler for ExerciseCard
+  const handleStartRest = useCallback(
+    (exerciseId: string, exerciseName: string, seconds: number) => {
+      const activeTimers = getActiveTimers();
+      for (const timer of activeTimers) {
+        stopTimer(timer.id);
       }
+      startTimer(exerciseId, exerciseName, seconds);
+    },
+    [getActiveTimers, stopTimer, startTimer]
+  );
 
-      return {
-        name: exerciseBlock.exercise.name,
-        sets: setsWithPRFlags,
-      };
-    });
-
-    // Calculate duration
-    const durationMs = Date.now() - new Date(workout.started_at).getTime();
-    const totalSeconds = Math.floor(durationMs / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const durationString =
-      hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-
-    const nowIso = new Date().toISOString();
-
-    const { data: session, error: sessionError } = await supabase
-      .from("workout_sessions")
-      .insert({
-        user_id: userId,
-        template_id: workout.template_id,
-        name: workout.name,
-        status: "in_progress",
-        started_at: workout.started_at,
-        completed_at: null,
-        duration_seconds: null,
-        total_volume_kg: null,
-        notes: workout.notes,
-      })
-      .select("id")
-      .single();
-
-    if (sessionError || !session) {
-      if (sessionError && isMissingTableError(sessionError)) {
-        setDbFeaturesAvailable(false);
-        toast.message(
-          `${workout.name} finished locally, but history sync is unavailable until migrations are applied.`
-        );
-        return;
-      }
-      toast.error(sessionError?.message ?? "Failed to save workout session.");
-      return;
-    }
-
-    let sortOrder = 0;
-    const setRows = workout.exercises.flatMap((exerciseBlock) =>
-      exerciseBlock.sets.map((set) => {
-        sortOrder += 1;
-        return {
-          session_id: session.id,
-          exercise_id: exerciseBlock.exercise.id,
-          set_number: set.set_number,
-          set_type: set.set_type,
-          reps: set.reps,
-          weight_kg: set.weight_kg,
-          rir: set.rir,
-          rest_seconds: set.rest_seconds,
-          completed_at: set.completed ? set.completed_at ?? nowIso : null,
-          sort_order: sortOrder,
-        };
-      })
-    );
-
-    const { error: setsError } = await supabase.from("workout_sets").insert(setRows);
-
-    if (setsError) {
-      if (isMissingTableError(setsError)) {
-        setDbFeaturesAvailable(false);
-        toast.message(
-          `${workout.name} finished locally, but set history sync is unavailable until migrations are applied.`
-        );
-        return;
-      }
-      toast.error(setsError.message);
-      return;
-    }
-
-    // Snapshot level before completion so we can detect a level-up afterwards
-    const { data: levelBefore } = await supabase
-      .from("profiles")
-      .select("level")
-      .eq("id", userId)
-      .maybeSingle();
-    const levelBeforeCompletion = levelBefore?.level ?? 1;
-
-    const { error: completeError } = await supabase
-      .from("workout_sessions")
-      .update({
-        status: "completed",
-        completed_at: nowIso,
-        duration_seconds: Math.max(
-          0,
-          Math.floor((new Date(nowIso).getTime() - new Date(workout.started_at).getTime()) / 1000)
-        ),
-        total_volume_kg: Number(totalVolume.toFixed(2)),
-        notes: workout.notes,
-      })
-      .eq("id", session.id)
-      .eq("user_id", userId);
-
-    if (completeError) {
-      toast.error(completeError.message ?? "Workout saved, but completion sync failed.");
-      return;
-    }
-
-    const setsCompleted = workout.exercises.flatMap((exercise) => exercise.sets).filter(
-      (set) => set.completed
-    ).length;
-
-    void trackSessionIntentCompleted(supabase, userId, {
-      workout_name: workout.name,
-      template_id: workout.template_id ?? null,
-      exercise_count: workout.exercises.length,
-      completed_sets: setsCompleted,
-      total_volume_kg: Number(totalVolume.toFixed(2)),
-      duration_seconds: Math.max(
-        0,
-        Math.floor((new Date(nowIso).getTime() - new Date(workout.started_at).getTime()) / 1000)
-      ),
-    });
-
-    // Investment loop: automatically seed a next-session intent for tomorrow.
-    try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const intentDate = tomorrow.toISOString().slice(0, 10);
-      await supabase.from("user_intents").insert({
-        user_id: userId,
-        intent_type: "next_session_commitment",
-        intent_for_date: intentDate,
-        source_screen: "workout",
-        intent_payload: {
-          previous_workout_name: workout.name,
-          suggested_goal: "Complete one focused session",
-          suggested_duration_min: 20,
-        },
-      });
-    } catch {
-      // Optional table (migration 035); keep workout flow resilient.
-    }
-
-    // Retention micro-win reinforcement: summarize immediate progress signals.
-    try {
-      const { data: profileSnapshot } = await supabase
-        .from("profiles")
-        .select("current_streak, level, xp")
-        .eq("id", userId)
-        .maybeSingle();
-
-      const currentStreak = profileSnapshot?.current_streak ?? 0;
-      const level = profileSnapshot?.level ?? null;
-      const xp = profileSnapshot?.xp ?? 0;
-      const milestones = [7, 30, 100, 365];
-      const nextMilestone = milestones.find((m) => m > currentStreak) ?? null;
-      const milestoneText =
-        nextMilestone != null
-          ? `${nextMilestone - currentStreak} days to ${nextMilestone}-day milestone`
-          : "Milestone ladder complete";
-
-      // Calculate XP awarded this session for the toast message
-      const xpAwarded = 100 + (setsCompleted * 2);
-
-      void logRetentionEvent(supabase, {
-        userId,
-        eventType: "micro_win_shown",
-        sourceScreen: "workout",
-        metadata: {
-          streak: currentStreak,
-          level,
-          next_milestone: nextMilestone,
-          pr_count: prCount,
-          beat_ghost_count: ghostWorkoutData ? beatGhostCount : 0,
-          workout_name: workout.name,
-          completed_sets: setsCompleted,
-          xp_awarded: xpAwarded,
-        },
-      });
-
-      toast.success(`+${xpAwarded} XP earned`, {
-        description: level != null ? `Level ${level} • ${xp} XP • ${milestoneText}` : milestoneText,
-      });
-
-      // Detect and queue level-up celebration (shown after workout celebration closes)
-      if (level != null && level > levelBeforeCompletion) {
-        setLevelUpData({ newLevel: level });
-      }
-    } catch (err) {
-      // Non-critical — keep workout flow resilient
-      void err;
-    }
-
-    // Show celebration modal with stats
-    setCelebrationStats({
-      duration: durationString,
-      exerciseCount: workout.exercises.length,
-      totalVolume: toDisplayVolume(totalVolume),
-      unitLabel,
-      prCount,
-      totalSets: allSets.length,
-      beatGhostCount: ghostWorkoutData ? beatGhostCount : undefined,
-      exercises: exerciseRecap,
-    });
-    setShowCelebration(true);
-    setPendingSessionId(session.id);
-  }
-
-  async function handleCancelWorkout() {
-    await cancelWorkout();
-    toast.message("Workout cancelled");
-  }
-
-  function handleCloseWorkoutCelebration() {
-    setShowCelebration(false);
-    setCelebrationStats(null);
-
-    if (levelUpData) {
-      // Show level-up modal first; RPE prompt follows after that
-      return;
-    }
-
-    // Open the second popup only after the first one is closed.
-    setTimeout(() => {
-      fireConfetti();
-      setSessionRpePromptOpen(true);
-    }, 650);
-  }
-
-  function handleCloseLevelUp() {
-    setLevelUpData(null);
-    setTimeout(() => {
-      fireConfetti();
-      setSessionRpePromptOpen(true);
-    }, 650);
-  }
-
-  async function handleSaveSessionRpe() {
-    if (!pendingSessionId) return;
-
-    setSavingSessionRpe(true);
-    try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const response = await fetch("/api/fatigue/session-rpe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: pendingSessionId,
-          session_rpe: sessionRpeValue,
-          timezone,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Could not save session effort");
-
-      toast.success("Session effort saved.");
-      setSessionRpePromptOpen(false);
-      setPendingSessionId(null);
-    } catch (error) {
-      console.error("Failed to save session effort:", error);
-      toast.error("Could not save session effort");
-    } finally {
-      setSavingSessionRpe(false);
-    }
-  }
-
-  // Shared inner content for the lift picker — used by both Sheet (mobile) and Popover (desktop).
+  // Shared inner content for the lift picker
   const liftPickerExerciseList = (
     <>
       <Input
@@ -2095,7 +1400,7 @@ export default function WorkoutPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
+    <div data-phase="active" className="min-h-screen bg-background pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
       <div className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-6 lg:px-10">
           <div className="flex items-center gap-2.5">
@@ -2173,297 +1478,33 @@ export default function WorkoutPage() {
               </div>
 
               {setupTab === "templates" ? (
-                <div className="space-y-3 rounded-xl border border-border/70 bg-secondary/20 p-3">
-                  <div className="flex items-center justify-between">
-                    <Label
-                      htmlFor="saved-template"
-                      className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
-                    >
-                      Template Selection
-                    </Label>
-                    <button
-                      type="button"
-                      onClick={() => setShowTemplateManager((prev) => !prev)}
-                      className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <LayoutList className="size-3" />
-                      {showTemplateManager ? "Hide Manager" : "Template Manager"}
-                    </button>
-                  </div>
-                  {showTemplateManager ? (
-                    <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                      {loadingTemplates ? (
-                        <div className="rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-sm text-muted-foreground">
-                          Loading templates...
-                        </div>
-                      ) : templates.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-border/70 bg-card/60 px-3 py-2 text-sm text-muted-foreground">
-                          No templates yet.
-                        </div>
-                      ) : (
-                        templates.map((template) => (
-                          <div
-                            key={template.id}
-                            className={`rounded-xl border px-3 py-2 transition ${selectedTemplateId === template.id
-                              ? "border-primary/40 bg-primary/10"
-                              : "border-border/70 bg-card/70"
-                              }`}
-                          >
-                            <p className="truncate text-sm font-semibold">{template.name}</p>
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => handleSendTemplate(template)}
-                                disabled={templateActionBusyId === template.id}
-                                className="h-7 px-2 text-xs"
-                              >
-                                <Send className="mr-1 h-3 w-3" />
-                                Send
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => handleEditTemplate(template)}
-                                disabled={templateActionBusyId === template.id}
-                                className="h-7 px-2 text-xs"
-                              >
-                                <Pencil className="mr-1 h-3 w-3" />
-                                Edit
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => handleCopyTemplate(template)}
-                                disabled={templateActionBusyId === template.id}
-                                className="h-7 px-2 text-xs"
-                              >
-                                <Copy className="mr-1 h-3 w-3" />
-                                Copy
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleDeleteTemplate(template)}
-                                disabled={templateActionBusyId === template.id}
-                                className="h-7 px-2 text-xs"
-                              >
-                                <Trash2 className="mr-1 h-3 w-3" />
-                                Delete
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={likedTemplateIds.has(template.id) ? "default" : "secondary"}
-                                onClick={() => handleToggleTemplateLike(template.id)}
-                                className="h-7 px-2 text-xs"
-                              >
-                                <Heart className="mr-1 h-3 w-3" />
-                                {likedTemplateIds.has(template.id) ? "Liked" : "Like"}
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ) : null}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTemplateId("none")}
-                      className={`rounded-xl border px-3 py-2 text-left transition ${selectedTemplateId === "none"
-                        ? "border-primary/40 bg-primary/10"
-                        : "border-border/70 bg-card/70 hover:bg-card"
-                        }`}
-                    >
-                      <p className="text-sm font-semibold">Start Fresh</p>
-                      <p className="text-xs text-muted-foreground">No template preloaded</p>
-                    </button>
-                    {loadingTemplates ? (
-                      <div className="rounded-xl border border-border/70 bg-card/70 px-3 py-2 text-sm text-muted-foreground">
-                        Loading templates...
-                      </div>
-                    ) : templates.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-border/70 bg-card/60 px-3 py-2 text-sm text-muted-foreground">
-                        No templates yet. Use Template Manager above to create one here.
-                      </div>
-                    ) : (
-                      templates.map((template) => (
-                        <div
-                          key={template.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            setSelectedTemplateId(template.id);
-                            setWorkoutName(template.name);
-                            setPendingCategories([]);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key !== "Enter" && event.key !== " ") return;
-                            event.preventDefault();
-                            setSelectedTemplateId(template.id);
-                            setWorkoutName(template.name);
-                            setPendingCategories([]);
-                          }}
-                          className={`rounded-xl border px-3 py-2 text-left transition ${selectedTemplateId === template.id
-                            ? "border-primary/40 bg-primary/10"
-                            : "border-border/70 bg-card/70 hover:bg-card"
-                            }`}
-                        >
-                          <div className="flex items-start justify-between gap-1 mb-0.5">
-                            <p className="truncate text-sm font-semibold">{template.name}</p>
-                            <div className="flex shrink-0 items-center gap-1">
-                              {likedTemplateIds.has(template.id) ? (
-                                <Heart className="h-3.5 w-3.5 text-rose-400" />
-                              ) : null}
-                              {template.primary_muscle_group && template.primary_muscle_group.split(",").map((cat) => {
-                                const trimmed = cat.trim();
-                                const tgc = getMuscleColor(trimmed);
-                                return (
-                                  <span
-                                    key={trimmed}
-                                    className="rounded-full px-1.5 py-0.5 text-[8px] font-bold capitalize"
-                                    style={{ background: tgc.bgAlpha, color: tgc.labelColor, border: `1px solid ${tgc.borderAlpha}` }}
-                                  >
-                                    {trimmed}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          <p className="text-xs text-muted-foreground">Tap to preload</p>
-                          <div className="mt-1.5 flex gap-1.5">
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleToggleTemplateLike(template.id);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key !== "Enter" && event.key !== " ") return;
-                                event.preventDefault();
-                                event.stopPropagation();
-                                handleToggleTemplateLike(template.id);
-                              }}
-                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${likedTemplateIds.has(template.id)
-                                ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
-                                : "border-border/70 text-muted-foreground"
-                                }`}
-                            >
-                              <Heart className="h-3 w-3" />
-                              Like
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <TemplateManagerPanel
+                  templates={templates}
+                  loadingTemplates={loadingTemplates}
+                  selectedTemplateId={selectedTemplateId}
+                  showTemplateManager={showTemplateManager}
+                  templateActionBusyId={templateActionBusyId}
+                  likedTemplateIds={likedTemplateIds}
+                  onToggleManager={() => setShowTemplateManager((prev) => !prev)}
+                  onSelectTemplate={(id, name) => {
+                    setSelectedTemplateId(id);
+                    setWorkoutName(name);
+                    setPendingCategories([]);
+                  }}
+                  onSelectStartFresh={() => setSelectedTemplateId("none")}
+                  onSendTemplate={handleSendTemplate}
+                  onEditTemplate={handleEditTemplate}
+                  onCopyTemplate={handleCopyTemplate}
+                  onDeleteTemplate={handleDeleteTemplate}
+                  onToggleLike={handleToggleTemplateLike}
+                />
               ) : (
-                <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/20 p-3">
-                  <Label
-                    htmlFor="preset"
-                    className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
-                  >
-                    Choose a Preset
-                  </Label>
-
-                  {/* Marketplace-style filter pills */}
-                  <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                    {MUSCLE_FILTERS.map((f) => {
-                      const on = quickFilter === f;
-                      const mgc = f !== "All" ? getMuscleColor(f) : null;
-                      return (
-                        <button
-                          key={f}
-                          type="button"
-                          onClick={() => setQuickFilter(f)}
-                          className="shrink-0 rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition-all duration-150"
-                          style={{
-                            background: on
-                              ? (mgc ? mgc.bgAlpha : "rgba(200,255,0,0.15)")
-                              : "rgba(255,255,255,0.04)",
-                            border: `1px solid ${on
-                              ? (mgc ? mgc.borderAlpha : "rgba(200,255,0,0.4)")
-                              : "rgba(255,255,255,0.08)"}`,
-                            color: on
-                              ? (mgc ? mgc.labelColor : "hsl(var(--primary))")
-                              : "hsl(var(--muted-foreground))",
-                            fontWeight: on ? 700 : 500,
-                          }}
-                        >
-                          {f}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Filtered preset grid */}
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {POPULAR_WORKOUTS
-                      .filter((preset) => quickFilter === "All" || preset.category.toLowerCase() === quickFilter.toLowerCase())
-                      .map((preset) => {
-                        const gc = getMuscleColor(preset.category);
-                        const active = presetId === preset.id;
-                        return (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() => handlePresetChange(preset.id)}
-                            className={`rounded-xl border px-3 py-2 text-left transition ${active
-                              ? "border-primary/40 bg-primary/10"
-                              : "border-border/70 bg-card/70 hover:bg-card"
-                              }`}
-                          >
-                            <div className="flex items-start justify-between gap-1 mb-0.5">
-                              <p className="text-xs font-semibold leading-snug">{preset.defaultName}</p>
-                              <span
-                                className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold capitalize"
-                                style={{
-                                  background: gc.bgAlpha,
-                                  color: gc.labelColor,
-                                  border: `1px solid ${gc.borderAlpha}`,
-                                }}
-                              >
-                                {preset.category}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground">
-                              {preset.liftNames.length} exercises
-                            </p>
-                            <div className="mt-1.5 space-y-0.5">
-                              {preset.liftNames.slice(0, 2).map((lift) => (
-                                <p key={lift} className="truncate text-[10px] text-muted-foreground/90">
-                                  • {lift}
-                                </p>
-                              ))}
-                              {preset.liftNames.length > 2 ? (
-                                <p className="text-[10px] text-muted-foreground/80">
-                                  +{preset.liftNames.length - 2} more
-                                </p>
-                              ) : null}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    <button
-                      type="button"
-                      onClick={() => handlePresetChange("custom")}
-                      className={`rounded-xl border px-3 py-2 text-left transition ${presetId === "custom"
-                        ? "border-primary/40 bg-primary/10"
-                        : "border-border/70 bg-card/70 hover:bg-card"
-                        }`}
-                    >
-                      <p className="text-xs font-semibold">Custom</p>
-                      <p className="text-[10px] text-muted-foreground">Start empty workout</p>
-                    </button>
-                  </div>
-                </div>
+                <QuickStartPanel
+                  presetId={presetId}
+                  quickFilter={quickFilter}
+                  onQuickFilterChange={setQuickFilter}
+                  onPresetChange={handlePresetChange}
+                />
               )}
 
               <div className="space-y-2">
@@ -2476,9 +1517,8 @@ export default function WorkoutPage() {
                 />
               </div>
 
-              {/* Category picker — required when a saved template has no workout type OR Start Fresh */}
+              {/* Category picker -- required when a saved template has no workout type OR Start Fresh */}
               {setupTab === "templates" && (() => {
-                // Show for Start Fresh OR for templates missing a category
                 if (selectedTemplateId !== "none") {
                   const tpl = templates.find((t) => t.id === selectedTemplateId);
                   if (tpl?.primary_muscle_group) return null;
@@ -2556,56 +1596,16 @@ export default function WorkoutPage() {
 
         {isWorkoutActive && activeWorkout ? (
           <>
-            <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/10 p-5 sm:p-6">
-              <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
-              <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-accent/20 blur-3xl" />
-              <div className="relative space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Active Session</p>
-                    <h2 className="mt-1 text-[28px] font-black leading-tight tracking-tight sm:text-[32px]">
-                      {activeWorkout.name}
-                    </h2>
-                  </div>
-                  <div className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
-                    <Clock3 className="size-4" />
-                    <ElapsedTime startedAt={activeWorkout.started_at} />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Badge className="rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-cyan-300">
-                    <Activity className="mr-1 h-3.5 w-3.5" />
-                    {toDisplayVolume(plannerStats.totalVolumeKg).toLocaleString()} {unitLabel}
-                  </Badge>
-                  <Badge className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-emerald-300">
-                    <CircleCheck className="mr-1 h-3.5 w-3.5" />
-                    {plannerStats.completedSets} done
-                  </Badge>
-                  <Badge className="rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-violet-300">
-                    <Layers className="mr-1 h-3.5 w-3.5" />
-                    {plannerStats.totalSets} total sets
-                  </Badge>
-                  <Badge className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-amber-300">
-                    <Dumbbell className="mr-1 h-3.5 w-3.5" />
-                    {plannerStats.exercises} exercises
-                  </Badge>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[12px] uppercase tracking-[0.12em] text-muted-foreground">
-                    <span>Session Progress</span>
-                    <span>{completionProgressPct}%</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-secondary/80">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]"
-                      style={{ width: `${completionProgressPct}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </section>
+            <WorkoutHeader
+              workoutName={activeWorkout.name}
+              startedAt={activeWorkout.started_at}
+              totalVolumeDisplay={toDisplayVolume(plannerStats.totalVolumeKg).toLocaleString()}
+              completedSets={plannerStats.completedSets}
+              totalSets={plannerStats.totalSets}
+              exerciseCount={plannerStats.exercises}
+              completionProgressPct={completionProgressPct}
+              unitLabel={unitLabel}
+            />
 
             <div className="grid gap-6 lg:grid-cols-[21.25rem_minmax(0,1fr)]">
               <Card className="h-fit border-border/70 bg-card/95 shadow-sm transition-all duration-300 lg:sticky lg:top-20">
@@ -2658,7 +1658,6 @@ export default function WorkoutPage() {
                     <div className="space-y-2">
                       <Label>Available lifts</Label>
                       {isSmallScreen ? (
-                        /* Mobile: bottom Sheet avoids virtual keyboard overlap */
                         <Sheet open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
                           <Button
                             variant="outline"
@@ -2681,7 +1680,6 @@ export default function WorkoutPage() {
                           </SheetContent>
                         </Sheet>
                       ) : (
-                        /* Desktop: Popover anchored to trigger */
                         <Popover open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" role="combobox" className="w-full justify-between">
@@ -2707,7 +1705,7 @@ export default function WorkoutPage() {
                           <p className="mt-0.5 text-xs text-muted-foreground">
                             {MUSCLE_GROUP_LABELS[selectedExercise.muscle_group as MuscleGroup] ?? selectedExercise.muscle_group}
                             {selectedExercise.equipment
-                              ? ` · ${EQUIPMENT_LABELS[selectedExercise.equipment] ?? selectedExercise.equipment}`
+                              ? ` \u00b7 ${EQUIPMENT_LABELS[selectedExercise.equipment] ?? selectedExercise.equipment}`
                               : ""}
                           </p>
                         </div>
@@ -2819,164 +1817,24 @@ export default function WorkoutPage() {
                           </div>
                         ) : null}
                         {activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
-                          <Card
+                          <ExerciseCard
                             key={exerciseBlock.exercise.id}
-                            className="overflow-hidden border-border/70 bg-card/90 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-primary/30 hover:shadow-lg"
-                          >
-                            <div className="h-1 w-full bg-gradient-to-r from-primary via-primary/60 to-accent" />
-                            <CardHeader className="pb-3">
-                              <CardTitle className="flex items-center justify-between text-[20px] font-semibold tracking-tight">
-                                <div>
-                                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                                    <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
-                                      {exerciseBlock.exercise.category}
-                                    </Badge>
-                                    {exerciseBlock.exercise.equipment ? (
-                                      <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
-                                        {EQUIPMENT_LABELS[exerciseBlock.exercise.equipment] ?? exerciseBlock.exercise.equipment}
-                                      </Badge>
-                                    ) : null}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <p>{exerciseBlock.exercise.name}</p>
-                                    {exerciseTrendlines[exerciseBlock.exercise.id] && (
-                                      <ExerciseSparkline
-                                        weights={exerciseTrendlines[exerciseBlock.exercise.id].weights}
-                                        slope={exerciseTrendlines[exerciseBlock.exercise.id].slope}
-                                      />
-                                    )}
-                                  </div>
-                                  {previousByExerciseId[exerciseBlock.exercise.id]?.length ? (
-                                    <p className="mt-1 text-xs font-normal text-muted-foreground">
-                                      Ghost: last session sets loaded
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="text-right">
-                                    <p className="text-lg font-bold leading-none text-primary">
-                                      {exerciseBlock.sets.filter((set) => set.completed).length}
-                                      <span className="text-sm font-medium text-muted-foreground">/{exerciseBlock.sets.length}</span>
-                                    </p>
-                                    <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">sets done</p>
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => setSwapSheetIndex(exerciseIndex)}
-                                    title="Swap exercise"
-                                  >
-                                    <ArrowLeftRight className="size-4 text-muted-foreground" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => removeExercise(exerciseIndex)}
-                                  >
-                                    <X className="size-4 text-destructive" />
-                                  </Button>
-                                </div>
-                              </CardTitle>
-                            </CardHeader>
-                            {/* Form Tips Panel */}
-                            {exerciseBlock.exercise.form_tips && exerciseBlock.exercise.form_tips.length > 0 && (
-                              <FormTipsPanel
-                                exerciseName={exerciseBlock.exercise.name}
-                                formTips={exerciseBlock.exercise.form_tips}
-                              />
-                            )}
-                            <CardContent className="space-y-3 px-5 pb-5">
-                              {ghostWorkoutData?.exercises[exerciseBlock.exercise.id]?.length ? (
-                                <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2">
-                                  <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-cyan-300/80">
-                                    Last Session Set Ladder
-                                  </p>
-                                  <div className="mt-2 flex flex-wrap gap-1.5">
-                                    {ghostWorkoutData.exercises[exerciseBlock.exercise.id]
-                                      .slice()
-                                      .sort((a, b) => a.setNumber - b.setNumber)
-                                      .map((ghostSet) => (
-                                        <span
-                                          key={`${exerciseBlock.exercise.id}-ghost-${ghostSet.setNumber}`}
-                                          className="inline-flex items-center gap-1 rounded-md border border-cyan-500/25 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200"
-                                        >
-                                          <span className="font-semibold">S{ghostSet.setNumber}</span>
-                                          <span className="text-cyan-100/90">
-                                            {ghostSet.weight != null
-                                              ? preference === "imperial"
-                                                ? weightToDisplay(ghostSet.weight, true, 1)
-                                                : ghostSet.weight
-                                              : "—"} x {ghostSet.reps ?? "—"}
-                                          </span>
-                                        </span>
-                                      ))}
-                                  </div>
-                                </div>
-                              ) : null}
-                              {exerciseBlock.sets.map((set, setIndex) => {
-                                const matchedGhostSet = ghostWorkoutData?.exercises[
-                                  exerciseBlock.exercise.id
-                                ]?.find((ghostSet) => ghostSet.setNumber === set.set_number);
-                                return (
-                                  <SetRow
-                                    key={set.id}
-                                    set={set}
-                                    previousSet={previousByExerciseId[exerciseBlock.exercise.id]?.[setIndex]}
-                                    ghostSet={
-                                      matchedGhostSet
-                                        ? {
-                                          reps: matchedGhostSet.reps,
-                                          weight: matchedGhostSet.weight,
-                                        }
-                                        : undefined
-                                    }
-                                    suggestedWeight={
-                                      suggestedWeightsByKey[exerciseBlock.exercise.id]?.[setIndex] ?? null
-                                    }
-                                    autoFocusWeight={setIndex === exerciseBlock.sets.length - 1 && !set.completed}
-                                    onUpdate={(updates) => updateSet(exerciseIndex, setIndex, updates)}
-                                    onComplete={() => completeSet(exerciseIndex, setIndex)}
-                                    onRemove={() => removeSet(exerciseIndex, setIndex)}
-                                    onStartRest={(seconds) => {
-                                      const activeTimers = getActiveTimers();
-                                      for (const timer of activeTimers) {
-                                        stopTimer(timer.id);
-                                      }
-                                      startTimer(
-                                        exerciseBlock.exercise.id,
-                                        exerciseBlock.exercise.name,
-                                        seconds
-                                      );
-                                    }}
-                                  />
-                                );
-                              })}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="w-full transition-all duration-200 hover:scale-[1.01]"
-                                onClick={() => addSet(exerciseIndex)}
-                              >
-                                Add Set
-                              </Button>
-                              {/* Exercise Notes */}
-                              <div className="space-y-1.5 pt-1">
-                                <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <NotebookPen className="h-3 w-3" />
-                                  Exercise notes
-                                </Label>
-                                <Textarea
-                                  placeholder="Notes for this exercise (optional)..."
-                                  value={exerciseBlock.notes}
-                                  onChange={(e) => setExerciseNote(exerciseIndex, e.target.value)}
-                                  className="min-h-[60px] resize-none text-sm"
-                                  rows={2}
-                                />
-                              </div>
-                            </CardContent>
-                          </Card>
+                            exerciseBlock={exerciseBlock}
+                            exerciseIndex={exerciseIndex}
+                            ghostSets={ghostWorkoutData?.exercises[exerciseBlock.exercise.id]}
+                            previousSets={previousByExerciseId[exerciseBlock.exercise.id]}
+                            suggestedWeights={suggestedWeightsByKey[exerciseBlock.exercise.id]}
+                            trendline={exerciseTrendlines[exerciseBlock.exercise.id]}
+                            preference={preference}
+                            onUpdateSet={updateSet}
+                            onCompleteSet={completeSet}
+                            onRemoveSet={removeSet}
+                            onAddSet={addSet}
+                            onRemoveExercise={removeExercise}
+                            onSwapExercise={setSwapSheetIndex}
+                            onSetExerciseNote={setExerciseNote}
+                            onStartRest={handleStartRest}
+                          />
                         ))}
                       </div>
                     )}
@@ -3073,7 +1931,7 @@ export default function WorkoutPage() {
           />
         )}
 
-        {/* Level-Up Celebration — shown after workout celebration closes */}
+        {/* Level-Up Celebration -- shown after workout celebration closes */}
         {!showCelebration && levelUpData && (
           <LevelUpCelebration
             newLevel={levelUpData.newLevel}
@@ -3081,49 +1939,15 @@ export default function WorkoutPage() {
           />
         )}
 
-        <Dialog open={sessionRpePromptOpen} onOpenChange={setSessionRpePromptOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Rate Session Effort</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Quick post-session rating. This improves your fatigue estimate.
-              </p>
-              <div className="rounded-md border border-border/60 bg-card/40 p-3 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">What is sRPE?</p>
-                <p className="mt-1">
-                  sRPE means <span className="font-semibold">Session Rate of Perceived Exertion</span>:
-                  how hard the <span className="font-semibold">entire workout</span> felt on a 0-10
-                  scale.
-                </p>
-                <p className="mt-1">
-                  0-2 = very easy, 3-5 = moderate, 6-8 = hard, 9-10 = near max effort.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Session RPE</span>
-                  <span className="font-semibold tabular-nums">{sessionRpeValue.toFixed(1)}</span>
-                </div>
-                <Slider
-                  min={0}
-                  max={10}
-                  step={0.5}
-                  value={[sessionRpeValue]}
-                  onValueChange={(value) => setSessionRpeValue(value[0] ?? 7)}
-                />
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Very easy</span>
-                  <span>Max effort</span>
-                </div>
-              </div>
-              <Button onClick={handleSaveSessionRpe} disabled={savingSessionRpe} className="w-full">
-                {savingSessionRpe ? "Saving..." : "Save Effort"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Session RPE Prompt */}
+        <WorkoutCompletionDialog
+          open={sessionRpePromptOpen}
+          onOpenChange={setSessionRpePromptOpen}
+          sessionRpeValue={sessionRpeValue}
+          onSessionRpeChange={setSessionRpeValue}
+          onSave={handleSaveSessionRpe}
+          saving={savingSessionRpe}
+        />
 
         {/* Floating Rest Timer Pill */}
         <RestTimerPill />

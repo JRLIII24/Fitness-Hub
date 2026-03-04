@@ -175,7 +175,11 @@ export const SetRow = memo(function SetRow({
   const currentRepsText = set.reps != null ? `${set.reps}` : "—";
 
   return (
-    <div
+    <motion.div
+      animate={set.completed ? {
+        boxShadow: ["0 0 0px transparent", "0 0 16px 2px var(--phase-active-glow, oklch(0.78 0.16 195 / 0.20))", "0 0 0px transparent"],
+      } : {}}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
         "space-y-2.5 rounded-xl border border-border/60 px-3.5 py-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
         set.completed
@@ -420,6 +424,6 @@ export const SetRow = memo(function SetRow({
           ) : null}
         </div>
       ) : null}
-    </div>
+    </motion.div>
   );
 });

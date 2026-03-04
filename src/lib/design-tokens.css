@@ -162,6 +162,57 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+
+  /* ==================== GLASS SURFACE TOKENS ==================== */
+  /* Glass blur levels — higher blur for true frosted glass see-through */
+  --glass-blur-sm: 12px;
+  --glass-blur-md: 20px;
+  --glass-blur-lg: 32px;
+  --glass-blur-xl: 40px;           /* Max for Capacitor perf */
+
+  /* Glass tint (OKLCH + alpha) — low opacity for true transparency */
+  --glass-tint-light: oklch(0.98 0.005 264 / 0.03);
+  --glass-tint-medium: oklch(0.95 0.01 264 / 0.06);
+  --glass-tint-heavy: oklch(0.90 0.015 264 / 0.10);
+
+  /* Glass borders (light refraction edge) */
+  --glass-border-light: oklch(0.98 0 0 / 0.12);
+  --glass-border-medium: oklch(0.98 0 0 / 0.18);
+  --glass-border-heavy: oklch(0.98 0 0 / 0.25);
+
+  /* Inner highlight (top-edge light catch) */
+  --glass-highlight: oklch(0.99 0 0 / 0.10);
+
+  /* Glass depth shadows (OKLCH-based) */
+  --glass-shadow-sm: 0 2px 8px oklch(0 0 0 / 0.12), 0 1px 2px oklch(0 0 0 / 0.08);
+  --glass-shadow-md: 0 4px 16px oklch(0 0 0 / 0.16), 0 2px 4px oklch(0 0 0 / 0.10);
+  --glass-shadow-lg: 0 8px 32px oklch(0 0 0 / 0.20), 0 4px 8px oklch(0 0 0 / 0.12);
+  --glass-shadow-xl: 0 16px 48px oklch(0 0 0 / 0.24), 0 8px 16px oklch(0 0 0 / 0.14);
+
+  /* ==================== CONTEXTUAL PHASE COLORS ==================== */
+  /* "Cloud Dancer" — recovery/rest */
+  --phase-rest-accent: oklch(0.72 0.08 220);
+  --phase-rest-glow: oklch(0.72 0.08 220 / 0.15);
+
+  /* "Electric Cyan" — active strength */
+  --phase-active-accent: oklch(0.78 0.16 195);
+  --phase-active-glow: oklch(0.78 0.16 195 / 0.20);
+
+  /* Pre-workout — warm amber */
+  --phase-preworkout-accent: oklch(0.80 0.15 70);
+  --phase-preworkout-glow: oklch(0.80 0.15 70 / 0.18);
+
+  /* Post-workout — recovery green */
+  --phase-postworkout-accent: oklch(0.75 0.16 155);
+  --phase-postworkout-glow: oklch(0.75 0.16 155 / 0.18);
+
+  /* Morning — sunrise gold */
+  --phase-morning-accent: oklch(0.82 0.12 55);
+  --phase-morning-glow: oklch(0.82 0.12 55 / 0.15);
+
+  /* Evening — deep indigo */
+  --phase-evening-accent: oklch(0.60 0.14 280);
+  --phase-evening-glow: oklch(0.60 0.14 280 / 0.12);
 }
 
 /* ==================== ACCENT COLOR PRESETS ==================== */

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Trophy, Medal } from "lucide-react";
 import { HistoryNav } from "@/components/history/history-nav";
 import { PRsClient } from "./prs-client";
+import { estimateE1RM } from "@/lib/e1rm";
 
 export default async function PRsPage() {
   const supabase = await createClient();
@@ -37,15 +38,21 @@ export default async function PRsPage() {
 
   const rows = (rawPRs ?? []) as RawRow[];
 
-  // Aggregate best weight per exercise
-  const prMap = new Map<string, { id: string; name: string; muscle_group: string; pr_kg: number; reps: number | null; achieved_at: string }>();
+  // Aggregate best weight AND best e1RM per exercise
+  const prMap = new Map<string, {
+    id: string; name: string; muscle_group: string;
+    pr_kg: number; reps: number | null; achieved_at: string;
+    e1rm_kg: number | null;
+  }>();
 
   for (const row of rows) {
     const ex = Array.isArray(row.exercises) ? row.exercises[0] : row.exercises;
     const sess = Array.isArray(row.workout_sessions) ? row.workout_sessions[0] : row.workout_sessions;
     if (!ex || !row.weight_kg) continue;
 
+    const e1rm = row.reps ? estimateE1RM(row.weight_kg, row.reps) : null;
     const existing = prMap.get(ex.id);
+
     if (!existing || row.weight_kg > existing.pr_kg) {
       prMap.set(ex.id, {
         id: ex.id,
@@ -54,7 +61,13 @@ export default async function PRsPage() {
         pr_kg: row.weight_kg,
         reps: row.reps,
         achieved_at: sess?.started_at ?? "",
+        e1rm_kg: e1rm !== null && (existing?.e1rm_kg == null || e1rm > existing.e1rm_kg)
+          ? e1rm
+          : existing?.e1rm_kg ?? e1rm,
       });
+    } else if (e1rm !== null && (existing.e1rm_kg == null || e1rm > existing.e1rm_kg)) {
+      // Different set has higher e1RM even if lower raw weight
+      prMap.set(ex.id, { ...existing, e1rm_kg: e1rm });
     }
   }
 

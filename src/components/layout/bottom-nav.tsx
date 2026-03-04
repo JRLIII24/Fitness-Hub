@@ -118,7 +118,7 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-card/90 backdrop-blur-[20px]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--glass-border-medium)] bg-[var(--glass-tint-heavy)] backdrop-blur-[var(--glass-blur-xl)]">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-center px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <LayoutGroup id="bottom-nav">
           <div className="flex max-w-full items-center gap-1 overflow-x-auto scrollbar-none rounded-full border border-border/70 bg-background/60 p-1 sm:gap-1">
@@ -138,7 +138,7 @@ export function BottomNav() {
                       <motion.span
                         layoutId="nav-active-pill"
                         transition={{ type: "spring", stiffness: 400, damping: 34, mass: 0.8 }}
-                        className="absolute inset-0 rounded-full bg-gradient-to-br from-primary to-primary/70 shadow-[0_2px_14px_rgba(198,255,0,0.32)]"
+                        className="absolute inset-0 rounded-full bg-gradient-to-br from-[var(--phase-current-accent,var(--primary))] to-[var(--phase-current-accent,var(--primary))]/70 shadow-[0_2px_14px_var(--phase-current-glow,oklch(0.98_0_0_/_0.32))]"
                       />
                     ) : null}
 

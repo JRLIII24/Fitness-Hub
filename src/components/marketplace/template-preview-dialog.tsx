@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Download,
@@ -26,8 +27,6 @@ function initials(name: string | null | undefined): string {
 
 interface TemplatePreviewDialogProps {
   template: PublicTemplate | null;
-  isSaved: boolean;
-  onSave: () => void;
   onImport: () => Promise<void>;
   onClose: () => void;
   currentUserId?: string;
@@ -38,8 +37,6 @@ interface TemplatePreviewDialogProps {
 
 export function TemplatePreviewDialog({
   template,
-  isSaved,
-  onSave,
   onImport,
   onClose,
   currentUserId,
@@ -60,7 +57,10 @@ export function TemplatePreviewDialog({
     }
   }
 
-  return (
+  const portalTarget = typeof document !== "undefined" ? document.body : null;
+  if (!portalTarget) return null;
+
+  return createPortal(
     <AnimatePresence>
       {template && (
         <PreviewSheet
@@ -75,7 +75,8 @@ export function TemplatePreviewDialog({
           onRetry={() => setImportState("idle")}
         />
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    portalTarget
   );
 }
 
@@ -116,17 +117,17 @@ function PreviewSheet({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-40 bg-black/75 backdrop-blur-sm"
+        className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Sheet */}
+      {/* Sheet — pinned to viewport bottom */}
       <motion.div
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 340, damping: 36 }}
-        className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[94dvh] min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-border/60 bg-card/95 shadow-2xl"
+        transition={{ type: "tween", duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+        className="fixed inset-x-0 bottom-0 z-[70] mx-auto flex max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-1rem))] min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-t-3xl glass-surface-modal glass-highlight"
       >
         {/* Drag handle */}
         <div className="flex justify-center pb-0 pt-3">

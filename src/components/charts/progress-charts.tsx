@@ -16,8 +16,8 @@ import {
 
 // ─── Chart theme constants ──────────────────────────────────────────────────
 
-const GRID_STROKE = "rgba(255,255,255,0.05)";
-const TICK_STYLE = { fill: "rgba(255,255,255,0.4)", fontSize: 10 };
+const GRID_STROKE = "oklch(0.98 0 0 / 0.06)";
+const TICK_STYLE = { fill: "oklch(0.70 0 0)", fontSize: 10 };
 
 // ─── Custom Tooltips ────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ function SingleTooltip({
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="rounded-xl border border-primary/25 bg-card px-3.5 py-2.5 text-xs shadow-xl">
+    <div className="glass-surface-elevated glass-highlight rounded-xl px-3.5 py-2.5 text-xs">
       <p className="mb-1.5 text-[10px] text-muted-foreground">{d.date}</p>
       <p className="text-sm font-bold text-foreground">
         {d.topWeight} {unitLabel}
@@ -63,7 +63,7 @@ function StackedVolumeTooltip({
   if (!active || !payload?.length) return null;
   const total = payload.reduce((s, p) => s + (p.value || 0), 0);
   return (
-    <div className="min-w-[150px] rounded-xl border border-border/60 bg-card px-3.5 py-2.5 text-xs shadow-xl">
+    <div className="min-w-[150px] glass-surface-elevated glass-highlight rounded-xl px-3.5 py-2.5 text-xs">
       <p className="mb-2 text-[10px] text-muted-foreground">{label}</p>
       {payload
         .filter((p) => p.value > 0)
@@ -102,7 +102,7 @@ function MiniVolumeTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-border/60 bg-card px-2.5 py-1.5 text-xs shadow-xl">
+    <div className="glass-surface glass-highlight rounded-lg px-2.5 py-1.5 text-xs">
       <span style={{ color }} className="font-bold">
         {(payload[0].value / 1000).toFixed(1)}k {unitLabel}
       </span>
@@ -217,7 +217,7 @@ export function StackedVolumeBarChart({
         />
         <Tooltip
           content={<StackedVolumeTooltip unitLabel={unitLabel} />}
-          cursor={{ fill: "rgba(255,255,255,0.03)" }}
+          cursor={{ fill: "oklch(0.98 0 0 / 0.03)" }}
         />
         {volumeCategoryOrder.map((cat, i) => (
           <Bar
@@ -251,10 +251,10 @@ export function CategoryMiniBarChart({
   return (
     <ResponsiveContainer width="100%" height={140}>
       <BarChart data={categoryVolumeData} margin={{ top: 2, right: 4, bottom: 2, left: 4 }} barCategoryGap="20%">
-        <CartesianGrid strokeDasharray="2 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+        <CartesianGrid strokeDasharray="2 3" stroke="oklch(0.98 0 0 / 0.04)" vertical={false} />
         <XAxis dataKey="date" tick={false} axisLine={false} tickLine={false} />
         <YAxis
-          tick={{ fill: "rgba(255,255,255,0.35)", fontSize: 8 }}
+          tick={{ fill: "oklch(0.65 0 0)", fontSize: 8 }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
@@ -262,7 +262,7 @@ export function CategoryMiniBarChart({
         />
         <Tooltip
           content={<MiniVolumeTooltip color={color} unitLabel={unitLabel} />}
-          cursor={{ fill: "rgba(255,255,255,0.04)" }}
+          cursor={{ fill: "oklch(0.98 0 0 / 0.04)" }}
         />
         <Bar dataKey={category} fill={color} radius={[3, 3, 0, 0]} isAnimationActive={false} opacity={0.85} />
       </BarChart>

@@ -5,13 +5,18 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { getCachedOrComputeFatigueSnapshot } from '@/lib/fatigue/server';
-import type { LauncherPrediction, LauncherExercise } from '@/types/adaptive';
+import { computeRecoveryStatus } from '@/lib/fatigue/muscle-group';
+import { findSubstitute } from './find-substitute';
+import { AUTO_SWAP_THRESHOLD } from './substitution-map';
+import type { LauncherPrediction, LauncherExercise, ExerciseSwapResult, MuscleRecoverySnapshot } from '@/types/adaptive';
 
 interface AdaptiveWorkout extends LauncherPrediction {
   fatigueScore: number;
   adaptationType: 'REST' | 'VOLUME' | 'INTENSITY';
   adaptationReason: string;
   volumeAdjustment: number; // Percentage change from baseline (-30 to +15)
+  swaps?: ExerciseSwapResult[];
+  muscleRecoverySnapshot?: MuscleRecoverySnapshot;
 }
 
 /**
@@ -113,17 +118,22 @@ export async function generateAdaptiveWorkout(userId: string): Promise<AdaptiveW
         recommendation
       );
 
+      const { exercises: swappedExercises, swaps, muscleRecoverySnapshot } =
+        await applyMuscleSubstitutions(userId, exercises);
+
       return {
         template_id: baseTemplateId,
         template_name: getAdaptedName(templateData.name, recommendation),
-        exercises,
-        estimated_duration_mins: estimateDuration(exercises, recommendation),
+        exercises: swappedExercises,
+        estimated_duration_mins: estimateDuration(swappedExercises, recommendation),
         confidence: 'high',
         reason: `${reason} • Based on your recent ${templateData.name}`,
         fatigueScore,
         adaptationType: recommendation,
         adaptationReason: reason,
-        volumeAdjustment
+        volumeAdjustment,
+        swaps: swaps.length > 0 ? swaps : undefined,
+        muscleRecoverySnapshot,
       };
     }
   }
@@ -131,13 +141,102 @@ export async function generateAdaptiveWorkout(userId: string): Promise<AdaptiveW
   // Fallback: Create a preset workout adapted to fatigue level
   const presetWorkout = await createPresetWorkout(recommendation);
 
+  const { exercises: swappedExercises, swaps, muscleRecoverySnapshot } =
+    await applyMuscleSubstitutions(userId, presetWorkout.exercises);
+
   return {
     ...presetWorkout,
+    exercises: swappedExercises,
     fatigueScore,
     adaptationType: recommendation,
     adaptationReason: reason,
-    volumeAdjustment
+    volumeAdjustment,
+    swaps: swaps.length > 0 ? swaps : undefined,
+    muscleRecoverySnapshot,
   };
+}
+
+/**
+ * Per-muscle substitution pass.
+ * Checks each exercise's muscle group against the recovery map and swaps
+ * or deloads exercises targeting fatigued muscles.
+ */
+async function applyMuscleSubstitutions(
+  userId: string,
+  exercises: LauncherExercise[]
+): Promise<{
+  exercises: LauncherExercise[];
+  swaps: ExerciseSwapResult[];
+  muscleRecoverySnapshot: MuscleRecoverySnapshot;
+}> {
+  const supabase = await createClient();
+
+  // Fetch per-muscle recovery data via RPC
+  const { data: recoveryRows } = await supabase.rpc('get_muscle_group_recovery', {
+    p_user_id: userId,
+    p_lookback_days: 7,
+  });
+
+  // Build recovery map from RPC results
+  const recoveryMap: Record<string, { status: string; recoveryPct: number }> = {};
+  const muscleRecoverySnapshot: MuscleRecoverySnapshot = {};
+
+  if (recoveryRows && Array.isArray(recoveryRows)) {
+    for (const row of recoveryRows) {
+      const { status, pct } = computeRecoveryStatus(
+        row.hours_since_trained,
+        row.total_sets,
+        row.avg_rpe ?? null
+      );
+      recoveryMap[row.muscle_group] = { status, recoveryPct: pct };
+      muscleRecoverySnapshot[row.muscle_group] = {
+        status,
+        recoveryPct: pct,
+        hoursSinceTrained: row.hours_since_trained,
+        totalSets: row.total_sets,
+      };
+    }
+  }
+
+  const swaps: ExerciseSwapResult[] = [];
+  const result: LauncherExercise[] = [];
+
+  for (const ex of exercises) {
+    const { swap, deload } = await findSubstitute(
+      ex.exercise.id,
+      ex.exercise.name,
+      ex.exercise.muscle_group,
+      ex.exercise.equipment,
+      recoveryMap
+    );
+
+    if (swap) {
+      // Replace exercise with the swapped one
+      result.push({
+        ...ex,
+        exercise: {
+          id: swap.swappedExerciseId,
+          name: swap.swappedExerciseName,
+          muscle_group: swap.swappedMuscleGroup,
+          equipment: ex.exercise.equipment,
+        },
+      });
+      swaps.push(swap);
+    } else if (deload) {
+      // Keep same exercise but reduce load
+      result.push({
+        ...ex,
+        target_sets: Math.max(1, Math.round(ex.target_sets * deload.setsMultiplier)),
+        target_weight_kg: ex.target_weight_kg
+          ? Math.round(ex.target_weight_kg * deload.weightMultiplier * 10) / 10
+          : null,
+      });
+    } else {
+      result.push(ex);
+    }
+  }
+
+  return { exercises: result, swaps, muscleRecoverySnapshot };
 }
 
 /**

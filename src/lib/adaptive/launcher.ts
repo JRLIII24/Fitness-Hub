@@ -4,7 +4,22 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { getUserTimezone } from '@/lib/timezone';
 import type { LauncherPrediction, LauncherExercise } from '@/types/adaptive';
+
+/**
+ * Get the day-of-week (0=Sun … 6=Sat) for a Date in a given timezone.
+ */
+function getDayOfWeekInTimezone(date: Date, timezone: string): number {
+  const dayStr = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    weekday: 'short',
+  }).format(date);
+  const map: Record<string, number> = {
+    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+  };
+  return map[dayStr] ?? date.getDay();
+}
 
 interface WorkoutHistory {
   id: string;
@@ -56,8 +71,9 @@ function estimateDurationMins(exercises: Array<{ target_sets?: number | null }>)
  */
 export async function computeLauncherWorkout(userId: string): Promise<LauncherPrediction> {
   const supabase = await createClient();
+  const timezone = await getUserTimezone(userId);
   const today = new Date();
-  const dayOfWeek = today.getDay(); // 0-6
+  const dayOfWeek = getDayOfWeekInTimezone(today, timezone); // 0-6, user's timezone
 
   // Fetch last 30 days of workout history
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -81,7 +97,7 @@ export async function computeLauncherWorkout(userId: string): Promise<LauncherPr
     template_id: w.template_id,
     started_at: w.started_at,
     duration_mins: 45, // TODO: Calculate from sets
-    day_of_week: new Date(w.started_at).getDay()
+    day_of_week: getDayOfWeekInTimezone(new Date(w.started_at), timezone)
   }));
 
   // Strategy 1: Find most common template for this day of week

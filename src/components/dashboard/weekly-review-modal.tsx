@@ -94,7 +94,7 @@ export function WeeklyReviewModal({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 40, transition: { duration: 0.2 } }}
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              className="fixed inset-x-4 bottom-4 top-auto z-[101] max-h-[85vh] overflow-y-auto rounded-3xl border border-border/70 bg-card shadow-2xl sm:inset-x-auto sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2"
+              className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] top-auto z-[101] max-h-[85vh] overflow-y-auto rounded-3xl glass-surface-modal glass-highlight sm:inset-x-auto sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2"
             >
               <div className="space-y-5 p-6">
                 {/* Header */}

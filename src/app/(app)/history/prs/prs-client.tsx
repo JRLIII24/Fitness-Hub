@@ -17,6 +17,7 @@ type PR = {
   pr_kg: number;
   reps: number | null;
   achieved_at: string;
+  e1rm_kg: number | null;
 };
 
 const MUSCLE_COLORS: Record<string, string> = {
@@ -116,6 +117,11 @@ export function PRsClient({
             {pr.reps && (
               <p className="mt-1 text-[11px] text-muted-foreground">x {pr.reps} reps</p>
             )}
+            {pr.e1rm_kg != null && pr.e1rm_kg > pr.pr_kg && (
+              <p className="mt-0.5 text-[10px] text-primary/70 font-medium">
+                e1RM {displayWeight(pr.e1rm_kg)}
+              </p>
+            )}
           </motion.div>
         ))}
       </div>
@@ -202,6 +208,11 @@ export function PRsClient({
                       </p>
                       {pr.reps && (
                         <p className="text-[11px] text-muted-foreground">x {pr.reps} reps</p>
+                      )}
+                      {pr.e1rm_kg != null && pr.e1rm_kg > pr.pr_kg && (
+                        <p className="text-[10px] text-primary/70 font-medium">
+                          e1RM {displayWeight(pr.e1rm_kg)}
+                        </p>
                       )}
                     </div>
                   </motion.div>

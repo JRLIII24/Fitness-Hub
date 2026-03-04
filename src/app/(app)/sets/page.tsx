@@ -32,7 +32,7 @@ export default function SetsPage() {
   } = useClips(userId, feedMode);
 
   return (
-    <div className="relative h-[calc(100svh-56px)] overflow-hidden bg-black">
+    <div className="relative h-[calc(100svh-6rem-env(safe-area-inset-bottom,0px))] overflow-hidden bg-black">
       <div className="absolute top-3 left-1/2 z-10 w-[min(520px,calc(100%-1rem))] -translate-x-1/2">
         <Card className="border-white/20 bg-black/55 backdrop-blur">
           <CardContent className="px-2 py-2">

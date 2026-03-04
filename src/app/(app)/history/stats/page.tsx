@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { kgToLbs } from "@/lib/units";
 import { HistoryNav } from "@/components/history/history-nav";
+import type { HistoryStatsResponse } from "@/app/api/history/stats/route";
 import {
   BarChart3,
   Dumbbell,
@@ -32,120 +32,64 @@ function formatVolume(kg: number, isImperial: boolean) {
   return `${Math.round(kg).toLocaleString()} kg`;
 }
 
-function longestStreak(dates: string[]): number {
-  if (!dates.length) return 0;
-  const sorted = [...new Set(dates)].sort();
-  let best = 1;
-  let current = 1;
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = new Date(sorted[i - 1]);
-    const curr = new Date(sorted[i]);
-    const diff = (curr.getTime() - prev.getTime()) / 86400000;
-    if (diff === 1) {
-      current++;
-      best = Math.max(best, current);
-    } else {
-      current = 1;
-    }
-  }
-  return best;
-}
-
-type SessionRow = { started_at: string; duration_seconds: number | null; total_volume_kg: number | null };
-type SetRow = {
-  exercises: { muscle_group: string } | { muscle_group: string }[] | null;
-  workout_sessions: { user_id: string; status: string } | null;
-};
-
 export default function HistoryStatsPage() {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
   const { preference } = useUnitPreferenceStore();
   const isImperial = preference === "imperial";
 
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [sets, setSets] = useState<SetRow[]>([]);
+  const [stats, setStats] = useState<HistoryStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
 
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const res = await fetch("/api/history/stats");
+      if (res.status === 401) {
         router.push("/login");
         return;
       }
+      if (!res.ok) return;
 
-      const [sessionsResult, setsResult] = await Promise.all([
-        supabase
-          .from("workout_sessions")
-          .select("started_at, duration_seconds, total_volume_kg")
-          .eq("user_id", user.id)
-          .eq("status", "completed"),
-        supabase
-          .from("workout_sets")
-          .select("exercises!inner(muscle_group), workout_sessions!inner(user_id, status)")
-          .eq("workout_sessions.user_id", user.id)
-          .eq("workout_sessions.status", "completed"),
-      ]);
-
-      if (!active) return;
-
-      setSessions((sessionsResult.data ?? []) as SessionRow[]);
-      setSets((setsResult.data ?? []) as unknown as SetRow[]);
-      setLoading(false);
+      const data: HistoryStatsResponse = await res.json();
+      if (active) {
+        setStats(data);
+        setLoading(false);
+      }
     }
 
     load();
     return () => { active = false; };
-  }, [supabase, router]);
+  }, [router]);
 
-  const totalSessions = sessions.length;
-  const totalVolume = sessions.reduce((sum, s) => sum + (s.total_volume_kg ?? 0), 0);
-  const totalDuration = sessions.reduce((sum, s) => sum + (s.duration_seconds ?? 0), 0);
-  const avgDuration = totalSessions > 0 ? totalDuration / totalSessions : 0;
+  const maxCount = stats?.top_muscle_groups[0]?.set_count ?? 1;
 
-  const workoutDates = sessions.map((s) => s.started_at.slice(0, 10));
-  const streak = longestStreak(workoutDates);
-
-  // Muscle group frequency
-  const muscleCount: Record<string, number> = {};
-  for (const s of sets) {
-    const ex = s.exercises;
-    const mg = Array.isArray(ex) ? ex[0]?.muscle_group : ex?.muscle_group;
-    if (mg) muscleCount[mg] = (muscleCount[mg] ?? 0) + 1;
-  }
-  const topMuscles = Object.entries(muscleCount)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
-  const maxCount = topMuscles[0]?.[1] ?? 1;
-
-  // Monthly breakdown (last 6 months)
   const months = useMemo(() => {
-    const monthMap: Record<string, { sessions: number; volume: number }> = {};
+    if (!stats) return [];
+    // Fill in missing months from last 6 months
+    const monthMap: Record<string, { sessions: number; volume_kg: number }> = {};
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      monthMap[key] = { sessions: 0, volume: 0 };
+      monthMap[key] = { sessions: 0, volume_kg: 0 };
     }
-    for (const s of sessions) {
-      const key = s.started_at.slice(0, 7);
-      if (monthMap[key]) {
-        monthMap[key].sessions++;
-        monthMap[key].volume += s.total_volume_kg ?? 0;
+    for (const m of stats.monthly_breakdown) {
+      if (monthMap[m.month_key]) {
+        monthMap[m.month_key] = { sessions: m.sessions, volume_kg: m.volume_kg };
       }
     }
     return Object.entries(monthMap);
-  }, [sessions]);
+  }, [stats]);
 
-  const STAT_CARDS = [
-    { icon: Dumbbell, label: "Total Sessions", value: totalSessions.toLocaleString(), color: "text-primary" },
-    { icon: Weight, label: "Total Volume", value: formatVolume(totalVolume, isImperial), color: "text-amber-400" },
-    { icon: Clock, label: "Avg Session", value: avgDuration > 0 ? formatDuration(avgDuration) : "—", color: "text-sky-400" },
-    { icon: Flame, label: "Longest Streak", value: `${streak}d`, color: "text-rose-400" },
-  ];
+  const STAT_CARDS = stats
+    ? [
+        { icon: Dumbbell, label: "Total Sessions", value: stats.total_sessions.toLocaleString(), color: "text-primary" },
+        { icon: Weight, label: "Total Volume", value: formatVolume(stats.total_volume_kg, isImperial), color: "text-amber-400" },
+        { icon: Clock, label: "Avg Session", value: stats.avg_duration_seconds > 0 ? formatDuration(stats.avg_duration_seconds) : "—", color: "text-sky-400" },
+        { icon: Flame, label: "Longest Streak", value: `${stats.longest_streak}d`, color: "text-rose-400" },
+      ]
+    : [];
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4 px-4 pb-28 pt-6 md:px-6">
@@ -161,9 +105,9 @@ export default function HistoryStatsPage() {
         <div className="py-16 text-center">
           <p className="text-sm text-muted-foreground">Loading stats...</p>
         </div>
-      ) : (
+      ) : stats && stats.total_sessions > 0 ? (
         <>
-          {/* ── Stat Cards ─────────────────────────────────────────────── */}
+          {/* Stat Cards */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {STAT_CARDS.map(({ icon: Icon, label, value, color }) => (
               <div
@@ -181,8 +125,8 @@ export default function HistoryStatsPage() {
             ))}
           </div>
 
-          {/* ── Muscle Group Bar Chart ──────────────────────────────────── */}
-          {topMuscles.length > 0 && (
+          {/* Muscle Group Bar Chart */}
+          {stats.top_muscle_groups.length > 0 && (
             <div className="rounded-2xl border border-border/60 bg-card/30">
               <div className="flex items-center gap-2.5 px-5 py-4">
                 <Dumbbell className="h-4 w-4 text-primary" />
@@ -190,16 +134,16 @@ export default function HistoryStatsPage() {
               </div>
               <div className="h-px bg-border/40" />
               <div className="p-5 space-y-3">
-                {topMuscles.map(([mg, count]) => (
-                  <div key={mg} className="space-y-1">
+                {stats.top_muscle_groups.map(({ muscle_group, set_count }) => (
+                  <div key={muscle_group} className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-medium capitalize">{mg}</span>
-                      <span className="text-[12px] font-medium tabular-nums text-muted-foreground">{count} sets</span>
+                      <span className="text-[12px] font-medium capitalize">{muscle_group}</span>
+                      <span className="text-[12px] font-medium tabular-nums text-muted-foreground">{set_count} sets</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-muted/40 overflow-hidden">
                       <div
                         className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${(count / maxCount) * 100}%` }}
+                        style={{ width: `${(set_count / maxCount) * 100}%` }}
                       />
                     </div>
                   </div>
@@ -208,7 +152,7 @@ export default function HistoryStatsPage() {
             </div>
           )}
 
-          {/* ── Monthly Breakdown ──────────────────────────────────────── */}
+          {/* Monthly Breakdown */}
           <div className="rounded-2xl border border-border/60 bg-card/30">
             <div className="flex items-center gap-2.5 px-5 py-4">
               <CalendarDays className="h-4 w-4 text-primary" />
@@ -230,7 +174,7 @@ export default function HistoryStatsPage() {
                         {data.sessions} sessions
                       </span>
                       <span className="tabular-nums text-[13px] font-bold text-muted-foreground">
-                        {formatVolume(data.volume, isImperial)}
+                        {formatVolume(data.volume_kg, isImperial)}
                       </span>
                     </div>
                   </div>
@@ -238,15 +182,13 @@ export default function HistoryStatsPage() {
               })}
             </div>
           </div>
-
-          {totalSessions === 0 && (
-            <div className="py-16 text-center">
-              <Dumbbell className="mx-auto h-12 w-12 text-muted-foreground/40" />
-              <p className="mt-4 text-lg font-semibold">No workouts yet</p>
-              <p className="mt-1 text-sm text-muted-foreground">Complete your first workout to see stats here.</p>
-            </div>
-          )}
         </>
+      ) : (
+        <div className="py-16 text-center">
+          <Dumbbell className="mx-auto h-12 w-12 text-muted-foreground/40" />
+          <p className="mt-4 text-lg font-semibold">No workouts yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">Complete your first workout to see stats here.</p>
+        </div>
       )}
     </div>
   );

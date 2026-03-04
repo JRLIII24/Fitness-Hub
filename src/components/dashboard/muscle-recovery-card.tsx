@@ -81,7 +81,7 @@ export function MuscleRecoveryCard() {
   }, []);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/30">
+    <div className="overflow-hidden glass-surface glass-highlight rounded-2xl">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 px-5 py-4">
         <div className="flex min-w-0 items-center gap-2.5">
@@ -119,7 +119,7 @@ export function MuscleRecoveryCard() {
             {recoveries.map((r) => (
               <div
                 key={r.muscleGroup}
-                className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/40 px-4 py-2.5"
+                className="flex items-center gap-3 rounded-xl border border-[var(--glass-border-light)] bg-[var(--glass-tint-light)] px-4 py-2.5"
               >
                 {/* Muscle name */}
                 <span className="w-20 shrink-0 truncate text-[11px] font-semibold text-foreground">
@@ -128,11 +128,14 @@ export function MuscleRecoveryCard() {
 
                 {/* Progress bar */}
                 <div className="flex-1">
-                  <div className="h-1.5 overflow-hidden rounded-full bg-border/40">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-[var(--glass-tint-medium)]">
                     <div
                       className={cn(
                         "h-full rounded-full transition-all duration-700",
-                        recoveryBarColor(r.recoveryStatus)
+                        recoveryBarColor(r.recoveryStatus),
+                        r.recoveryStatus === "recovered" && "shadow-[0_0_6px_oklch(0.72_0.18_145_/_0.4)]",
+                        r.recoveryStatus === "recovering" && "shadow-[0_0_6px_oklch(0.80_0.15_85_/_0.4)]",
+                        r.recoveryStatus === "fatigued" && "shadow-[0_0_6px_oklch(0.65_0.22_25_/_0.4)]",
                       )}
                       style={{ width: `${r.recoveryPct}%` }}
                     />

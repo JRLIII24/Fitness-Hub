@@ -221,7 +221,7 @@ export function MarketplaceContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="relative mb-5 overflow-hidden rounded-3xl border border-border/70 bg-card/90 px-6 py-7 sm:px-8"
+        className="relative mb-5 overflow-hidden rounded-3xl glass-surface-elevated glass-highlight px-6 py-7 sm:px-8"
       >
         <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/15 blur-[70px]" />
         <div className="pointer-events-none absolute -bottom-10 -left-10 h-48 w-48 rounded-full bg-sky-400/10 blur-3xl" />
@@ -446,8 +446,6 @@ export function MarketplaceContent() {
       {/* ── Preview dialog ───────────────────────────────────────────────── */}
       <TemplatePreviewDialog
         template={preview}
-        isSaved={preview ? savedIds.has(preview.id) : false}
-        onSave={() => preview && toggleSave(preview.id)}
         onImport={() => preview ? handleImport(preview.id) : Promise.resolve()}
         onClose={() => { setPreview(null); setImportedId(null); }}
         currentUserId={currentUserId}

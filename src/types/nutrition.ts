@@ -49,3 +49,26 @@ export interface DailyNutritionSummary {
 }
 
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
+
+// ── Meal Templates ───────────────────────────────────────────────────────────
+
+export interface MealTemplateItem {
+  food_item_id: string | null;
+  name: string;
+  brand: string | null;
+  servings: number;
+  calories: number;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+}
+
+export interface MealTemplate {
+  id: string;
+  name: string;
+  items: MealTemplateItem[];
+  total_calories: number;
+  total_protein_g: number;
+  created_at: string;
+  updated_at: string;
+}

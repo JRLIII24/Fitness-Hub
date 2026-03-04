@@ -17,6 +17,10 @@ export interface Ping {
   };
 }
 
+export function isStreakAlertPing(message: string): boolean {
+  return message.startsWith('\u{1F525}') || message.startsWith('\u26A1');
+}
+
 export function usePings(userId: string | null) {
   const supabase = useSupabase();
   const [pings, setPings] = useState<Ping[]>([]);

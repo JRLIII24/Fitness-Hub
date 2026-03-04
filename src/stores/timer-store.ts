@@ -374,21 +374,19 @@ export const useTimerStore = create<TimerState>()(
           const singleTimer = pickSingleMostRecentTimer(validTimers);
 
           if (singleTimer.length > 0) {
-            state.timers = singleTimer;
+            useTimerStore.setState({ timers: singleTimer });
 
             if (singleTimer.some((t) => t.isRunning)) {
-              startAnimationLoop(() => state as TimerState, (partial) => {
-                Object.assign(state, partial);
-              });
+              startAnimationLoop(useTimerStore.getState, useTimerStore.setState);
             }
           } else {
-            state.timers = [];
+            useTimerStore.setState({ timers: [] });
           }
         }
 
         // Restore notification permission
-        if (state && typeof window !== "undefined" && "Notification" in window) {
-          state.notificationPermission = Notification.permission;
+        if (typeof window !== "undefined" && "Notification" in window) {
+          useTimerStore.setState({ notificationPermission: Notification.permission });
         }
 
         // Attach once — onRehydrateStorage can fire on every page load/navigation.

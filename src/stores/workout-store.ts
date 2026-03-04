@@ -2,7 +2,6 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { Exercise, WorkoutExercise, WorkoutSet, ActiveWorkout } from "@/types/workout";
 import { idbStorage } from "@/lib/idb-storage";
-import { createClient } from "@/lib/supabase/client";
 import { uuid } from "@/lib/uuid";
 import { createActiveWorkoutSession, deleteActiveWorkoutSession } from "@/lib/services/workout.service";
 
@@ -13,10 +12,10 @@ interface WorkoutState {
   _isHydrated: boolean;
 
   // Actions
-  startWorkout: (name: string, templateId?: string) => Promise<void>;
+  startWorkout: (name: string, userId: string, templateId?: string) => void;
   loadWorkoutForEdit: (workout: ActiveWorkout, workoutSessionId: string) => void;
-  cancelWorkout: () => Promise<void>;
-  finishWorkout: () => Promise<ActiveWorkout | null>;
+  cancelWorkout: (userId: string) => void;
+  finishWorkout: (userId: string) => ActiveWorkout | null;
 
   // Workout metadata actions
   updateWorkoutName: (name: string) => void;
@@ -72,7 +71,7 @@ export const useWorkoutStore = create<WorkoutState>()(
       editingWorkoutId: null,
       _isHydrated: false,
 
-      startWorkout: async (name: string, templateId?: string) => {
+      startWorkout: (name: string, userId: string, templateId?: string) => {
         const workoutId = generateId();
         const startedAt = new Date().toISOString();
 
@@ -91,11 +90,7 @@ export const useWorkoutStore = create<WorkoutState>()(
         });
 
         // Sync to database in background (fire-and-forget)
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          void createActiveWorkoutSession(user.id, name, startedAt);
-        }
+        void createActiveWorkoutSession(userId, name, startedAt);
       },
 
       loadWorkoutForEdit: (workout: ActiveWorkout, workoutSessionId: string) => {
@@ -126,19 +121,15 @@ export const useWorkoutStore = create<WorkoutState>()(
         set({ activeWorkout: { ...state.activeWorkout, exercises } });
       },
 
-      cancelWorkout: async () => {
+      cancelWorkout: (userId: string) => {
         // Clear local state IMMEDIATELY
         set({ activeWorkout: null, isWorkoutActive: false, editingWorkoutId: null });
 
         // Remove active session from database in background
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          void deleteActiveWorkoutSession(user.id);
-        }
+        void deleteActiveWorkoutSession(userId);
       },
 
-      finishWorkout: async () => {
+      finishWorkout: (userId: string) => {
         // Capture workout reference before clearing state
         const workout = get().activeWorkout;
 
@@ -146,11 +137,7 @@ export const useWorkoutStore = create<WorkoutState>()(
         set({ activeWorkout: null, isWorkoutActive: false, editingWorkoutId: null });
 
         // Remove active session from database in background
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          void deleteActiveWorkoutSession(user.id);
-        }
+        void deleteActiveWorkoutSession(userId);
 
         return workout;
       },

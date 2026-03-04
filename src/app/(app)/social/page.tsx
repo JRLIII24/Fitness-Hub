@@ -249,9 +249,9 @@ export default function SocialPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4 px-4 pb-28 pt-5 md:px-6">
-      <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/90 p-5 sm:p-6">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
-        <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-accent/20 blur-3xl" />
+      <section className="relative overflow-hidden rounded-3xl glass-surface-elevated glass-highlight p-5 sm:p-6">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
+        <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
         <div className="relative space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -460,7 +460,7 @@ export default function SocialPage() {
         </TabsContent>
       </Tabs>
 
-      <div className="fixed bottom-24 right-4 z-20 md:right-6">
+      <div className="fixed bottom-[calc(6rem+1rem+env(safe-area-inset-bottom,0px))] right-4 z-20 md:right-6">
         {(pingsUnread > 0 || sharedUnread > 0) && (
           <Button size="sm" className="h-9 gap-1.5 rounded-full px-3 shadow-lg" onClick={() => setActiveTab("pings")}>
             <Bell className="size-4" />

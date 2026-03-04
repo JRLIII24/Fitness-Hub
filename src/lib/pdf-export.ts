@@ -59,7 +59,9 @@ function setTextColor(doc: jsPDF, hex: string) {
  * Builds a PDF report entirely programmatically with jsPDF — no html2canvas,
  * no DOM capture, no CSS color parsing. This sidesteps all oklch/lab issues.
  */
-export async function generateProgressPDF(data: PDFReportData): Promise<void> {
+export async function generateProgressPDF(data: PDFReportData, options?: { returnBuffer: true }): Promise<ArrayBuffer>;
+export async function generateProgressPDF(data: PDFReportData, options?: { returnBuffer?: false }): Promise<void>;
+export async function generateProgressPDF(data: PDFReportData, options?: { returnBuffer?: boolean }): Promise<void | ArrayBuffer> {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const W = doc.internal.pageSize.getWidth();   // 210mm
     const margin = 16;
@@ -390,7 +392,11 @@ export async function generateProgressPDF(data: PDFReportData): Promise<void> {
         doc.text(`Page ${p} of ${pageCount}`, W - margin, H - 6, { align: "right" });
     }
 
-    // ── Save ──────────────────────────────────────────────────────────────────
+    // ── Save or return buffer ──────────────────────────────────────────────────
+
+    if (options?.returnBuffer) {
+        return doc.output("arraybuffer");
+    }
 
     const dateStr = format(data.reportDate, "yyyy-MM-dd");
     doc.save(`FitHub_Progress_${dateStr}.pdf`);

@@ -16,6 +16,8 @@ export interface Database {
           avatar_url: string | null;
           height_cm: number | null;
           weight_kg: number | null;
+          current_weight_kg: number | null;
+          goal_weight_kg: number | null;
           date_of_birth: string | null;
           gender: "male" | "female" | "other" | "prefer_not_to_say" | null;
           fitness_goal:
@@ -25,6 +27,21 @@ export interface Database {
             | "improve_endurance"
             | null;
           timezone: string | null;
+          unit_preference: "metric" | "imperial" | null;
+          show_weight: boolean | null;
+          onboarding_completed: boolean | null;
+          theme_preference: string | null;
+          accent_color: string | null;
+          equipment_available: string[] | null;
+          experience_level: "beginner" | "intermediate" | "advanced" | null;
+          feature_flags: Record<string, boolean> | null;
+          xp: number;
+          level: number;
+          current_streak: number;
+          streak_milestones_unlocked: number[] | null;
+          streak_freeze_available: boolean;
+          username: string | null;
+          is_public: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -34,6 +51,8 @@ export interface Database {
           avatar_url?: string | null;
           height_cm?: number | null;
           weight_kg?: number | null;
+          current_weight_kg?: number | null;
+          goal_weight_kg?: number | null;
           date_of_birth?: string | null;
           gender?: "male" | "female" | "other" | "prefer_not_to_say" | null;
           fitness_goal?:
@@ -43,6 +62,14 @@ export interface Database {
             | "improve_endurance"
             | null;
           timezone?: string | null;
+          unit_preference?: "metric" | "imperial" | null;
+          show_weight?: boolean | null;
+          onboarding_completed?: boolean | null;
+          theme_preference?: string | null;
+          accent_color?: string | null;
+          equipment_available?: string[] | null;
+          experience_level?: "beginner" | "intermediate" | "advanced" | null;
+          feature_flags?: Record<string, boolean> | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -52,6 +79,8 @@ export interface Database {
           avatar_url?: string | null;
           height_cm?: number | null;
           weight_kg?: number | null;
+          current_weight_kg?: number | null;
+          goal_weight_kg?: number | null;
           date_of_birth?: string | null;
           gender?: "male" | "female" | "other" | "prefer_not_to_say" | null;
           fitness_goal?:
@@ -61,8 +90,17 @@ export interface Database {
             | "improve_endurance"
             | null;
           timezone?: string | null;
+          unit_preference?: "metric" | "imperial" | null;
+          show_weight?: boolean | null;
+          onboarding_completed?: boolean | null;
+          theme_preference?: string | null;
+          accent_color?: string | null;
+          equipment_available?: string[] | null;
+          experience_level?: "beginner" | "intermediate" | "advanced" | null;
+          feature_flags?: Record<string, boolean> | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       body_weight_logs: {
         Row: {
@@ -94,6 +132,102 @@ export interface Database {
           note?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
+      };
+      pro_waitlist: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          email: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          email: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          email?: string;
+        };
+        Relationships: [];
+      };
+      meal_templates: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          items: Json;
+          total_calories: number;
+          total_protein_g: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          items: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          items?: Json;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      body_measurements: {
+        Row: {
+          id: string;
+          user_id: string;
+          measured_date: string;
+          waist_cm: number | null;
+          chest_cm: number | null;
+          hips_cm: number | null;
+          left_arm_cm: number | null;
+          right_arm_cm: number | null;
+          left_thigh_cm: number | null;
+          right_thigh_cm: number | null;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          measured_date: string;
+          waist_cm?: number | null;
+          chest_cm?: number | null;
+          hips_cm?: number | null;
+          left_arm_cm?: number | null;
+          right_arm_cm?: number | null;
+          left_thigh_cm?: number | null;
+          right_thigh_cm?: number | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          measured_date?: string;
+          waist_cm?: number | null;
+          chest_cm?: number | null;
+          hips_cm?: number | null;
+          left_arm_cm?: number | null;
+          right_arm_cm?: number | null;
+          left_thigh_cm?: number | null;
+          right_thigh_cm?: number | null;
+          note?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       exercises: {
         Row: {
@@ -135,6 +269,7 @@ export interface Database {
           image_url?: string | null;
           is_custom?: boolean;
         };
+        Relationships: [];
       };
       workout_templates: {
         Row: {
@@ -178,6 +313,7 @@ export interface Database {
           difficulty_level?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       template_saves: {
         Row: {
@@ -195,6 +331,7 @@ export interface Database {
         Update: {
           saved_at?: string;
         };
+        Relationships: [];
       };
       pod_challenges: {
         Row: {
@@ -226,6 +363,7 @@ export interface Database {
           end_date?: string;
           target_value?: number | null;
         };
+        Relationships: [];
       };
       template_exercises: {
         Row: {
@@ -258,6 +396,7 @@ export interface Database {
           rest_seconds?: number;
           notes?: string | null;
         };
+        Relationships: [];
       };
       workout_sessions: {
         Row: {
@@ -297,6 +436,7 @@ export interface Database {
           notes?: string | null;
           total_volume_kg?: number | null;
         };
+        Relationships: [];
       };
       workout_sets: {
         Row: {
@@ -344,6 +484,7 @@ export interface Database {
           notes?: string | null;
           sort_order?: number;
         };
+        Relationships: [];
       };
       fatigue_daily_checkins: {
         Row: {
@@ -382,6 +523,7 @@ export interface Database {
           notes?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       fatigue_daily_scores: {
         Row: {
@@ -439,6 +581,170 @@ export interface Database {
           confidence?: "low" | "medium" | "high";
           computed_at?: string;
         };
+        Relationships: [];
+      };
+      readiness_daily_scores: {
+        Row: {
+          id: string;
+          user_id: string;
+          score_date: string;
+          readiness_score: number;
+          training_score: number | null;
+          nutrition_score: number | null;
+          recovery_score: number | null;
+          external_score: number | null;
+          confidence: "low" | "medium" | "high";
+          recommendation: string;
+          computed_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          score_date: string;
+          readiness_score: number;
+          training_score?: number | null;
+          nutrition_score?: number | null;
+          recovery_score?: number | null;
+          external_score?: number | null;
+          confidence: "low" | "medium" | "high";
+          recommendation: string;
+          computed_at?: string;
+        };
+        Update: {
+          score_date?: string;
+          readiness_score?: number;
+          training_score?: number | null;
+          nutrition_score?: number | null;
+          recovery_score?: number | null;
+          external_score?: number | null;
+          confidence?: "low" | "medium" | "high";
+          recommendation?: string;
+          computed_at?: string;
+        };
+        Relationships: [];
+      };
+      health_sync_data: {
+        Row: {
+          id: string;
+          user_id: string;
+          sync_date: string;
+          sleep_hours: number | null;
+          resting_heart_rate: number | null;
+          hrv_ms: number | null;
+          steps: number | null;
+          source: "healthkit" | "google_fit" | "manual";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          sync_date: string;
+          sleep_hours?: number | null;
+          resting_heart_rate?: number | null;
+          hrv_ms?: number | null;
+          steps?: number | null;
+          source: "healthkit" | "google_fit" | "manual";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          sync_date?: string;
+          sleep_hours?: number | null;
+          resting_heart_rate?: number | null;
+          hrv_ms?: number | null;
+          steps?: number | null;
+          source?: "healthkit" | "google_fit" | "manual";
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      push_device_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          token: string;
+          platform: 'ios' | 'android' | 'web';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token: string;
+          platform: 'ios' | 'android' | 'web';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          token?: string;
+          platform?: 'ios' | 'android' | 'web';
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      streak_risk_alerts: {
+        Row: {
+          id: string;
+          user_id: string;
+          alert_date: string;
+          risk_level: 'warning' | 'critical';
+          streak_count: number;
+          notified_pod_member_ids: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          alert_date: string;
+          risk_level: 'warning' | 'critical';
+          streak_count: number;
+          notified_pod_member_ids?: string[];
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          alert_date?: string;
+          risk_level?: 'warning' | 'critical';
+          streak_count?: number;
+          notified_pod_member_ids?: string[];
+        };
+        Relationships: [];
+      };
+      notification_preferences: {
+        Row: {
+          id: string;
+          user_id: string;
+          streak_alerts_enabled: boolean;
+          pod_pings_enabled: boolean;
+          workout_reminders_enabled: boolean;
+          quiet_hours_start: number | null;
+          quiet_hours_end: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          streak_alerts_enabled?: boolean;
+          pod_pings_enabled?: boolean;
+          workout_reminders_enabled?: boolean;
+          quiet_hours_start?: number | null;
+          quiet_hours_end?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          streak_alerts_enabled?: boolean;
+          pod_pings_enabled?: boolean;
+          workout_reminders_enabled?: boolean;
+          quiet_hours_start?: number | null;
+          quiet_hours_end?: number | null;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       food_items: {
         Row: {
@@ -492,6 +798,7 @@ export interface Database {
           sodium_mg?: number | null;
           source?: string;
         };
+        Relationships: [];
       };
       nutrition_goals: {
         Row: {
@@ -524,6 +831,7 @@ export interface Database {
           fiber_g_target?: number | null;
           effective_from?: string;
         };
+        Relationships: [];
       };
       food_log: {
         Row: {
@@ -563,6 +871,7 @@ export interface Database {
           fat_g?: number | null;
           notes?: string | null;
         };
+        Relationships: [];
       };
     };
     Views: {
@@ -571,6 +880,7 @@ export interface Database {
           template_id: string;
           last_performed_at: string | null;
         };
+        Relationships: [];
       };
     };
     Functions: {
@@ -618,6 +928,25 @@ export interface Database {
           latest_started_at: string | null;
           latest_duration: number | null;
           latest_volume_kg: number | null;
+        }>;
+      };
+      get_nutrition_compliance: {
+        Args: { p_user_id: string; p_days?: number };
+        Returns: Array<{
+          days_tracked: number;
+          avg_calorie_pct: number;
+          avg_protein_pct: number;
+        }>;
+      };
+      detect_streak_risk_users: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          user_id: string;
+          display_name: string | null;
+          current_streak: number;
+          hours_since_last_workout: number;
+          risk_level: string;
+          pod_ids: string[];
         }>;
       };
       get_muscle_group_recovery: {

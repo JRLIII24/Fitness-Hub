@@ -10,6 +10,23 @@
 
 import confetti from "canvas-confetti";
 
+// ── AudioContext singleton (reuse across all celebration sounds) ──────────────
+let _celebrationAudioCtx: AudioContext | null = null;
+
+function getOrCreateCelebrationAudioContext(): AudioContext | null {
+  try {
+    if (!_celebrationAudioCtx || _celebrationAudioCtx.state === "closed") {
+      _celebrationAudioCtx = new AudioContext();
+    }
+    if (_celebrationAudioCtx.state === "suspended") {
+      _celebrationAudioCtx.resume().catch(() => {});
+    }
+    return _celebrationAudioCtx;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Haptic feedback helper (mobile vibration)
  */
@@ -32,24 +49,23 @@ export function triggerHaptic(pattern: "light" | "medium" | "heavy" = "medium") 
 /**
  * Audio beep helper (lightweight success sound)
  */
-export function playSuccessSound() {
+export function playSuccessSound(frequency: number = 523) {
   try {
-    const ctx = new AudioContext();
+    const ctx = getOrCreateCelebrationAudioContext();
+    if (!ctx) return;
+
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
 
     oscillator.connect(gain);
     gain.connect(ctx.destination);
 
-    // Happy chord: C major (523Hz)
-    oscillator.frequency.value = 523;
+    oscillator.frequency.value = frequency;
     gain.gain.setValueAtTime(0.3, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
 
     oscillator.start();
     oscillator.stop(ctx.currentTime + 0.3);
-
-    setTimeout(() => ctx.close(), 400);
   } catch {
     // Audio not available
   }
@@ -181,13 +197,13 @@ export function celebrateStreak(streakCount: number) {
   fireStreakConfetti(streakCount);
   triggerHaptic(streakCount >= 30 ? "heavy" : "medium");
 
-  // Different sound pitch based on milestone
+  // Higher pitch for bigger milestones (C5 → E5 → G5)
   if (streakCount >= 100) {
-    playSuccessSound(); // Higher pitched for big milestones
+    playSuccessSound(784); // G5
   } else if (streakCount >= 30) {
-    playSuccessSound();
+    playSuccessSound(659); // E5
   } else if (streakCount >= 7) {
-    playSuccessSound();
+    playSuccessSound(523); // C5
   }
 }
 

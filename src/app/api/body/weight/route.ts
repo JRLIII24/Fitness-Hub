@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
+import { parsePayload } from "@/lib/validation/parse-payload";
+import { bodyWeightCreateSchema, bodyWeightUpdateSchema } from "@/lib/validation/api.schemas";
 
 export async function GET(req: NextRequest) {
   try {
@@ -40,27 +42,10 @@ export async function POST(req: NextRequest) {
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
-    const body = await req.json();
-    const { logged_date, weight_kg, body_fat_pct, note } = body as {
-      logged_date: string;
-      weight_kg: number;
-      body_fat_pct?: number | null;
-      note?: string | null;
-    };
-
-    if (!logged_date || typeof weight_kg !== "number" || Number.isNaN(weight_kg) || weight_kg <= 0) {
-      return NextResponse.json({ error: "logged_date and positive weight_kg are required" }, { status: 400 });
-    }
-
-    if (
-      body_fat_pct != null &&
-      (typeof body_fat_pct !== "number" ||
-        Number.isNaN(body_fat_pct) ||
-        body_fat_pct < 0 ||
-        body_fat_pct > 100)
-    ) {
-      return NextResponse.json({ error: "body_fat_pct must be between 0 and 100" }, { status: 400 });
-    }
+    const { logged_date, weight_kg, body_fat_pct, note } = parsePayload(
+      bodyWeightCreateSchema,
+      await req.json(),
+    );
 
     const { data, error } = await supabase
       .from("body_weight_logs")
@@ -80,6 +65,7 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
     return NextResponse.json(data);
   } catch (error) {
+    if (error instanceof NextResponse) return error;
     logger.error("POST /api/body/weight error:", error);
     return NextResponse.json({ error: "Failed to save weight log" }, { status: 500 });
   }
@@ -91,32 +77,10 @@ export async function PUT(req: NextRequest) {
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
-    const body = await req.json();
-    const { id, logged_date, weight_kg, body_fat_pct, note } = body as {
-      id: string;
-      logged_date: string;
-      weight_kg: number;
-      body_fat_pct?: number | null;
-      note?: string | null;
-    };
-
-    if (!id) {
-      return NextResponse.json({ error: "id is required" }, { status: 400 });
-    }
-
-    if (!logged_date || typeof weight_kg !== "number" || Number.isNaN(weight_kg) || weight_kg <= 0) {
-      return NextResponse.json({ error: "logged_date and positive weight_kg are required" }, { status: 400 });
-    }
-
-    if (
-      body_fat_pct != null &&
-      (typeof body_fat_pct !== "number" ||
-        Number.isNaN(body_fat_pct) ||
-        body_fat_pct < 0 ||
-        body_fat_pct > 100)
-    ) {
-      return NextResponse.json({ error: "body_fat_pct must be between 0 and 100" }, { status: 400 });
-    }
+    const { id, logged_date, weight_kg, body_fat_pct, note } = parsePayload(
+      bodyWeightUpdateSchema,
+      await req.json(),
+    );
 
     const { data, error } = await supabase
       .from("body_weight_logs")
@@ -145,6 +109,7 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
+    if (error instanceof NextResponse) return error;
     logger.error("PUT /api/body/weight error:", error);
     return NextResponse.json({ error: "Failed to update weight log" }, { status: 500 });
   }

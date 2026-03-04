@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
 import { computeLauncherWorkout, getAlternativeTemplates, logLauncherEvent, enrichWithAI } from '@/lib/adaptive/launcher';
 import { logger } from '@/lib/logger';
+import { SMART_LAUNCHER_ENABLED } from "@/lib/features";
 
 /**
  * GET /api/workout/launcher
@@ -22,7 +23,12 @@ export async function GET(request: NextRequest) {
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
-    // Check feature flag
+    // Check global feature flag first
+    if (!SMART_LAUNCHER_ENABLED) {
+      return NextResponse.json({ error: "Feature not enabled" }, { status: 403 });
+    }
+
+    // Check per-user feature flag
     const { data: profile } = await supabase
       .from('profiles')
       .select('feature_flags')

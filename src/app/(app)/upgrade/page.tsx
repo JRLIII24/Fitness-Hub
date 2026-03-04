@@ -39,19 +39,30 @@ export default function UpgradePage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [joined, setJoined] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleJoinWaitlist(e: React.FormEvent) {
+  async function handleJoinWaitlist(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim() || !email.includes("@")) {
       toast.error("Please enter a valid email address");
       return;
     }
-    if (typeof window !== "undefined") {
-      localStorage.setItem("pro_waitlist_email", email.trim());
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/upgrade/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed to join waitlist");
+      setJoined(true);
+      toast.success("You're on the list! We'll notify you when Pro launches.");
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setJoined(true);
-    toast.success("You're on the list! We'll notify you when Pro launches.");
   }
 
   return (
@@ -70,10 +81,10 @@ export default function UpgradePage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/90 p-6"
+        className="relative overflow-hidden rounded-3xl glass-surface-elevated glass-highlight p-6"
       >
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
-        <div className="pointer-events-none absolute -left-12 bottom-0 h-36 w-36 rounded-full bg-accent/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
+        <div className="pointer-events-none absolute -left-12 bottom-0 h-36 w-36 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
         <div className="relative flex flex-col items-center text-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/30 bg-primary/15">
             <Lock className="h-5 w-5 text-primary" />
@@ -148,8 +159,8 @@ export default function UpgradePage() {
                   className="pl-9 h-10 text-sm"
                 />
               </div>
-              <Button type="submit" size="sm" className="h-10 px-4 motion-press">
-                Join
+              <Button type="submit" size="sm" className="h-10 px-4 motion-press" disabled={submitting}>
+                {submitting ? "Joining…" : "Join"}
               </Button>
             </form>
           </>

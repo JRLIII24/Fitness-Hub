@@ -408,7 +408,7 @@ export default function EditWorkoutPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-2xl space-y-5 px-4 py-5">
+      <div className="mx-auto max-w-2xl space-y-5 px-4 pb-28 pt-5">
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()} className="rounded-xl border border-border/60 bg-card/40 h-10 px-3 text-[13px] font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
             <ChevronLeft className="size-4" />
@@ -424,7 +424,7 @@ export default function EditWorkoutPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 px-4 py-5">
+    <div className="mx-auto max-w-2xl space-y-5 px-4 pb-28 pt-5">
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="rounded-xl border border-border/60 bg-card/40 h-10 px-3 text-[13px] font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
           <ChevronLeft className="size-4" />

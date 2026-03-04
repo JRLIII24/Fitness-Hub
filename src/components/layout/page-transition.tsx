@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { motionDurations, motionEasings } from "@/lib/motion";
+import { glassMotionVariants } from "@/lib/motion";
 
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -23,14 +23,9 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={pathname}
-        initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
-        transition={{
-          duration: motionDurations.panel,
-          ease: motionEasings.primary,
-        }}
-        className="will-change-transform"
+        initial={prefersReducedMotion ? { opacity: 1 } : glassMotionVariants.glassReveal.initial}
+        animate={prefersReducedMotion ? { opacity: 1 } : glassMotionVariants.glassReveal.animate}
+        exit={prefersReducedMotion ? { opacity: 1 } : glassMotionVariants.glassReveal.exit}
       >
         {children}
       </motion.div>

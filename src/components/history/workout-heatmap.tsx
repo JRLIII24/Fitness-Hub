@@ -67,14 +67,14 @@ export function WorkoutHeatmap({ sessionsByDay, weeks = 26 }: WorkoutHeatmapProp
     if (count === 0) return "bg-muted/40";
     if (count === 1) return "bg-primary/40";
     if (count === 2) return "bg-primary/65";
-    return "bg-primary";
+    return "bg-primary shadow-[0_0_6px_var(--phase-current-glow,oklch(0.78_0.16_195_/_0.20))]";
   }
 
   const totalSessions = days.reduce((sum, d) => sum + d.count, 0);
   const activeDays = days.filter((d) => d.count > 0).length;
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/30 p-5">
+    <div className="glass-surface glass-highlight rounded-2xl p-5">
       {/* Premium header row */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">

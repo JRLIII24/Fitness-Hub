@@ -3,7 +3,8 @@ export type MutationType =
     | 'DELETE_ACTIVE_SESSION'
     | 'SAVE_WORKOUT_SESSION'
     | 'LOG_BODY_WEIGHT'
-    | 'LOG_FOOD';
+    | 'LOG_FOOD'
+    | 'SYNC_GROCERY_ITEMS';
 
 export interface SyncMutationPayload {
     id: string; // Idempotency key
@@ -55,4 +56,16 @@ export interface LogFoodPayload {
     proteinG: number;
     carbsG: number;
     fatG: number;
+}
+
+export interface SyncGroceryPayload {
+    groceryListId: string;
+    items: Array<{
+        id: string;
+        name: string;
+        quantity: number;
+        unit: string;
+        checked: boolean;
+        category: string | null;
+    }>;
 }

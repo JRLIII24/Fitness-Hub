@@ -1,6 +1,9 @@
 "use client";
 
-import { ArrowLeftRight, NotebookPen, X } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeftRight, ChevronDown, NotebookPen, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,8 +59,15 @@ export function ExerciseCard({
   onSetExerciseNote,
   onStartRest,
 }: ExerciseCardProps) {
+  const [showGhosts, setShowGhosts] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fithub_show_ghost_sets") !== "false";
+    }
+    return true;
+  });
+
   return (
-    <Card className="overflow-hidden glass-surface-elevated glass-highlight transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-primary/30 hover:shadow-lg">
+    <Card className="overflow-hidden glass-surface-elevated shimmer-target transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-primary/30 hover:shadow-lg">
       <div className="h-1 w-full bg-gradient-to-r from-primary via-primary/60 to-accent" />
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between text-[20px] font-semibold tracking-tight">
@@ -89,7 +99,7 @@ export function ExerciseCard({
           </div>
           <div className="flex items-center gap-2">
             <div className="text-right">
-              <p className="text-lg font-bold leading-none text-primary">
+              <p className="text-lg font-bold font-display tabular-nums leading-none text-primary">
                 {exerciseBlock.sets.filter((set) => set.completed).length}
                 <span className="text-sm font-medium text-muted-foreground">/{exerciseBlock.sets.length}</span>
               </p>
@@ -100,7 +110,7 @@ export function ExerciseCard({
               size="icon"
               variant="ghost"
               onClick={() => onSwapExercise(exerciseIndex)}
-              title="Swap exercise"
+              aria-label="Swap exercise"
             >
               <ArrowLeftRight className="size-4 text-muted-foreground" />
             </Button>
@@ -109,6 +119,7 @@ export function ExerciseCard({
               size="icon"
               variant="ghost"
               onClick={() => onRemoveExercise(exerciseIndex)}
+              aria-label="Remove exercise"
             >
               <X className="size-4 text-destructive" />
             </Button>
@@ -124,30 +135,55 @@ export function ExerciseCard({
       )}
       <CardContent className="space-y-3 px-5 pb-5">
         {ghostSets?.length ? (
-          <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-cyan-300/80">
-              Last Session Set Ladder
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {ghostSets
-                .slice()
-                .sort((a, b) => a.setNumber - b.setNumber)
-                .map((ghostSet) => (
-                  <span
-                    key={`${exerciseBlock.exercise.id}-ghost-${ghostSet.setNumber}`}
-                    className="inline-flex items-center gap-1 rounded-md border border-cyan-500/25 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200"
-                  >
-                    <span className="font-semibold">S{ghostSet.setNumber}</span>
-                    <span className="text-cyan-100/90">
-                      {ghostSet.weight != null
-                        ? preference === "imperial"
-                          ? weightToDisplay(ghostSet.weight, true, 1)
-                          : ghostSet.weight
-                        : "\u2014"} x {ghostSet.reps ?? "\u2014"}
-                    </span>
-                  </span>
-                ))}
-            </div>
+          <div className="px-4 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowGhosts((prev) => {
+                  const next = !prev;
+                  localStorage.setItem("fithub_show_ghost_sets", String(next));
+                  return next;
+                });
+              }}
+              className="flex w-full items-center gap-1.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
+            >
+              <ChevronDown className={cn("h-3 w-3 transition-transform", showGhosts && "rotate-180")} />
+              Last session
+            </button>
+            <AnimatePresence initial={false}>
+              {showGhosts && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="glass-inner rounded-lg px-3 py-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {ghostSets
+                        .slice()
+                        .sort((a, b) => a.setNumber - b.setNumber)
+                        .map((ghostSet) => (
+                          <span
+                            key={`${exerciseBlock.exercise.id}-ghost-${ghostSet.setNumber}`}
+                            className="glass-chip inline-flex items-center gap-1 px-2 py-1 text-[11px] text-primary"
+                          >
+                            <span className="font-semibold">S{ghostSet.setNumber}</span>
+                            <span className="text-primary">
+                              {ghostSet.weight != null
+                                ? preference === "imperial"
+                                  ? weightToDisplay(ghostSet.weight, true, 1)
+                                  : ghostSet.weight
+                                : "\u2014"} x {ghostSet.reps ?? "\u2014"}
+                            </span>
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         ) : null}
         {exerciseBlock.sets.map((set, setIndex) => {

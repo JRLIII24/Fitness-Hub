@@ -81,21 +81,21 @@ export function MuscleRecoveryCard() {
   }, []);
 
   return (
-    <div className="overflow-hidden glass-surface glass-highlight rounded-2xl">
+    <div className="overflow-hidden glass-surface shimmer-target rounded-2xl">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 px-5 py-4">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-card/70">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg glass-icon-container">
             <Dumbbell className="h-3.5 w-3.5 text-primary" />
           </div>
-          <span className="truncate text-[13px] font-bold text-foreground">
+          <span className="truncate text-[13px] font-bold text-[#F0F4FF]">
             Muscle Recovery
           </span>
         </div>
       </div>
 
       {/* Divider */}
-      <div className="h-px bg-border/40" />
+      <div className="glass-divider" />
 
       {/* Content */}
       <div className="p-4">
@@ -133,9 +133,6 @@ export function MuscleRecoveryCard() {
                       className={cn(
                         "h-full rounded-full transition-all duration-700",
                         recoveryBarColor(r.recoveryStatus),
-                        r.recoveryStatus === "recovered" && "shadow-[0_0_6px_oklch(0.72_0.18_145_/_0.4)]",
-                        r.recoveryStatus === "recovering" && "shadow-[0_0_6px_oklch(0.80_0.15_85_/_0.4)]",
-                        r.recoveryStatus === "fatigued" && "shadow-[0_0_6px_oklch(0.65_0.22_25_/_0.4)]",
                       )}
                       style={{ width: `${r.recoveryPct}%` }}
                     />
@@ -166,9 +163,9 @@ export function MuscleRecoveryCard() {
             <div className="flex flex-wrap items-center gap-3 px-1 pt-2">
               {(
                 [
-                  ["Fatigued", "bg-rose-400"],
-                  ["Recovering", "bg-amber-400"],
-                  ["Recovered", "bg-emerald-400"],
+                  ["Fatigued", "bg-[var(--status-negative)]"],
+                  ["Recovering", "bg-[var(--status-warning)]"],
+                  ["Recovered", "bg-[var(--status-positive)]"],
                 ] as const
               ).map(([label, dot]) => (
                 <div key={label} className="flex items-center gap-1.5">

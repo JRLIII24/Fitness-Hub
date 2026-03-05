@@ -70,12 +70,12 @@ export function WeightLogWidget() {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-border/60 bg-card/30 p-4"
+      className="rounded-2xl glass-surface p-4"
     >
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Scale className="h-3.5 w-3.5 text-primary" />
-          <span className="text-[13px] font-bold">Body Weight</span>
+          <span className="text-[13px] font-bold text-[#F0F4FF]">Body Weight</span>
         </div>
         <Link
           href="/body"
@@ -88,7 +88,7 @@ export function WeightLogWidget() {
       <div className="flex items-end gap-3">
         {latest ? (
           <div className="flex-1">
-            <p className="text-[26px] font-black leading-none tabular-nums">
+            <p className="font-display text-[26px] font-black leading-none tabular-nums text-[#F0F4FF]">
               {displayWeight(latest.weight_kg)}
             </p>
             <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -112,7 +112,7 @@ export function WeightLogWidget() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void handleSave()}
-            className="h-8 w-20 rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="h-8 w-20 rounded-lg border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.04)] px-2.5 text-sm tabular-nums text-[#F0F4FF] placeholder:text-[#94A3B8]/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
           <button
             onClick={() => void handleSave()}

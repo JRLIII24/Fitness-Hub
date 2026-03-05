@@ -127,7 +127,7 @@ function PreviewSheet({
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "tween", duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
-        className="fixed inset-x-0 bottom-0 z-[70] mx-auto flex max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-1rem))] min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-t-3xl glass-surface-modal glass-highlight"
+        className="fixed inset-x-0 bottom-0 z-[70] mx-auto flex max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-1rem))] min-h-0 w-full max-w-lg flex-col overflow-hidden rounded-t-3xl glass-surface-modal "
       >
         {/* Drag handle */}
         <div className="flex justify-center pb-0 pt-3">
@@ -145,6 +145,7 @@ function PreviewSheet({
           {/* Close */}
           <button
             onClick={onClose}
+            aria-label="Close template preview"
             className="absolute right-4 top-3.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/35 text-white/80 backdrop-blur-sm transition-opacity hover:opacity-80"
           >
             <X className="h-4 w-4" />
@@ -200,7 +201,7 @@ function PreviewSheet({
             ].map(s => (
               <div
                 key={s.sub}
-                className="flex flex-col items-center justify-center rounded-xl border border-border/50 bg-card/40 px-2 py-3 text-center"
+                className="flex flex-col items-center justify-center rounded-xl glass-inner px-2 py-3 text-center"
               >
                 <div className="mb-1.5 flex justify-center">{s.icon}</div>
                 <span className="tabular-nums text-[17px] font-black leading-none text-foreground">{s.val}</span>
@@ -255,8 +256,7 @@ function PreviewSheet({
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.03 }}
                       className={cn(
-                        "grid grid-cols-[1fr_40px_52px_56px] items-center gap-2 rounded-xl border border-border/50 px-3 py-2.5",
-                        i % 2 === 0 ? "bg-card/40" : "bg-card/20",
+                        "grid grid-cols-[1fr_40px_52px_56px] items-center gap-2 rounded-xl glass-inner px-3 py-2.5",
                       )}
                     >
                       <span className="truncate text-[12px] font-semibold text-foreground">
@@ -280,7 +280,7 @@ function PreviewSheet({
           )}
 
           {/* Summary pill */}
-          <div className="mb-5 flex items-center gap-3 rounded-xl border border-border/50 bg-card/40 px-4 py-3">
+          <div className="mb-5 flex items-center gap-3 rounded-xl glass-inner px-4 py-3">
             <Zap className="h-3.5 w-3.5 shrink-0" style={{ color: diff.color }} />
             <p className="text-[12px] text-muted-foreground">
               <span className="font-bold" style={{ color: diff.color }}>{diff.label}</span>
@@ -330,7 +330,7 @@ function PreviewSheet({
             </>
           ) : isOwn ? (
             /* Own template: read-only — no save action */
-            <div className="flex items-center justify-center rounded-2xl border border-border/50 bg-card/40 px-4 py-3.5">
+            <div className="flex items-center justify-center rounded-2xl glass-inner px-4 py-3.5">
               <span className="text-[13px] font-semibold text-muted-foreground">This is your template</span>
             </div>
           ) : importState === "error" ? (

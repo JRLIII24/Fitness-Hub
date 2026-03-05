@@ -20,7 +20,7 @@ export function ProUpgradeCard({ userId }: ProUpgradeCardProps) {
     if (typeof window !== "undefined" && window.localStorage.getItem(dedupeKey)) return;
     if (typeof window !== "undefined") window.localStorage.setItem(dedupeKey, "1");
 
-    void supabase.from("conversion_impressions").insert({
+    supabase.from("conversion_impressions").insert({
       user_id: userId,
       placement: "dashboard",
       impression_type: "locked_preview",
@@ -28,11 +28,13 @@ export function ProUpgradeCard({ userId }: ProUpgradeCardProps) {
       metadata: {
         module: "analytics_and_coaching",
       },
+    }).then(({ error }) => {
+      if (error) console.warn("[pro-upgrade-card] impression tracking failed:", error.message);
     });
   }, [supabase, userId]);
 
   return (
-    <Card className="border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card/85">
+    <Card className="glass-surface">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Lock className="h-4 w-4 text-primary" />
@@ -44,15 +46,15 @@ export function ProUpgradeCard({ userId }: ProUpgradeCardProps) {
           You&apos;ve built momentum. Unlock coaching-grade trend models and pod competition analytics.
         </p>
         <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-secondary/25 px-2.5 py-2">
+          <div className="flex items-center gap-2 rounded-lg glass-inner px-2.5 py-2">
             <LineChart className="h-3.5 w-3.5 text-primary" />
             <span>Advanced PR trajectory forecasting</span>
           </div>
-          <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-secondary/25 px-2.5 py-2">
+          <div className="flex items-center gap-2 rounded-lg glass-inner px-2.5 py-2">
             <ShieldCheck className="h-3.5 w-3.5 text-primary" />
             <span>Accountability pod pressure index</span>
           </div>
-          <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-secondary/25 px-2.5 py-2">
+          <div className="flex items-center gap-2 rounded-lg glass-inner px-2.5 py-2">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span>Adaptive fueling recommendations</span>
           </div>

@@ -132,6 +132,7 @@ function InteractiveStars({
                     >
                         <motion.button
                             type="button"
+                            aria-label={`Rate ${i + 1} out of 5`}
                             onPointerEnter={() => setHovered(i)}
                             onClick={() => handleClick(i)}
                             animate={hovered >= i ? { scale: 1.15 } : { scale: 1 }}

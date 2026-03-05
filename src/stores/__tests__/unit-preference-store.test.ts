@@ -111,7 +111,6 @@ describe("useUnitPreferenceStore", () => {
       const state = useUnitPreferenceStore.getState();
       expect(state.unitLabel).toBe("kg");
       expect(state.heightLabel).toBe("cm");
-      expect(state.distanceLabel).toBe("km");
       expect(state.paceLabel).toBe("/km");
     });
 
@@ -120,7 +119,6 @@ describe("useUnitPreferenceStore", () => {
       const state = useUnitPreferenceStore.getState();
       expect(state.unitLabel).toBe("lbs");
       expect(state.heightLabel).toBe("inches");
-      expect(state.distanceLabel).toBe("mi");
       expect(state.paceLabel).toBe("/mi");
     });
   });

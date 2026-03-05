@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import type { SaveWorkoutPayload, LogBodyWeightPayload, LogFoodPayload } from './queue.types';
+import type { SaveWorkoutPayload, LogBodyWeightPayload, LogFoodPayload, SyncGroceryPayload } from './queue.types';
 
 type SyncHandler = (payload: unknown) => Promise<void>;
 
@@ -97,6 +97,19 @@ const handlers: Record<string, SyncHandler> = {
         });
 
         if (error) throw error;
+    },
+
+    SYNC_GROCERY_ITEMS: async (raw) => {
+        const payload = raw as SyncGroceryPayload;
+        const res = await fetch(`/api/nutrition/grocery-list/${payload.groceryListId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: payload.items }),
+        });
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => null);
+            throw new Error(errorData?.error ?? 'Failed to sync grocery items');
+        }
     },
 };
 

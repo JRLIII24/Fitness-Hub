@@ -26,7 +26,7 @@ export const ProteinRing = React.memo(function ProteinRing({ consumed, goal }: P
             </feMerge>
           </filter>
         </defs>
-        <circle cx="38" cy="38" r={R} strokeWidth="5" fill="none" className="stroke-border" />
+        <circle cx="38" cy="38" r={R} strokeWidth="5" fill="none" stroke="rgba(255,255,255,0.07)" />
         {/* Glow layer */}
         <circle
           cx="38"
@@ -34,7 +34,7 @@ export const ProteinRing = React.memo(function ProteinRing({ consumed, goal }: P
           r={R}
           strokeWidth="8"
           fill="none"
-          stroke="rgb(96 165 250)"
+          stroke="var(--macro-protein)"
           strokeLinecap="round"
           strokeDasharray={`${CIRC}`}
           strokeDashoffset={`${offset}`}
@@ -48,7 +48,7 @@ export const ProteinRing = React.memo(function ProteinRing({ consumed, goal }: P
           r={R}
           strokeWidth="5"
           fill="none"
-          stroke="rgb(96 165 250)"
+          stroke="var(--macro-protein)"
           strokeLinecap="round"
           strokeDasharray={`${CIRC}`}
           strokeDashoffset={`${offset}`}
@@ -56,13 +56,13 @@ export const ProteinRing = React.memo(function ProteinRing({ consumed, goal }: P
         />
       </svg>
       <div className="absolute flex flex-col items-center justify-center">
-        <span className="tabular-nums text-[16px] font-black leading-none text-blue-400">
+        <span className="font-display tabular-nums text-[16px] font-black leading-none text-[var(--macro-protein)]">
           {Math.round(consumed)}
         </span>
         <span className="text-[8px] font-semibold text-muted-foreground">
           {isOver ? "over" : "left"}
         </span>
-        <span className={cn("tabular-nums text-[8px] font-bold", isOver ? "text-rose-400" : "text-blue-400")}>
+        <span className={cn("tabular-nums text-[8px] font-bold", isOver ? "text-[var(--status-negative)]" : "text-[var(--macro-protein)]")}>
           {Math.round(isOver ? consumed - goal : remaining)}g
         </span>
       </div>

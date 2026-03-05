@@ -25,7 +25,7 @@ export async function POST(
     if (authErr) return authErr;
 
     // Rate limit: 30 messages per user per minute
-    if (!rateLimit(`msg:${user.id}`, 30, 60_000)) {
+    if (!(await rateLimit(`msg:${user.id}`, 30, 60_000))) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 

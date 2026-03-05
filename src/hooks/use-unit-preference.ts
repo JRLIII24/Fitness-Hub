@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useState, useEffect } from "react";
 import { useSupabase } from "./use-supabase";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";

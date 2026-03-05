@@ -38,7 +38,7 @@ export const CalorieRing = React.memo(function CalorieRing({ consumed, goal }: C
           r={R}
           strokeWidth="7"
           fill="none"
-          className="stroke-border"
+          stroke="rgba(255,255,255,0.07)"
         />
         {/* Glow layer */}
         <circle
@@ -47,7 +47,7 @@ export const CalorieRing = React.memo(function CalorieRing({ consumed, goal }: C
           r={R}
           strokeWidth="10"
           fill="none"
-          stroke={isOver ? "rgb(244 63 94)" : "rgb(52 211 153)"}
+          stroke={isOver ? "var(--status-negative)" : "var(--status-positive)"}
           strokeLinecap="round"
           strokeDasharray={`${CIRC}`}
           strokeDashoffset={`${offset}`}
@@ -62,7 +62,7 @@ export const CalorieRing = React.memo(function CalorieRing({ consumed, goal }: C
           r={R}
           strokeWidth="7"
           fill="none"
-          stroke={isOver ? "rgb(244 63 94)" : "rgb(52 211 153)"}
+          stroke={isOver ? "var(--status-negative)" : "var(--status-positive)"}
           strokeLinecap="round"
           strokeDasharray={`${CIRC}`}
           strokeDashoffset={`${offset}`}
@@ -70,14 +70,14 @@ export const CalorieRing = React.memo(function CalorieRing({ consumed, goal }: C
         />
       </svg>
       <div className="absolute flex flex-col items-center justify-center">
-        <span className="tabular-nums text-[22px] font-black leading-none text-foreground">
+        <span className="font-display tabular-nums text-[22px] font-black leading-none text-[#F0F4FF]">
           {Math.round(consumed)}
         </span>
         <span className="text-[9px] font-semibold text-muted-foreground">kcal</span>
         <span
           className={cn(
             "mt-0.5 tabular-nums text-[9px] font-bold",
-            isOver ? "text-rose-400" : "text-emerald-400"
+            isOver ? "text-[var(--status-negative)]" : "text-[var(--status-positive)]"
           )}
         >
           {isOver ? "+" : ""}

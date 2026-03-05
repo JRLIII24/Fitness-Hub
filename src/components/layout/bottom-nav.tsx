@@ -118,10 +118,10 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--glass-border-medium)] bg-[var(--glass-tint-heavy)] backdrop-blur-[var(--glass-blur-xl)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 glass-nav border-t border-[rgba(255,255,255,0.09)] shadow-[0_-8px_32px_rgba(0,0,0,0.60)]">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-center px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <LayoutGroup id="bottom-nav">
-          <div className="flex max-w-full items-center gap-1 overflow-x-auto scrollbar-none rounded-full border border-border/70 bg-background/60 p-1 sm:gap-1">
+          <div className="flex max-w-full items-center gap-1 overflow-x-auto scrollbar-none rounded-full border border-border/70 glass-inner p-1 sm:gap-1">
             {tabs.map((tab) => {
               const isActive = isTabActive(tab.href);
               const Icon = tab.icon;

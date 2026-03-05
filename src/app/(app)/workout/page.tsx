@@ -64,6 +64,8 @@ import { ExerciseCard } from "@/components/workout/exercise-card";
 import { WorkoutCompletionDialog } from "@/components/workout/workout-completion-dialog";
 import { TemplateManagerPanel } from "@/components/workout/template-manager-panel";
 import { QuickStartPanel } from "@/components/workout/quick-start-panel";
+import { AI_COACH_ENABLED } from "@/lib/features";
+import { VoiceCommandBar } from "@/components/coach/voice-command-bar";
 
 type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 
@@ -1401,16 +1403,16 @@ export default function WorkoutPage() {
 
   return (
     <div data-phase="active" className="min-h-screen bg-background pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
-      <div className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
+      <div className="sticky top-0 z-40 glass-surface border-b border-[rgba(255,255,255,0.06)]">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-6 lg:px-10">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
+            <div className="glass-icon-container flex h-8 w-8 items-center justify-center rounded-lg">
               <Dumbbell className="h-4 w-4 text-primary" />
             </div>
-            <p className="text-lg font-bold tracking-tight">Workout</p>
+            <p className="text-lg font-bold font-display tracking-tight">Workout</p>
           </div>
           {isWorkoutActive && activeWorkout ? (
-            <div className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            <div className="glass-chip inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-primary">
               <Zap className="h-3.5 w-3.5" />
               {plannerStats.completedSets}/{plannerStats.totalSets} sets
             </div>
@@ -1427,15 +1429,15 @@ export default function WorkoutPage() {
         ) : null}
 
         {!isWorkoutActive ? (
-          <Card className="mx-auto w-full max-w-3xl overflow-hidden border-primary/25 bg-card/95 shadow-xl transition-all duration-300">
-            <div className="border-b border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-5 py-4 sm:px-6">
+          <Card className="mx-auto w-full max-w-3xl overflow-hidden glass-surface-elevated shadow-xl transition-all duration-300">
+            <div className="border-b border-[rgba(255,255,255,0.06)] glass-inner px-5 py-4 sm:px-6">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-primary/30 bg-primary/15">
+                <div className="glass-icon-container flex h-10 w-10 items-center justify-center rounded-xl">
                   <Dumbbell className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">New Session</p>
-                  <p className="text-xl font-black tracking-tight">Start a Workout</p>
+                  <p className="text-xl font-black font-display tracking-tight">Start a Workout</p>
                 </div>
               </div>
             </div>
@@ -1447,7 +1449,7 @@ export default function WorkoutPage() {
                 </p>
               ) : null}
 
-              <div className="rounded-xl border border-border/70 bg-secondary/20 p-1">
+              <div className="glass-inner rounded-xl p-1">
                 <div className="grid grid-cols-2 gap-1">
                   <button
                     type="button"
@@ -1608,7 +1610,7 @@ export default function WorkoutPage() {
             />
 
             <div className="grid gap-6 lg:grid-cols-[21.25rem_minmax(0,1fr)]">
-              <Card className="h-fit border-border/70 bg-card/95 shadow-sm transition-all duration-300 lg:sticky lg:top-20">
+              <Card className="h-fit glass-surface shadow-sm transition-all duration-300 lg:sticky lg:top-20">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <Input
@@ -1698,7 +1700,7 @@ export default function WorkoutPage() {
                   </div>
 
                   {selectedExercise ? (
-                    <div className="rounded-xl border border-border/70 bg-card/80 p-3">
+                    <div className="glass-inner rounded-xl p-3">
                       <div className="flex items-center gap-3">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold">{selectedExercise.name}</p>
@@ -1795,9 +1797,9 @@ export default function WorkoutPage() {
               </Card>
 
               <div className="space-y-4">
-                <Card className="border-border/70 bg-card/90">
+                <Card className="glass-surface">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-[20px] font-bold tracking-tight">Exercises</CardTitle>
+                    <CardTitle className="text-[20px] font-bold font-display tracking-tight">Exercises</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {activeWorkout.exercises.length === 0 ? (
@@ -1812,7 +1814,7 @@ export default function WorkoutPage() {
                     ) : (
                       <div className="space-y-4">
                         {ghostWorkoutData ? (
-                          <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-muted-foreground">
+                          <div className="glass-inner rounded-lg px-3 py-2 text-xs text-muted-foreground">
                             Ghost workout active. You are training against your last matching session.
                           </div>
                         ) : null}
@@ -1841,13 +1843,13 @@ export default function WorkoutPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-border/70 bg-card/95 shadow-sm lg:sticky lg:top-20">
+                <Card className="glass-surface shadow-sm lg:sticky lg:top-20">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Session Actions</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {/* Workout Notes */}
-                    <div className="space-y-1.5 pb-3 border-b border-border/40">
+                    <div className="space-y-1.5 pb-3 border-b border-[rgba(255,255,255,0.06)]">
                       <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <NotebookPen className="h-3 w-3" />
                         Workout notes
@@ -1951,6 +1953,9 @@ export default function WorkoutPage() {
 
         {/* Floating Rest Timer Pill */}
         <RestTimerPill />
+
+        {/* AI Coach Voice Command Bar */}
+        {AI_COACH_ENABLED && isWorkoutActive && <VoiceCommandBar />}
 
         {/* Exercise Swap Sheet */}
         <ExerciseSwapSheet

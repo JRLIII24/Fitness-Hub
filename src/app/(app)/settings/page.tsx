@@ -61,7 +61,7 @@ export default async function SettingsPage() {
     <div className="mx-auto w-full max-w-2xl space-y-6 px-4 pb-28 pt-6">
       <PageHeader title="Settings" />
 
-      <Card className="border-border/60 bg-card/70">
+      <Card className="glass-surface">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Account & Preferences</CardTitle>
           <CardDescription className="text-xs">
@@ -76,7 +76,7 @@ export default async function SettingsPage() {
         userId={user.id}
       />
 
-      <Card className="border-border/60">
+      <Card className="glass-surface">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <LayoutList className="h-4 w-4 text-primary" />

@@ -8,7 +8,6 @@ import { glassMotionVariants } from "@/lib/motion";
 import {
   Dumbbell,
   Apple,
-  Flame,
   CalendarDays,
   ChevronRight,
   Trophy,
@@ -28,7 +27,6 @@ import { SmartLauncherWidget } from "@/components/workout/smart-launcher-widget"
 import { FatigueLevelCard } from "@/components/dashboard/fatigue-level-card";
 import { PodsDashboardCard } from "@/components/pods/pods-dashboard-card";
 import { XpProgressBar } from "@/components/profile/xp-progress-bar";
-import { RecoveryAICard } from "@/components/ai/recovery-ai-card";
 import { WeightLogWidget } from "@/components/dashboard/weight-log-widget";
 import { MuscleRecoveryCard } from "@/components/dashboard/muscle-recovery-card";
 import { WeeklyReviewModal } from "@/components/dashboard/weekly-review-modal";
@@ -126,7 +124,7 @@ function formatDate(iso: string) {
 }
 
 function CardDivider() {
-  return <div className="h-px bg-border/40" />;
+  return <div className="glass-divider" />;
 }
 
 // ─── DashboardContent ─────────────────────────────────────────────────────────
@@ -191,7 +189,7 @@ export function DashboardContent({
             Stay on this path to complete
           </p>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="tabular-nums text-[40px] font-black leading-none text-primary">
+            <span className="font-display tabular-nums text-[40px] font-black leading-none text-primary">
               {projectedSessions90d}
             </span>
             <span className="text-[13px] font-medium text-muted-foreground">
@@ -200,12 +198,12 @@ export function DashboardContent({
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-3">
+          <div className="rounded-xl glass-inner px-3 py-3">
             <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
               7-Day Goal
             </p>
             <div className="flex items-baseline gap-0.5">
-              <span className="tabular-nums text-[22px] font-black leading-none text-foreground">
+              <span className="font-display tabular-nums text-[22px] font-black leading-none text-[#F0F4FF]">
                 {thisWeekSessionCount}
               </span>
               <span className="text-[12px] font-medium text-muted-foreground">
@@ -213,12 +211,12 @@ export function DashboardContent({
               </span>
             </div>
           </div>
-          <div className="rounded-xl border border-border/50 bg-card/40 px-3 py-3">
+          <div className="rounded-xl glass-inner px-3 py-3">
             <p className="mb-1 text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
               Proj. Volume
             </p>
             <div className="flex items-baseline gap-0.5">
-              <span className="tabular-nums text-[18px] font-black leading-none text-foreground">
+              <span className="font-display tabular-nums text-[18px] font-black leading-none text-[#F0F4FF]">
                 {toDisplayVolume(projectedVolumeKg).toLocaleString()}
               </span>
               <span className="text-[11px] font-medium text-muted-foreground">{unitLabel}</span>
@@ -234,7 +232,7 @@ export function DashboardContent({
               {weeklyProgressPct}%
             </span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-border/40">
+          <div className="h-1.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.07)]">
             <motion.div
               className="h-full rounded-full bg-primary"
               initial={{ width: 0 }}
@@ -253,7 +251,7 @@ export function DashboardContent({
   const nutritionCard = (
     <SectionCard key="nutrition">
       <DashboardCardHeader
-        icon={<Apple className="h-3.5 w-3.5 text-emerald-400" />}
+        icon={<Apple className="h-3.5 w-3.5 text-[var(--status-positive)]" />}
         title="Today's Nutrition"
         action={
           <Link href="/nutrition">
@@ -278,16 +276,16 @@ export function DashboardContent({
                   <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
                     Goal
                   </p>
-                  <p className="tabular-nums text-[20px] font-black leading-none text-foreground">
+                  <p className="font-display tabular-nums text-[20px] font-black leading-none text-[#F0F4FF]">
                     {calorieGoal.toLocaleString()}
                     <span className="text-[11px] font-normal text-muted-foreground">
                       {" "}kcal
                     </span>
                   </p>
                 </div>
-                <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2">
+                <div className="rounded-xl border border-[var(--status-positive)]/20 bg-[var(--status-positive)]/10 px-3 py-2">
                   <p className="mb-0.5 text-[10px] text-muted-foreground">Remaining</p>
-                  <p className="tabular-nums text-[18px] font-black leading-none text-emerald-400">
+                  <p className="tabular-nums text-[18px] font-black leading-none text-[var(--status-positive)]">
                     {Math.max(0, calorieGoal - todayCalories).toLocaleString()}
                     <span className="text-[11px] font-normal text-muted-foreground">
                       {" "}kcal
@@ -308,32 +306,32 @@ export function DashboardContent({
                 label="Protein"
                 value={todayProtein}
                 goal={nutritionGoal?.protein_g_target ?? null}
-                textColorClass="text-blue-400"
-                barColorClass="bg-blue-400"
+                textColorClass="text-[var(--macro-protein)]"
+                barColorClass="bg-[var(--macro-protein)]"
                 trackHeight="h-2"
               />
               <MacroBar
                 label="Carbs"
                 value={todayCarbs}
                 goal={nutritionGoal?.carbs_g_target ?? null}
-                textColorClass="text-amber-400"
-                barColorClass="bg-amber-400"
+                textColorClass="text-[var(--macro-carbs)]"
+                barColorClass="bg-[var(--macro-carbs)]"
               />
               <MacroBar
                 label="Fat"
                 value={todayFat}
                 goal={nutritionGoal?.fat_g_target ?? null}
-                textColorClass="text-rose-400"
-                barColorClass="bg-rose-400"
+                textColorClass="text-[var(--macro-fat)]"
+                barColorClass="bg-[var(--macro-fat)]"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/50 bg-card/30 p-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 rounded-xl glass-inner p-3 sm:grid-cols-4">
               {[
-                { label: "Fiber", value: `${Math.round(todayFiber)}g`, colorClass: "text-emerald-400" },
-                { label: "Sugar", value: `${Math.round(todaySugar)}g`, colorClass: "text-rose-400" },
-                { label: "Sodium", value: `${Math.round(todaySodiumMg / 100) / 10}g`, colorClass: "text-cyan-400" },
-                { label: "Servings", value: `${Math.round(todayServings * 10) / 10}`, colorClass: "text-violet-400" },
+                { label: "Fiber", value: `${Math.round(todayFiber)}g`, colorClass: "text-[var(--macro-fiber)]" },
+                { label: "Sugar", value: `${Math.round(todaySugar)}g`, colorClass: "text-[var(--macro-carbs)]" },
+                { label: "Sodium", value: `${Math.round(todaySodiumMg / 100) / 10}g`, colorClass: "text-[var(--status-neutral)]" },
+                { label: "Servings", value: `${Math.round(todayServings * 10) / 10}`, colorClass: "text-[var(--status-neutral)]" },
               ].map(({ label, value, colorClass }) => (
                 <div key={label} className="text-center">
                   <p className={cn("tabular-nums text-[14px] font-black leading-none", colorClass)}>
@@ -364,7 +362,6 @@ export function DashboardContent({
     launcher: <SmartLauncherWidget key="launcher" />,
     fatigue: <FatigueLevelCard key="fatigue" initialSnapshot={fatigueSnapshot} />,
     muscleRecovery: <MuscleRecoveryCard key="muscleRecovery" />,
-    recovery: <RecoveryAICard key="recovery" />,
     weight: <WeightLogWidget key="weight" />,
     ninetyDay: ninetyDayCard,
     nutrition: nutritionCard,
@@ -380,7 +377,7 @@ export function DashboardContent({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-3xl glass-surface-elevated glass-highlight p-6 sm:p-8"
+        className="relative overflow-hidden rounded-3xl glass-surface-elevated p-6 sm:p-8"
       >
         {/* Ambient glows */}
         <div className="pointer-events-none absolute -right-28 -top-28 h-72 w-72 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-[80px]" />
@@ -394,11 +391,11 @@ export function DashboardContent({
               {/* Date pill + Level badge */}
               <div className="flex flex-wrap items-center gap-2">
                 {/* Date pill with live dot */}
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 py-1">
+                <div className="inline-flex items-center gap-2 rounded-full glass-chip px-3 py-1">
                   <span
-                    className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"
+                    className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--status-positive)]"
                     style={{
-                      boxShadow: "0 0 6px rgb(52 211 153)",
+                      boxShadow: "0 0 6px var(--status-positive)",
                       animation: "pulse 2s infinite",
                     }}
                   />
@@ -426,7 +423,7 @@ export function DashboardContent({
               {/* Heading */}
               <div>
                 <h1
-                  className="font-black leading-[1.1] tracking-tight text-foreground"
+                  className="font-display font-black leading-[1.1] tracking-tight text-[#F0F4FF]"
                   style={{ fontSize: "clamp(24px, 5vw, 40px)" }}
                 >
                   {workedOutToday ? (
@@ -441,7 +438,7 @@ export function DashboardContent({
                     </>
                   )}
                 </h1>
-                <p className="mt-2 max-w-[440px] text-[13px] leading-relaxed text-muted-foreground">
+                <p className="mt-2 max-w-[440px] text-[13px] leading-relaxed text-[#94A3B8]">
                   {workedOutToday
                     ? "Session complete. Keep the edge by recovering and logging nutrition precisely."
                     : "Your next session defines the week. Start now and protect your streak."}
@@ -460,21 +457,16 @@ export function DashboardContent({
           </div>
 
           {/* Stat pills */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <StatPill
-              icon={<Flame className="h-4 w-4 text-orange-500" />}
-              value={streak}
-              label="Day Streak"
-            />
-            <StatPill
-              icon={<Dumbbell className="h-4 w-4 text-primary" />}
-              value={thisWeekSessionCount}
-              label="This Week"
-            />
-            <StatPill
-              icon={<Trophy className="h-4 w-4 text-amber-400" />}
+              icon={<Trophy className="h-4 w-4 text-primary" />}
               value={totalSessionCount}
-              label="Total"
+              label="Total Sessions"
+            />
+            <StatPill
+              icon={<BarChart3 className="h-4 w-4 text-primary" />}
+              value={lastWorkout?.total_volume_kg ? toDisplayVolume(lastWorkout.total_volume_kg).toLocaleString() : "—"}
+              label={`Volume (${unitLabel})`}
             />
           </div>
 
@@ -551,33 +543,33 @@ export function DashboardContent({
                         {formatDate(lastWorkout.started_at)}
                       </p>
                     </div>
-                    <span className="whitespace-nowrap rounded-full border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-0.5 text-[9px] font-bold text-emerald-400">
+                    <span className="whitespace-nowrap rounded-full border border-[var(--status-positive)]/30 bg-[var(--status-positive)]/15 px-2.5 py-0.5 text-[9px] font-bold text-[var(--status-positive)]">
                       Completed
                     </span>
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-0.5 rounded-xl border border-border/50 bg-card/40 px-3 py-3">
+                    <div className="flex flex-col gap-0.5 rounded-xl glass-inner px-3 py-3">
                       <div className="flex items-center gap-1.5">
-                        <Clock className="h-2.5 w-2.5 text-muted-foreground" />
-                        <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
+                        <Clock className="h-2.5 w-2.5 text-[#94A3B8]" />
+                        <span className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#94A3B8]">
                           Duration
                         </span>
                       </div>
-                      <span className="tabular-nums text-[20px] font-black leading-none text-foreground">
+                      <span className="font-display tabular-nums text-[20px] font-black leading-none text-[#F0F4FF]">
                         {formatDuration(lastWorkout.duration_seconds)}
                       </span>
                     </div>
 
                     {lastWorkout.total_volume_kg && (
-                      <div className="flex flex-col gap-0.5 rounded-xl border border-border/50 bg-card/40 px-3 py-3">
+                      <div className="flex flex-col gap-0.5 rounded-xl glass-inner px-3 py-3">
                         <div className="flex items-center gap-1.5">
-                          <BarChart3 className="h-2.5 w-2.5 text-muted-foreground" />
-                          <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <BarChart3 className="h-2.5 w-2.5 text-[#94A3B8]" />
+                          <span className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#94A3B8]">
                             Volume
                           </span>
                         </div>
-                        <span className="tabular-nums text-[20px] font-black leading-none text-foreground">
+                        <span className="font-display tabular-nums text-[20px] font-black leading-none text-[#F0F4FF]">
                           {toDisplayVolume(lastWorkout.total_volume_kg).toLocaleString()}
                           <span className="text-[12px] font-normal text-muted-foreground"> {unitLabel}</span>
                         </span>

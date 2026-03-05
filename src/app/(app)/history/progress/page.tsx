@@ -19,8 +19,6 @@ import {
 import { cn } from "@/lib/utils";
 import { HistoryNav } from "@/components/history/history-nav";
 // pdf-export loaded dynamically in handleExportPDF to reduce bundle
-import { ProgressInsightCard } from "@/components/ai/progress-insight-card";
-
 const ProgressCharts = {
   SparklineChart: dynamic(
     () => import("@/components/charts/progress-charts").then((m) => m.SparklineChart),
@@ -188,7 +186,7 @@ function SparklineCard({
     <motion.button
       whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className="flex flex-col rounded-2xl border border-border/60 bg-card/30 p-4 text-left transition-all hover:border-primary/30 hover:bg-card/80"
+      className="flex flex-col glass-surface shimmer-target rounded-2xl p-4 text-left transition-all hover:border-primary/30"
     >
       <p className="text-[13px] font-semibold min-w-0 truncate text-foreground">{name}</p>
       <p className="text-[10px] capitalize text-muted-foreground">
@@ -589,7 +587,7 @@ export default function ProgressPage() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
                   Analytics
                 </p>
-                <h1 className="text-2xl font-extrabold tracking-tight">Progress</h1>
+                <h1 className="text-2xl font-display font-black tracking-tight text-[#F0F4FF]">Progress</h1>
               </div>
               <HistoryNav />
             </div>
@@ -634,11 +632,6 @@ export default function ProgressPage() {
           )}
 
           <TabBar active={tab} onChange={setTab} />
-        </div>
-
-        {/* AI Progress Insight */}
-        <div className="px-4 pb-4">
-          <ProgressInsightCard />
         </div>
 
         {/* Content */}
@@ -746,7 +739,7 @@ export default function ProgressPage() {
                           <EmptyState message="No data for this exercise" />
                         ) : (
                           <>
-                            <div className="mb-4 rounded-2xl border border-border/60 bg-card/30 p-5">
+                            <div className="mb-4 glass-surface rounded-2xl p-5">
                               <div className="mb-3 flex items-center justify-between">
                                 <p className="text-[13px] font-bold text-foreground">
                                   {exerciseOptions.find((e) => e.id === selectedExerciseId)?.name ?? "Exercise"}
@@ -837,7 +830,7 @@ export default function ProgressPage() {
                         </div>
 
                         {/* Stacked chart */}
-                        <div className="mb-4 rounded-2xl border border-border/60 bg-card/30 p-5">
+                        <div className="mb-4 glass-surface rounded-2xl p-5">
                           <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                             Session Volume ({unitLabel})
                           </p>
@@ -905,7 +898,7 @@ export default function ProgressPage() {
                               (d) => (d[cat as keyof typeof d] as number) > 0
                             );
                             return (
-                              <div key={cat} className="overflow-hidden rounded-2xl border border-border/60 bg-card/30 p-4">
+                              <div key={cat} className="overflow-hidden glass-surface rounded-2xl p-4">
                                 <p className="mb-2.5 text-xs font-semibold" style={{ color }}>
                                   {cat}
                                 </p>

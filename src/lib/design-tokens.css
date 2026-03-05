@@ -1,69 +1,53 @@
 /**
- * Fit-Hub Design Tokens
- * OKLCH-based color system for perceptually uniform colors
- * User-customizable accent color with semantic color scales
+ * Fit-Hub Design Tokens — Liquid Glass System
+ * OKLCH-based semantic colors + rgba-based glass surface physics
+ * User-customizable accent color with bloom shadow system
  */
 
 :root {
   /* ==================== BASE COLORS (OKLCH) ==================== */
-  /* Dark mode base palette - perceptually uniform lightness */
   --base-background: oklch(0.12 0.01 264);
-  /* Deep charcoal */
   --base-surface: oklch(0.18 0.01 264);
-  /* Elevated cards */
   --base-surface-elevated: oklch(0.22 0.01 264);
-  /* Modals/dialogs */
   --base-border: oklch(0.28 0.01 264);
-  /* Subtle dividers */
 
   /* Text hierarchy */
   --text-primary: oklch(0.98 0 0);
-  /* High contrast white */
   --text-secondary: oklch(0.70 0 0);
-  /* Muted gray */
   --text-tertiary: oklch(0.50 0 0);
-  /* Disabled */
+  --color-heading: #F0F4FF;
+  --color-secondary-text: #94A3B8;
 
   /* ==================== SEMANTIC COLORS ==================== */
   --success: oklch(0.72 0.18 145);
-  /* Green (streaks, goals met) */
   --warning: oklch(0.80 0.15 85);
-  /* Amber (fatigue alerts) */
   --error: oklch(0.65 0.22 25);
-  /* Red (delete, cancel) */
   --info: oklch(0.70 0.15 240);
-  /* Blue (informational) */
+
+  /* ==================== STATUS TOKENS (Functional) ==================== */
+  --status-positive: oklch(0.72 0.18 145);
+  --status-warning: oklch(0.80 0.15 85);
+  --status-negative: oklch(0.65 0.22 25);
+  --status-info: oklch(0.70 0.15 240);
+  --status-neutral: oklch(0.70 0 0);
 
   /* ==================== MACRO COLORS ==================== */
   --macro-protein: oklch(0.70 0.15 240);
-  /* Blue */
   --macro-carbs: oklch(0.80 0.14 85);
-  /* Yellow */
   --macro-fat: oklch(0.75 0.18 340);
-  /* Pink */
   --macro-fiber: oklch(0.72 0.16 145);
-  /* Green */
 
   /* ==================== ACCENT COLOR (User-Customizable) ==================== */
-  /* Default: Electric Blue */
   --accent-h: 240;
-  /* Hue (0-360) */
   --accent-c: 0.20;
-  /* Chroma (0-0.4) */
   --accent-l: 0.70;
-  /* Lightness (0-1) */
 
-  /* Accent scales — chroma pre-computed to avoid calc() inside oklch() */
+  /* Accent scales */
   --accent-c-30: 0.06;
-  /* accent-c * 0.3  (0.20 * 0.3)  */
   --accent-c-50: 0.10;
-  /* accent-c * 0.5  (0.20 * 0.5)  */
   --accent-c-70: 0.14;
-  /* accent-c * 0.7  (0.20 * 0.7)  */
   --accent-c-85: 0.17;
-  /* accent-c * 0.85 (0.20 * 0.85) */
   --accent-c-90: 0.18;
-  /* accent-c * 0.9  (0.20 * 0.9)  */
 
   --accent-50: oklch(0.95 var(--accent-c-30) var(--accent-h));
   --accent-100: oklch(0.90 var(--accent-c-50) var(--accent-h));
@@ -71,7 +55,6 @@
   --accent-300: oklch(0.80 var(--accent-c-85) var(--accent-h));
   --accent-400: oklch(0.75 var(--accent-c) var(--accent-h));
   --accent-500: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
-  /* Base */
   --accent-600: oklch(0.65 var(--accent-c) var(--accent-h));
   --accent-700: oklch(0.55 var(--accent-c-90) var(--accent-h));
   --accent-800: oklch(0.45 var(--accent-c-70) var(--accent-h));
@@ -80,137 +63,146 @@
   /* ==================== SPACING SCALE (4px base grid) ==================== */
   --space-0: 0;
   --space-1: 0.25rem;
-  /* 4px  - icon padding */
   --space-2: 0.5rem;
-  /* 8px  - tight gaps */
   --space-3: 0.75rem;
-  /* 12px - compact card padding */
   --space-4: 1rem;
-  /* 16px - standard gap */
   --space-5: 1.25rem;
-  /* 20px - section spacing */
   --space-6: 1.5rem;
-  /* 24px - card padding */
   --space-8: 2rem;
-  /* 32px - large sections */
   --space-10: 2.5rem;
-  /* 40px */
   --space-12: 3rem;
-  /* 48px - hero spacing */
   --space-16: 4rem;
-  /* 64px */
   --space-20: 5rem;
-  /* 80px */
   --space-24: 6rem;
-  /* 96px */
 
-  /* ==================== TYPOGRAPHY SCALE (Fluid, mobile-first) ==================== */
+  /* ==================== TYPOGRAPHY SCALE ==================== */
+  /* Display — Barlow Condensed */
+  --text-display-xl: clamp(2.5rem, 2rem + 2.5vw, 5rem);
+  --text-display-lg: clamp(1.75rem, 1.5rem + 1.25vw, 3rem);
+  --text-display-md: clamp(1.375rem, 1.2rem + 0.875vw, 2rem);
+
+  /* Body — Space Grotesk */
   --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.8rem);
-  /* 12–13px */
   --text-sm: clamp(0.875rem, 0.85rem + 0.15vw, 0.9rem);
-  /* 14–14.4px */
   --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
-  /* 16–18px */
   --text-lg: clamp(1.125rem, 1rem + 0.625vw, 1.5rem);
-  /* 18–24px */
   --text-xl: clamp(1.5rem, 1.25rem + 1.25vw, 2.25rem);
-  /* 24–36px */
   --text-2xl: clamp(2rem, 1.5rem + 2.5vw, 3.5rem);
-  /* 32–56px */
 
   /* Font weights */
   --font-regular: 400;
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
+  --font-extrabold: 800;
+  --font-black: 900;
 
   /* Line heights */
   --leading-tight: 1.2;
   --leading-base: 1.5;
   --leading-relaxed: 1.75;
 
-  /* ==================== BORDER RADIUS (Soft rounded) ==================== */
-  --radius-sm: 6px;
-  /* Chips, badges */
-  --radius-md: 10px;
-  /* Buttons, inputs */
-  --radius-lg: 16px;
-  /* Cards, modals */
+  /* ==================== BORDER RADIUS ==================== */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
   --radius-xl: 24px;
-  /* Large containers */
-  --radius-full: 9999px;
-  /* Pills, avatar */
+  --radius-2xl: 32px;
+  --radius-pill: 9999px;
 
-  /* ==================== MOTION (Easing & Duration) ==================== */
-  /* Easing curves */
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* ==================== MOTION ==================== */
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
 
-  /* Duration scale */
-  --duration-instant: 150ms;
-  --duration-fast: 220ms;
-  --duration-base: 320ms;
-  --duration-slow: 480ms;
-  --duration-slower: 700ms;
+  --duration-micro: 50ms;
+  --duration-fast: 150ms;
+  --duration-quick: 200ms;
+  --duration-base: 300ms;
+  --duration-moderate: 400ms;
+  --duration-slow: 500ms;
+  --duration-shimmer: 650ms;
+  --duration-ring: 800ms;
+  --duration-long: 1000ms;
 
-  /* ==================== SHADOWS ==================== */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-base: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  /* ==================== SHADOW SYSTEM ==================== */
+  --shadow-xs: 0 1px 4px rgba(0, 0, 0, 0.30);
+  --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.50);
+  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.60);
+  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.75);
+  --shadow-xl: 0 16px 64px rgba(0, 0, 0, 0.85);
+
+  /* Bloom shadows — colored glows on accent elements */
+  --bloom-volt: 0 8px 28px rgba(200, 255, 0, 0.35);
+  --bloom-sky: 0 6px 22px rgba(0, 196, 232, 0.35);
+  --bloom-violet: 0 6px 22px rgba(148, 112, 255, 0.35);
+  --bloom-mint: 0 6px 18px rgba(0, 217, 142, 0.30);
+  --bloom-ember: 0 6px 20px rgba(255, 87, 51, 0.30);
+  --bloom-crimson: 0 6px 20px rgba(255, 59, 92, 0.30);
+  --bloom-gold: 0 6px 20px rgba(255, 149, 0, 0.30);
+
+  /* Inset specular highlights */
+  --inset-top: inset 0 1.5px 0 rgba(255, 255, 255, 0.35);
+  --inset-top-hero: inset 0 1.5px 0 rgba(255, 255, 255, 0.42);
+  --inset-top-bright: inset 0 1.5px 0 rgba(255, 255, 255, 0.55);
+  --inset-bottom: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  --inset-bottom-heavy: inset 0 -1px 0 rgba(0, 0, 0, 0.22);
 
   /* ==================== GLASS SURFACE TOKENS ==================== */
-  /* Glass blur levels — higher blur for true frosted glass see-through */
-  --glass-blur-sm: 12px;
-  --glass-blur-md: 20px;
-  --glass-blur-lg: 32px;
-  --glass-blur-xl: 40px;           /* Max for Capacitor perf */
+  /* Shared glass properties */
+  --glass-bg: rgba(255, 255, 255, 0.055);
+  --glass-border: rgba(255, 255, 255, 0.22);
+  --glass-border-hover: rgba(255, 255, 255, 0.38);
+  --glass-specular-top: rgba(255, 255, 255, 0.35);
+  --glass-specular-top-hover: rgba(255, 255, 255, 0.50);
+  --glass-specular-bottom: rgba(0, 0, 0, 0.08);
 
-  /* Glass tint (OKLCH + alpha) — low opacity for true transparency */
+  /* Glass blur levels */
+  --glass-blur-sm: 12px;
+  --glass-blur-md: 16px;
+  --glass-blur-lg: 20px;
+  --glass-blur-xl: 24px;
+  --glass-blur-nav: 36px;
+
+  /* Glass tints (kept for backwards compat in dark mode) */
   --glass-tint-light: oklch(0.98 0.005 264 / 0.03);
   --glass-tint-medium: oklch(0.95 0.01 264 / 0.06);
   --glass-tint-heavy: oklch(0.90 0.015 264 / 0.10);
 
-  /* Glass borders (light refraction edge) */
-  --glass-border-light: oklch(0.98 0 0 / 0.12);
-  --glass-border-medium: oklch(0.98 0 0 / 0.18);
-  --glass-border-heavy: oklch(0.98 0 0 / 0.25);
+  /* Glass borders (kept for backwards compat) */
+  --glass-border-light: rgba(255, 255, 255, 0.20);
+  --glass-border-medium: rgba(255, 255, 255, 0.22);
+  --glass-border-heavy: rgba(255, 255, 255, 0.22);
 
-  /* Inner highlight (top-edge light catch) */
-  --glass-highlight: oklch(0.99 0 0 / 0.10);
+  /* Inner highlight (kept as no-op for backwards compat) */
+  --glass-highlight: transparent;
 
-  /* Glass depth shadows (OKLCH-based) */
-  --glass-shadow-sm: 0 2px 8px oklch(0 0 0 / 0.12), 0 1px 2px oklch(0 0 0 / 0.08);
-  --glass-shadow-md: 0 4px 16px oklch(0 0 0 / 0.16), 0 2px 4px oklch(0 0 0 / 0.10);
-  --glass-shadow-lg: 0 8px 32px oklch(0 0 0 / 0.20), 0 4px 8px oklch(0 0 0 / 0.12);
-  --glass-shadow-xl: 0 16px 48px oklch(0 0 0 / 0.24), 0 8px 16px oklch(0 0 0 / 0.14);
+  /* Glass depth shadows */
+  --glass-shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.50);
+  --glass-shadow-md: 0 4px 28px rgba(0, 0, 0, 0.20);
+  --glass-shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.22);
+  --glass-shadow-xl: 0 24px 80px rgba(0, 0, 0, 0.55);
+
+  /* Status indicators */
+  --live-dot-size: 6px;
+  --live-dot-color: #34d399;
+  --divider-color: rgba(255, 255, 255, 0.06);
+  --icon-container-bg: rgba(255, 255, 255, 0.07);
 
   /* ==================== CONTEXTUAL PHASE COLORS ==================== */
-  /* "Cloud Dancer" — recovery/rest */
   --phase-rest-accent: oklch(0.72 0.08 220);
   --phase-rest-glow: oklch(0.72 0.08 220 / 0.15);
-
-  /* "Electric Cyan" — active strength */
   --phase-active-accent: oklch(0.78 0.16 195);
   --phase-active-glow: oklch(0.78 0.16 195 / 0.20);
-
-  /* Pre-workout — warm amber */
   --phase-preworkout-accent: oklch(0.80 0.15 70);
   --phase-preworkout-glow: oklch(0.80 0.15 70 / 0.18);
-
-  /* Post-workout — recovery green */
   --phase-postworkout-accent: oklch(0.75 0.16 155);
   --phase-postworkout-glow: oklch(0.75 0.16 155 / 0.18);
-
-  /* Morning — sunrise gold */
   --phase-morning-accent: oklch(0.82 0.12 55);
   --phase-morning-glow: oklch(0.82 0.12 55 / 0.15);
-
-  /* Evening — deep indigo */
   --phase-evening-accent: oklch(0.60 0.14 280);
   --phase-evening-glow: oklch(0.60 0.14 280 / 0.12);
 }

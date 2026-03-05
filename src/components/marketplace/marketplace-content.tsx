@@ -221,7 +221,7 @@ export function MarketplaceContent() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="relative mb-5 overflow-hidden rounded-3xl glass-surface-elevated glass-highlight px-6 py-7 sm:px-8"
+        className="relative mb-5 overflow-hidden rounded-3xl glass-surface-elevated  px-6 py-7 sm:px-8"
       >
         <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary/15 blur-[70px]" />
         <div className="pointer-events-none absolute -bottom-10 -left-10 h-48 w-48 rounded-full bg-sky-400/10 blur-3xl" />
@@ -247,7 +247,7 @@ export function MarketplaceContent() {
       <div className="mb-4 space-y-3">
 
         {/* Tab bar */}
-        <div className="flex gap-1 rounded-xl border border-border/50 bg-card/40 p-1">
+        <div className="flex gap-1 rounded-xl glass-inner p-1">
           {(["community", "mine"] as const).map(t => (
             <button
               key={t}
@@ -265,7 +265,7 @@ export function MarketplaceContent() {
         </div>
 
         {/* Search */}
-        <div className="flex h-11 items-center gap-3 rounded-xl border border-border/60 bg-card/40 px-4 transition-colors focus-within:border-primary/50">
+        <div className="flex h-11 items-center gap-3 rounded-xl glass-inner px-4 transition-colors focus-within:border-primary/50">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
             value={search}
@@ -329,7 +329,7 @@ export function MarketplaceContent() {
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowSort(v => !v)}
-              className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-card/40 px-3 py-1.5 text-[11px] font-semibold text-foreground"
+              className="flex items-center gap-1.5 rounded-xl glass-inner px-3 py-1.5 text-[11px] font-semibold text-foreground"
             >
               <span className="text-sky-400">{currentSort.icon}</span>
               {currentSort.label}
@@ -343,7 +343,7 @@ export function MarketplaceContent() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.95 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[148px] overflow-hidden rounded-xl border border-border/60 bg-card/95 shadow-xl backdrop-blur-sm"
+                  className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[148px] overflow-hidden rounded-xl glass-surface shadow-xl"
                 >
                   {SORT_OPTIONS.map(s => (
                     <button
@@ -381,7 +381,7 @@ export function MarketplaceContent() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center justify-center py-20 text-center"
         >
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-border/60 bg-card/40">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl glass-inner">
             <Dumbbell className="h-7 w-7 text-muted-foreground/50" />
           </div>
           <h3 className="mb-1.5 text-[18px] font-black text-foreground">
@@ -434,7 +434,7 @@ export function MarketplaceContent() {
                 whileTap={{ scale: 0.96 }}
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="rounded-xl border border-border/60 bg-card/40 px-6 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:opacity-50"
+                className="rounded-xl glass-inner px-6 py-2.5 text-[13px] font-semibold text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary disabled:opacity-50"
               >
                 {loadingMore ? "Loading…" : "Load more"}
               </motion.button>

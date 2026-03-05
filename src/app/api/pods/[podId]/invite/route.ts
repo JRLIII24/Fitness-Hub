@@ -26,7 +26,7 @@ export async function POST(
     if (authErr) return authErr;
 
     // Rate limit: 5 invites per user per minute
-    if (!rateLimit(`invite:${user.id}`, 5, 60_000)) {
+    if (!(await rateLimit(`invite:${user.id}`, 5, 60_000))) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 

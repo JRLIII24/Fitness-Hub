@@ -32,7 +32,8 @@ export async function GET(
   }
 
   const supabase = await createClient();
-  const { user } = await requireAuth(supabase);
+  const { user, response: authErr } = await requireAuth(supabase);
+  if (authErr) return authErr;
 
   // Fetch all reviews, ordered by most recent
   const { data: reviews, error } = await supabase
@@ -100,7 +101,7 @@ export async function POST(
   if (authErr) return authErr;
 
   // Rate limit: 10 reviews per user per minute
-  if (!rateLimit(`reviews:${user.id}`, 10, 60_000)) {
+  if (!(await rateLimit(`reviews:${user.id}`, 10, 60_000))) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

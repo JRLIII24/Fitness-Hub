@@ -137,7 +137,8 @@ export function DateRangePicker({
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => setPickerYear((y) => y - 1)}
-                                    className="h-7 w-7"
+                                    className="h-9 w-9"
+                                    aria-label="Previous year"
                                 >
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
@@ -146,8 +147,9 @@ export function DateRangePicker({
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => setPickerYear((y) => y + 1)}
-                                    className="h-7 w-7"
+                                    className="h-9 w-9"
                                     disabled={pickerYear >= currentYear}
+                                    aria-label="Next year"
                                 >
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>

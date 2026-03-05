@@ -42,6 +42,7 @@ interface Props {
 export function FoodLogCard({ entry, onDelete, onEdit }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   const handleDelete = async () => {
     if (!confirm("Delete this food entry?")) return;
@@ -79,7 +80,7 @@ export function FoodLogCard({ entry, onDelete, onEdit }: Props) {
 
   return (
     <>
-      <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-card p-3">
+      <div className="flex items-start justify-between gap-3 glass-inner rounded-lg p-3">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-foreground truncate">{displayName}</p>
           {displayBrand && (
@@ -112,23 +113,34 @@ export function FoodLogCard({ entry, onDelete, onEdit }: Props) {
             </div>
           )}
           {(totalFiber > 0 || totalSugar > 0 || totalSodium > 0) && (
-            <div className="mt-1 flex gap-3 text-[11px] text-muted-foreground">
-              {totalFiber > 0 && (
-                <span>
-                  <span className={`font-medium ${MACRO_COLORS.fiber}`}>Fi</span> {Math.round(totalFiber)}g
-                </span>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowMore((v) => !v)}
+                className="mt-0.5 text-[10px] font-medium text-muted-foreground/70 hover:text-muted-foreground"
+              >
+                {showMore ? "less" : "more"}
+              </button>
+              {showMore && (
+                <div className="mt-1 flex gap-3 text-[11px] text-muted-foreground">
+                  {totalFiber > 0 && (
+                    <span>
+                      <span className={`font-medium ${MACRO_COLORS.fiber}`}>Fi</span> {Math.round(totalFiber)}g
+                    </span>
+                  )}
+                  {totalSugar > 0 && (
+                    <span>
+                      <span className="font-medium text-[var(--macro-carbs)]">Su</span> {Math.round(totalSugar)}g
+                    </span>
+                  )}
+                  {totalSodium > 0 && (
+                    <span>
+                      <span className="font-medium text-[var(--status-neutral)]">Na</span> {Math.round(totalSodium)}mg
+                    </span>
+                  )}
+                </div>
               )}
-              {totalSugar > 0 && (
-                <span>
-                  <span className="font-medium text-rose-400">Su</span> {Math.round(totalSugar)}g
-                </span>
-              )}
-              {totalSodium > 0 && (
-                <span>
-                  <span className="font-medium text-cyan-400">Na</span> {Math.round(totalSodium)}mg
-                </span>
-              )}
-            </div>
+            </>
           )}
           {sourceLabel && (
             <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -139,14 +151,14 @@ export function FoodLogCard({ entry, onDelete, onEdit }: Props) {
 
         <div className="flex shrink-0 flex-col items-end gap-2">
           <div className="text-right">
-            <p className="font-bold text-foreground text-sm">{Math.round(entry.calories_consumed)}</p>
-            <p className="text-xs text-muted-foreground">kcal</p>
+            <p className="font-bold font-display tabular-nums text-foreground text-sm">{Math.round(entry.calories_consumed)}</p>
+            <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">kcal</p>
           </div>
           <div className="flex gap-1">
             <Button
               size="icon"
               variant="ghost"
-              className="size-8 shrink-0"
+              className="h-9 w-9 shrink-0"
               onClick={() => setEditDialogOpen(true)}
               aria-label="Edit entry"
             >

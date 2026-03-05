@@ -34,6 +34,7 @@ export interface Database {
           accent_color: string | null;
           equipment_available: string[] | null;
           experience_level: "beginner" | "intermediate" | "advanced" | null;
+          activity_level: string | null;
           feature_flags: Record<string, boolean> | null;
           xp: number;
           level: number;
@@ -69,6 +70,7 @@ export interface Database {
           accent_color?: string | null;
           equipment_available?: string[] | null;
           experience_level?: "beginner" | "intermediate" | "advanced" | null;
+          activity_level?: string | null;
           feature_flags?: Record<string, boolean> | null;
           created_at?: string;
           updated_at?: string;
@@ -97,6 +99,7 @@ export interface Database {
           accent_color?: string | null;
           equipment_available?: string[] | null;
           experience_level?: "beginner" | "intermediate" | "advanced" | null;
+          activity_level?: string | null;
           feature_flags?: Record<string, boolean> | null;
           updated_at?: string;
         };
@@ -151,6 +154,38 @@ export interface Database {
           id?: string;
           user_id?: string | null;
           email?: string;
+        };
+        Relationships: [];
+      };
+      grocery_lists: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          week_start: string;
+          items: Json;
+          ai_summary: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title?: string;
+          week_start: string;
+          items?: Json;
+          ai_summary?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          week_start?: string;
+          items?: Json;
+          ai_summary?: string | null;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -338,7 +373,7 @@ export interface Database {
           id: string;
           pod_id: string;
           name: string;
-          challenge_type: "volume" | "consistency" | "distance";
+          challenge_type: "volume" | "consistency";
           start_date: string;
           end_date: string;
           target_value: number | null;
@@ -349,7 +384,7 @@ export interface Database {
           id?: string;
           pod_id: string;
           name: string;
-          challenge_type: "volume" | "consistency" | "distance";
+          challenge_type: "volume" | "consistency";
           start_date: string;
           end_date: string;
           target_value?: number | null;
@@ -358,7 +393,7 @@ export interface Database {
         };
         Update: {
           name?: string;
-          challenge_type?: "volume" | "consistency" | "distance";
+          challenge_type?: "volume" | "consistency";
           start_date?: string;
           end_date?: string;
           target_value?: number | null;
@@ -958,6 +993,32 @@ export interface Database {
           total_sets: number;
           total_volume_kg: number;
           avg_rpe: number | null;
+        }>;
+      };
+      get_food_log_summary_for_grocery: {
+        Args: { p_days_back?: number };
+        Returns: Array<{
+          food_name: string;
+          total_servings: number;
+          avg_daily_servings: number;
+          serving_size_g: number | null;
+          serving_description: string | null;
+          times_logged: number;
+          meal_types: string[];
+        }>;
+      };
+      get_exercise_recent_performance: {
+        Args: { p_exercise_id: string; p_limit?: number };
+        Returns: Array<{
+          session_id: string;
+          session_date: string;
+          session_name: string;
+          set_number: number;
+          weight_kg: number;
+          reps: number;
+          set_type: string;
+          rpe: number | null;
+          rir: number | null;
         }>;
       };
     };

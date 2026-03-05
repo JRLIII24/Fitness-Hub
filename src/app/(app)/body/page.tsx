@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { format, parseISO, subDays } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -140,6 +140,7 @@ export default function BodyMetricsPage() {
   const [measFormDate, setMeasFormDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [measFormNote, setMeasFormNote] = useState("");
   const [measFormValues, setMeasFormValues] = useState<Record<string, string>>({});
+  const measHasFetched = useRef(false);
 
   // ── Weight logic ──
 
@@ -323,10 +324,11 @@ export default function BodyMetricsPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "measurements" && measurements.length === 0 && !measLoading) {
+    if (activeTab === "measurements" && !measHasFetched.current) {
+      measHasFetched.current = true;
       void fetchMeasurements();
     }
-  }, [activeTab, measurements.length, measLoading, fetchMeasurements]);
+  }, [activeTab, fetchMeasurements]);
 
   const handleMeasSave = async () => {
     setMeasFormError(null);
@@ -462,7 +464,7 @@ export default function BodyMetricsPage() {
       {activeTab === "weight" && (
         <>
           {/* ── Hero Stats ─────────────────────────────────────────────── */}
-          <div className="rounded-3xl glass-surface-elevated glass-highlight p-5">
+          <div className="rounded-3xl glass-surface-hero p-5">
             {loading ? (
               <div className="space-y-2">
                 <Skeleton className="h-10 w-32" />
@@ -503,7 +505,7 @@ export default function BodyMetricsPage() {
 
           {/* ── Chart ──────────────────────────────────────────────────── */}
           {!loading && logs.length > 0 && (
-            <div className="rounded-2xl border border-border/60 bg-card/30 p-4">
+            <div className="glass-surface rounded-2xl p-4">
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-[13px] font-bold text-foreground">Weight History</p>
                 <div className="flex gap-1">
@@ -552,7 +554,7 @@ export default function BodyMetricsPage() {
 
           {/* ── Timeline Ribbon ────────────────────────────────────────── */}
           {!loading && timelineLogs.length > 1 && (
-            <div className="rounded-2xl border border-border/60 bg-card/30 p-4">
+            <div className="glass-surface rounded-2xl p-4">
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
                   <p className="text-[13px] font-bold text-foreground">Body Trend Ribbon</p>
@@ -667,7 +669,7 @@ export default function BodyMetricsPage() {
           )}
 
           {/* ── Log Form ───────────────────────────────────────────────── */}
-          <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/30">
+          <div className="overflow-hidden glass-surface rounded-2xl">
             <button
               onClick={toggleForm}
               className="flex w-full items-center justify-between p-4"
@@ -790,7 +792,7 @@ export default function BodyMetricsPage() {
           </div>
 
           {/* ── Log List ───────────────────────────────────────────────── */}
-          <div className="rounded-2xl border border-border/60 bg-card/30">
+          <div className="glass-surface rounded-2xl">
             <div className="border-b border-border/40 px-4 py-3">
               <p className="text-[13px] font-bold">
                 <Scale className="mr-1.5 inline h-3.5 w-3.5 text-primary" />
@@ -867,7 +869,7 @@ export default function BodyMetricsPage() {
         <>
           {/* ── Measurements Chart ─────────────────────────────────── */}
           {!measLoading && measurements.length > 0 && (
-            <div className="rounded-2xl border border-border/60 bg-card/30 p-4">
+            <div className="glass-surface rounded-2xl p-4">
               <p className="mb-3 text-[13px] font-bold text-foreground">
                 Measurement Trends
               </p>
@@ -879,7 +881,7 @@ export default function BodyMetricsPage() {
           )}
 
           {/* ── Measurement Log Form ───────────────────────────────── */}
-          <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/30">
+          <div className="overflow-hidden glass-surface rounded-2xl">
             <button
               onClick={toggleMeasForm}
               className="flex w-full items-center justify-between p-4"
@@ -1008,7 +1010,7 @@ export default function BodyMetricsPage() {
           </div>
 
           {/* ── Measurements List ──────────────────────────────────── */}
-          <div className="rounded-2xl border border-border/60 bg-card/30">
+          <div className="glass-surface rounded-2xl">
             <div className="border-b border-border/40 px-4 py-3">
               <p className="text-[13px] font-bold">
                 <Ruler className="mr-1.5 inline h-3.5 w-3.5 text-primary" />
@@ -1023,8 +1025,18 @@ export default function BodyMetricsPage() {
                 ))}
               </div>
             ) : measurements.length === 0 ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                No measurements yet. Log your first entry above.
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <Ruler className="h-8 w-8 text-muted-foreground/40" />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">No measurements logged yet</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Track waist, chest, arms and more to see your body change over time.
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={toggleMeasForm}>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Start logging metrics
+                </Button>
               </div>
             ) : (
               <div className="divide-y divide-border/30">

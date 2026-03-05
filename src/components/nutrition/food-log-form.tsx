@@ -129,13 +129,13 @@ export function FoodLogForm({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-primary/30 bg-card p-4">
+    <div className="space-y-4 glass-surface rounded-xl p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-semibold text-foreground">{food.name}</p>
           {food.brand && <p className="text-xs text-muted-foreground">{food.brand}</p>}
         </div>
-        <Button size="icon" variant="ghost" className="size-7 shrink-0" onClick={onCancel}>
+        <Button size="icon" variant="ghost" className="size-8 shrink-0" onClick={onCancel} aria-label="Cancel" style={{ minHeight: 44, minWidth: 44 }}>
           <X className="size-4" />
         </Button>
       </div>
@@ -151,10 +151,10 @@ export function FoodLogForm({
                 setServings(s);
                 setCustomServings("");
               }}
-              className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+              className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 servings === s && !customServings
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:border-primary/50"
+                  ? "border border-primary bg-primary text-primary-foreground"
+                  : "glass-inner text-foreground hover:border-primary/50"
               }`}
             >
               {s}x
@@ -180,10 +180,10 @@ export function FoodLogForm({
       </div>
 
       {/* Calories preview */}
-      <div className="rounded-lg bg-muted/50 px-3 py-2">
+      <div className="glass-inner rounded-lg px-3 py-2">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Calories</span>
-          <span className="text-lg font-bold text-foreground">{calculatedCalories} kcal</span>
+          <span className="text-lg font-bold font-display tabular-nums text-foreground">{calculatedCalories} kcal</span>
         </div>
         <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
           {calculatedProtein != null && (

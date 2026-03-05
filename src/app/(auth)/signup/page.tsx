@@ -37,7 +37,7 @@ export default function SignupPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -54,6 +54,13 @@ export default function SignupPage() {
       return;
     }
 
+    // Email confirmation is disabled — session is live immediately
+    if (data.session) {
+      router.push("/onboarding");
+      return;
+    }
+
+    // Fallback: email confirmation is enabled
     toast.success("Account created! Check your email to confirm your account.");
     router.push("/login");
   }
@@ -77,7 +84,7 @@ export default function SignupPage() {
   }
 
   return (
-    <Card>
+    <Card className="glass-surface-hero shimmer-target relative">
       <CardHeader className="text-center">
         <CardTitle className="text-xl">Create your account</CardTitle>
         <CardDescription>

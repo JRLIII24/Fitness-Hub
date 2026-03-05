@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
-import { computeLauncherWorkout, getAlternativeTemplates, logLauncherEvent, enrichWithAI } from '@/lib/adaptive/launcher';
+import { computeLauncherWorkout, getAlternativeTemplates, logLauncherEvent } from '@/lib/adaptive/launcher';
 import { logger } from '@/lib/logger';
 import { SMART_LAUNCHER_ENABLED } from "@/lib/features";
 
@@ -43,11 +43,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Compute launcher prediction, then enrich with AI asynchronously
-    const base_prediction = await computeLauncherWorkout(user.id);
-    const origin = new URL(request.url).origin;
+    // Compute launcher prediction
     const [suggested_workout, alternative_templates] = await Promise.all([
-      enrichWithAI(base_prediction, origin),
+      computeLauncherWorkout(user.id),
       getAlternativeTemplates(user.id, 3),
     ]);
 

@@ -81,11 +81,11 @@ export function computeRecoveryStatus(
 export function recoveryColor(status: RecoveryStatus): string {
   switch (status) {
     case "recovered":
-      return "text-emerald-400";
+      return "text-[var(--status-positive)]";
     case "recovering":
-      return "text-amber-400";
+      return "text-[var(--status-warning)]";
     case "fatigued":
-      return "text-rose-400";
+      return "text-[var(--status-negative)]";
     case "untrained":
       return "text-muted-foreground";
   }
@@ -94,11 +94,11 @@ export function recoveryColor(status: RecoveryStatus): string {
 export function recoveryBarColor(status: RecoveryStatus): string {
   switch (status) {
     case "recovered":
-      return "bg-emerald-400";
+      return "bg-[var(--status-positive)]";
     case "recovering":
-      return "bg-amber-400";
+      return "bg-[var(--status-warning)]";
     case "fatigued":
-      return "bg-rose-400";
+      return "bg-[var(--status-negative)]";
     case "untrained":
       return "bg-muted";
   }

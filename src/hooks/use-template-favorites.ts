@@ -10,15 +10,17 @@ export function useTemplateFavorites(userId: string | null) {
 
   useEffect(() => {
     if (!userId) return;
-    queueMicrotask(() => {
-      setLoading(true);
-    });
+    setLoading(true);
     supabase
       .from("template_favorites")
       .select("template_id")
       .eq("user_id", userId)
-      .then(({ data }) => {
-        setFavoriteIds(new Set((data ?? []).map((r) => r.template_id)));
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Failed to load template favorites:", error);
+        } else {
+          setFavoriteIds(new Set((data ?? []).map((r) => r.template_id)));
+        }
         setLoading(false);
       });
   }, [userId, supabase]);

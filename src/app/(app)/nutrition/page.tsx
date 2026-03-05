@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Share2,
   BookmarkPlus,
+  MoreHorizontal,
 } from "lucide-react";
 import { addDays, subDays, format } from "date-fns";
 import { toast } from "sonner";
@@ -27,7 +28,8 @@ import {
 } from "@/lib/retention-events";
 import { FoodLogCard } from "@/components/nutrition/food-log-card";
 import { MealTemplateSheet } from "@/components/nutrition/meal-template-sheet";
-import { NutritionAICard } from "@/components/ai/nutrition-ai-card";
+import { Camera, Utensils, ShoppingCart } from "lucide-react";
+import { MENU_SCANNER_ENABLED, FOOD_SCANNER_ENABLED, GROCERY_GENERATOR_ENABLED } from "@/lib/features";
 import { SendMealDialog } from "@/components/social/send-meal-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { MacroRing } from "@/components/ui/macro-ring";
@@ -35,6 +37,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import type { FoodItem, MealType, MealTemplateItem } from "@/types/nutrition";
 
@@ -135,9 +143,9 @@ function MacroChip({
   colorClass: string;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center gap-0.5 rounded-lg border border-border/70 bg-card/80 px-2 py-1.5 sm:gap-1 sm:rounded-xl sm:px-3 sm:py-2">
-      <span className={`text-[10px] font-semibold uppercase tracking-wider sm:text-xs ${colorClass}`}>{label}</span>
-      <span className="text-sm font-bold text-foreground sm:text-base">
+    <div className="flex flex-1 flex-col items-center gap-0.5 glass-inner rounded-lg px-2 py-1.5 sm:gap-1 sm:rounded-xl sm:px-3 sm:py-2">
+      <span className={`text-[10px] font-semibold uppercase tracking-[0.08em] sm:text-xs ${colorClass}`}>{label}</span>
+      <span className="text-sm font-bold font-display tabular-nums text-foreground sm:text-base">
         {Math.round(value)}
         <span className="text-[10px] font-normal text-muted-foreground sm:text-xs">{unit}</span>
       </span>
@@ -168,10 +176,10 @@ function MealSection({
   const mealCalories = entries.reduce((sum, e) => sum + getNutrition(e).calories, 0);
 
   return (
-    <Card className="border-border/70 bg-card/85 backdrop-blur-sm">
+    <Card className="glass-surface">
       <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
         <div className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
+          <div className="glass-icon-container flex size-8 items-center justify-center rounded-lg">
             <Icon className={`size-4 ${color}`} />
           </div>
           <div>
@@ -494,7 +502,7 @@ export default function NutritionPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 pb-28 pt-4 md:px-6 lg:px-8">
-      <section className="relative overflow-hidden rounded-3xl glass-surface-elevated glass-highlight p-5 sm:p-6">
+      <section className="relative overflow-hidden rounded-3xl glass-surface-elevated shimmer-target p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
         <div className="pointer-events-none absolute -left-14 bottom-0 h-36 w-36 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
         <div className="relative space-y-4">
@@ -502,45 +510,44 @@ export default function NutritionPage() {
             eyebrow={displayDate}
             title="Nutrition"
             actions={
-              <>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-9"
-                  onClick={() => setMealSheetOpen(true)}
-                  title="Saved Meals"
-                >
-                  <BookmarkPlus className="size-4" />
-                  <span className="sr-only">Saved Meals</span>
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-9"
-                  onClick={() => setSendMealDialogOpen(true)}
-                  disabled={entries.length === 0}
-                  title="Share today's meals"
-                >
-                  <Share2 className="size-4" />
-                  <span className="sr-only">Share Day</span>
-                </Button>
+              <div className="flex items-center gap-1.5">
                 <Link href="/nutrition/scan">
                   <Button size="sm" variant="outline" className="gap-1.5">
                     <Barcode className="size-4" />
-                    <span className="hidden sm:inline">Scan</span>
+                    Scan
                   </Button>
                 </Link>
-                <Link href="/nutrition/goals">
-                  <Button size="icon" variant="ghost" className="size-9">
-                    <Settings2 className="size-4" />
-                    <span className="sr-only">Nutrition Goals</span>
-                  </Button>
-                </Link>
-              </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-9">
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setMealSheetOpen(true)}>
+                      <BookmarkPlus className="mr-2 h-4 w-4" />
+                      Saved meals
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setSendMealDialogOpen(true)}
+                      disabled={entries.length === 0}
+                    >
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Share meal
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/nutrition/goals">
+                        <Settings2 className="mr-2 h-4 w-4" />
+                        Nutrition settings
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             }
           />
 
-          <div className="flex items-center justify-between gap-2 rounded-xl border border-border/70 bg-card/70 px-2 py-1">
+          <div className="flex items-center justify-between gap-2 glass-inner rounded-xl px-2 py-1">
             <Button
               size="icon"
               variant="ghost"
@@ -575,10 +582,10 @@ export default function NutritionPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-            <Card className="border-border/70 bg-card/85">
+            <Card className="glass-surface">
               <CardContent className="pt-5 pb-4">
                 {isToday ? (
-                  <div className="mb-3 rounded-xl border border-border/70 bg-secondary/35 px-3 py-2">
+                  <div className="mb-3 glass-inner rounded-xl px-3 py-2">
                     <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                       Fuel Readiness
                     </p>
@@ -595,7 +602,7 @@ export default function NutritionPage() {
                     <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                       <div>
                         <p className="text-xs text-muted-foreground">Calories consumed</p>
-                        <p className="text-2xl font-bold text-foreground sm:text-4xl">
+                        <p className="text-2xl font-bold font-display tabular-nums text-foreground sm:text-4xl">
                           {Math.round(totalCalories)}
                           <span className="ml-1 text-sm font-normal text-muted-foreground sm:text-base">
                             / {calorieGoal} kcal
@@ -617,7 +624,7 @@ export default function NutritionPage() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-xs text-muted-foreground">Calories consumed</p>
-                      <p className="text-2xl font-bold text-foreground sm:text-4xl">
+                      <p className="text-2xl font-bold font-display tabular-nums text-foreground sm:text-4xl">
                         {Math.round(totalCalories)}
                         <span className="ml-1 text-sm font-normal text-muted-foreground sm:text-base">kcal</span>
                       </p>
@@ -641,7 +648,7 @@ export default function NutritionPage() {
                 </div>
 
                 {catchupNeeded ? (
-                  <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-primary/35 bg-primary/10 px-3 py-2">
+                  <div className="mt-4 flex items-center justify-between gap-3 glass-inner rounded-xl px-3 py-2">
                     <div>
                       <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Protein Catch-Up</p>
                       <p className="text-sm font-medium text-foreground">
@@ -658,7 +665,7 @@ export default function NutritionPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border/70 bg-card/85">
+            <Card className="glass-surface">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Macro Rings</CardTitle>
               </CardHeader>
@@ -673,16 +680,64 @@ export default function NutritionPage() {
         </div>
       </section>
 
-      <NutritionAICard />
+      {(MENU_SCANNER_ENABLED || FOOD_SCANNER_ENABLED || GROCERY_GENERATOR_ENABLED) && (
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {MENU_SCANNER_ENABLED && (
+            <Link href="/nutrition/menu-scan">
+              <Card className="glass-surface shimmer-target transition-colors hover:border-primary/40">
+                <CardContent className="flex items-center gap-3 py-4">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    <Camera className="size-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Menu Scan</p>
+                    <p className="text-xs text-muted-foreground">Scan a restaurant menu</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {FOOD_SCANNER_ENABLED && (
+            <Link href="/nutrition/food-scan">
+              <Card className="glass-surface shimmer-target transition-colors hover:border-primary/40">
+                <CardContent className="flex items-center gap-3 py-4">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
+                    <Utensils className="size-5 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Food Scan</p>
+                    <p className="text-xs text-muted-foreground">Photograph your plate</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {GROCERY_GENERATOR_ENABLED && (
+            <Link href="/nutrition/grocery">
+              <Card className="glass-surface shimmer-target transition-colors hover:border-primary/40">
+                <CardContent className="flex items-center gap-3 py-4">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10">
+                    <ShoppingCart className="size-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Grocery List</p>
+                    <p className="text-xs text-muted-foreground">Generate a smart grocery list</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+        </section>
+      )}
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Meals</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">Meals</h2>
           <p className="text-xs text-muted-foreground">Organized by meal windows</p>
         </div>
 
         {loading ? (
-          <Card className="border-border/70 bg-card/85">
+          <Card className="glass-surface">
             <CardContent className="py-10 text-center text-sm text-muted-foreground">Loading nutrition data...</CardContent>
           </Card>
         ) : (

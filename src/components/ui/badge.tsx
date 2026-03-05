@@ -18,6 +18,8 @@ const badgeVariants = cva(
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
+        glass: "glass-chip text-foreground font-semibold",
+        volt: "bg-[rgba(200,255,0,0.15)] border border-[rgba(200,255,0,0.35)] text-[#C8FF00] font-bold tracking-[0.08em] uppercase",
       },
     },
     defaultVariants: {

@@ -25,10 +25,10 @@ const MILESTONE_LABELS: Record<number, string> = {
 };
 
 const MILESTONE_COLORS: Record<number, string> = {
-  7: "from-yellow-500/20 to-amber-500/20 border-yellow-400/30 text-yellow-400",
-  30: "from-orange-500/20 to-red-500/20 border-orange-400/30 text-orange-400",
-  100: "from-purple-500/20 to-pink-500/20 border-purple-400/30 text-purple-400",
-  365: "from-blue-500/20 to-cyan-500/20 border-blue-400/30 text-blue-400",
+  7: "from-primary/20 to-primary/10 border-primary/30 text-primary",
+  30: "from-primary/20 to-primary/10 border-primary/30 text-primary",
+  100: "from-primary/20 to-primary/10 border-primary/30 text-primary",
+  365: "from-primary/20 to-primary/10 border-primary/30 text-primary",
 };
 
 export function StreakBadge({
@@ -58,7 +58,7 @@ export function StreakBadge({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ["#FFD700", "#FFA500", "#FF6347"],
+        colors: ["#D4D4D8", "#A1A1AA", "#71717A"],
       });
 
       // Auto-hide notification after 5 seconds
@@ -74,7 +74,7 @@ export function StreakBadge({
 
   return (
     <div className={cn("relative", className)}>
-      <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5">
+      <Card className="glass-chip">
         <CardContent className="p-4 space-y-3">
           {/* Streak Display */}
           <div className="flex items-center justify-between">
@@ -90,10 +90,10 @@ export function StreakBadge({
                   repeatDelay: 2,
                 }}
               >
-                <Flame className="h-6 w-6 text-orange-500" />
+                <Flame className="h-6 w-6 text-primary" />
               </motion.div>
               <div>
-                <p className="text-2xl font-bold tabular-nums">
+                <p className="font-display text-2xl font-bold tabular-nums text-[#F0F4FF]">
                   {currentStreak}
                   <span className="ml-1 text-sm font-normal text-muted-foreground">day streak</span>
                 </p>
@@ -111,7 +111,7 @@ export function StreakBadge({
                 size="sm"
                 variant="ghost"
                 onClick={onUseFreeze}
-                className="gap-1 text-xs text-cyan-400 hover:text-cyan-300"
+                className="gap-1 text-xs text-primary hover:text-primary/80"
                 title="Use streak freeze (1x/month)"
               >
                 <Snowflake className="h-3 w-3" />

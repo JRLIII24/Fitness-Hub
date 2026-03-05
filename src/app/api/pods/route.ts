@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     if (authErr) return authErr;
 
     // Rate limit: 5 pod creations per user per minute
-    if (!rateLimit(`pods:${user.id}`, 5, 60_000)) {
+    if (!(await rateLimit(`pods:${user.id}`, 5, 60_000))) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 

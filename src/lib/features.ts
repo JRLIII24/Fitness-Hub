@@ -14,15 +14,6 @@ export const MARKETPLACE_ENABLED =
 export const POD_CHALLENGES_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_POD_CHALLENGES === "true";
 
-export const AI_PROGRESS_INSIGHT_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_AI_PROGRESS_INSIGHT === "true";
-
-export const AI_NUTRITION_ADVISOR_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_AI_NUTRITION_ADVISOR === "true";
-
-export const AI_RECOVERY_ADVISOR_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_AI_RECOVERY_ADVISOR === "true";
-
 export const VOICE_LOGGING_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_VOICE_LOGGING === "true";
 
@@ -43,9 +34,6 @@ export const READINESS_SCORE_ENABLED =
 export const HEALTHKIT_SYNC_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_HEALTHKIT_SYNC === "true";
 
-export const FOOD_VISION_ENABLED =
-  process.env.NEXT_PUBLIC_ENABLE_FOOD_VISION === "true";
-
 export const MOMENTUM_PROTECTION_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_MOMENTUM_PROTECTION === "true";
 
@@ -54,3 +42,21 @@ export const PUSH_NOTIFICATIONS_ENABLED =
 
 export const GLASS_UI_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_GLASS_UI !== "false";
+
+export const MENU_SCANNER_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_MENU_SCANNER === "true";
+
+export const FOOD_SCANNER_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_FOOD_SCANNER === "true";
+
+export const GROCERY_GENERATOR_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_GROCERY_GENERATOR === "true";
+
+export const AI_COACH_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_AI_COACH === "true";
+
+export const FORM_ANALYSIS_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_FORM_ANALYSIS === "true";
+
+export const AI_ONBOARDING_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_AI_ONBOARDING === "true";

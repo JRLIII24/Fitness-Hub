@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserCircle2, Zap, ArrowUpRight } from "lucide-react";
+import { Zap, ArrowUpRight } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { PresenceDot } from "./presence-dot";
 import { SendPingDialog } from "./send-ping-dialog";
@@ -24,6 +25,13 @@ interface UserCardProps {
   onFollow?: (userId: string) => Promise<void>;
   onUnfollow?: (userId: string) => Promise<void>;
   onSendPing: (recipientId: string, message: string) => Promise<void>;
+}
+
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return parts[0][0]?.toUpperCase() ?? "?";
 }
 
 export function UserCard({ user, onFollow, onUnfollow, onSendPing }: UserCardProps) {
@@ -57,14 +65,18 @@ export function UserCard({ user, onFollow, onUnfollow, onSendPing }: UserCardPro
   return (
     <>
       <Card
-        className="cursor-pointer border-border/70 bg-card/85 transition-colors hover:bg-accent/40"
+        className="cursor-pointer glass-surface shimmer-target transition-colors"
         onClick={() => router.push(`/social/${user.id}`)}
       >
         <CardContent className="px-4 py-3.5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="relative shrink-0">
-                <UserCircle2 className="size-11 text-muted-foreground" />
+                <Avatar className="size-11">
+                  <AvatarFallback className="bg-primary/15 text-sm font-semibold text-primary">
+                    {getInitials(user.display_name)}
+                  </AvatarFallback>
+                </Avatar>
                 <PresenceDot
                   userId={user.id}
                   size="sm"
@@ -84,7 +96,7 @@ export function UserCard({ user, onFollow, onUnfollow, onSendPing }: UserCardPro
                   </p>
                 )}
                 {goalLabel && (
-                  <Badge variant="secondary" className="mt-1 h-5 rounded-full px-2 text-[10px]">
+                  <Badge variant="secondary" className="mt-1 glass-chip h-5 rounded-full px-2 text-[10px]">
                     {goalLabel}
                   </Badge>
                 )}
@@ -99,7 +111,7 @@ export function UserCard({ user, onFollow, onUnfollow, onSendPing }: UserCardPro
                 size="icon"
                 variant="ghost"
                 className="size-8"
-                title="Send ping"
+                aria-label="Send ping"
                 onClick={() => setPingOpen(true)}
               >
                 <Zap className="size-4 text-yellow-500" />

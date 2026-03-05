@@ -96,17 +96,17 @@ export function MomentumProtectionCard({
 
   return (
     <Card
-      className={`border ${
+      className={`glass-surface ${
         urgency === "high"
-          ? "border-rose-500/50 bg-rose-500/10"
+          ? "!border-[var(--status-negative)]/50"
           : urgency === "medium"
-            ? "border-amber-500/50 bg-amber-500/10"
-            : "border-primary/40 bg-primary/10"
+            ? "!border-[var(--status-warning)]/50"
+            : "!border-primary/40"
       }`}
     >
       <CardContent className="flex items-start justify-between gap-3 p-3">
         <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
+          <p className="text-xs uppercase tracking-[0.12em] text-[#94A3B8]">
             Momentum Protection
           </p>
           <p className="mt-1 text-sm font-semibold">
@@ -124,9 +124,9 @@ export function MomentumProtectionCard({
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {urgency === "high" ? (
-            <ShieldAlert className="h-4 w-4 text-rose-400" />
+            <ShieldAlert className="h-4 w-4 text-[var(--status-negative)]" />
           ) : (
-            <Clock3 className="h-4 w-4 text-amber-400" />
+            <Clock3 className="h-4 w-4 text-[var(--status-warning)]" />
           )}
           {freezeAvailable ? (
             <Button

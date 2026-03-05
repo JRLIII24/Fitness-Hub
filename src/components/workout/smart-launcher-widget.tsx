@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Sparkles, ChevronRight, Loader2, Clock, Brain } from "lucide-react";
+import { Zap, Sparkles, ChevronRight, Loader2, Clock } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { getCachedPrediction, cachePrediction, clearExpiredCache } from "@/lib/launcher-cache";
 import { createClient } from "@/lib/supabase/client";
@@ -128,7 +128,7 @@ export function SmartLauncherWidget() {
 
   if (loading) {
     return (
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+      <Card className="glass-surface-hero">
         <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </CardContent>
@@ -140,7 +140,7 @@ export function SmartLauncherWidget() {
   const confidence = suggested_workout.confidence;
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+    <Card className="glass-surface-hero shimmer-target">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -174,33 +174,7 @@ export function SmartLauncherWidget() {
               <Clock className="h-3 w-3" />
               ~{suggested_workout.estimated_duration_mins} min
             </span>
-            {suggested_workout.ai_intensity && (
-              <span className={`flex items-center gap-1 font-medium ${
-                suggested_workout.ai_intensity === "recovery"
-                  ? "text-blue-500"
-                  : suggested_workout.ai_intensity === "high"
-                  ? "text-orange-500"
-                  : "text-green-500"
-              }`}>
-                {suggested_workout.ai_intensity === "recovery"
-                  ? "↓ Recovery"
-                  : suggested_workout.ai_intensity === "high"
-                  ? "↑ Push"
-                  : "● Moderate"}
-              </span>
-            )}
           </div>
-          {suggested_workout.ai_reasoning && (
-            <p className="mt-2 flex items-start gap-1.5 text-xs italic text-muted-foreground/80">
-              <Brain className="mt-0.5 h-3 w-3 shrink-0 text-primary/60" />
-              {suggested_workout.ai_reasoning}
-            </p>
-          )}
-          {suggested_workout.ai_coaching_note && (
-            <p className="mt-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-              {suggested_workout.ai_coaching_note}
-            </p>
-          )}
         </div>
 
         <div className="flex gap-2">
@@ -242,7 +216,7 @@ export function SmartLauncherWidget() {
                         setShowAlternatives(false);
                         handleStartWorkout(alt.id, false);
                       }}
-                      className="w-full rounded-lg border border-border/60 bg-secondary/30 p-3 text-left transition-colors hover:bg-secondary/50"
+                      className="w-full glass-inner rounded-lg p-3 text-left transition-colors hover:bg-card/50"
                     >
                       <p className="font-medium text-sm">{alt.name}</p>
                       <p className="text-xs text-muted-foreground">
@@ -271,7 +245,7 @@ export function SmartLauncherWidget() {
                       // Navigate to empty workout page
                       router.push("/workout");
                     }}
-                    className="w-full rounded-lg border border-dashed border-border/60 bg-background p-3 text-left transition-colors hover:bg-secondary/30"
+                    className="w-full glass-inner rounded-lg border-dashed p-3 text-left transition-colors hover:bg-card/50"
                   >
                     <p className="font-medium text-sm flex items-center gap-2">
                       <ChevronRight className="h-4 w-4" />

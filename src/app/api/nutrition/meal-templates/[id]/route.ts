@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
-import { parsePayload } from "@/lib/validation/parse-payload";
+import { parsePayload } from "@/lib/validation/parse";
 import { mealTemplateCreateSchema } from "@/lib/validation/api.schemas";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -20,7 +20,11 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     if (authErr) return authErr;
 
     const { id } = await context.params;
-    const { name, items } = parsePayload(mealTemplateCreateSchema, await req.json());
+    const parsed = parsePayload(mealTemplateCreateSchema, await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error }, { status: 400 });
+    }
+    const { name, items } = parsed.data;
 
     const total_calories = items.reduce((sum, i) => sum + i.calories * i.servings, 0);
     const total_protein_g = items.reduce(
@@ -49,7 +53,6 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 
     return NextResponse.json(data);
   } catch (error) {
-    if (error instanceof NextResponse) return error;
     logger.error("PUT /api/nutrition/meal-templates/[id] error:", error);
     return NextResponse.json(
       { error: "Failed to update meal template" },

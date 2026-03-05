@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
-import { parsePayload } from "@/lib/validation/parse-payload";
+import { parsePayload } from "@/lib/validation/parse";
 import { exerciseCreateSchema } from "@/lib/validation/api.schemas";
 
 export async function POST(req: NextRequest) {
@@ -16,10 +16,11 @@ export async function POST(req: NextRequest) {
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
-    const { name, muscle_group, equipment, category, instructions } = parsePayload(
-      exerciseCreateSchema,
-      await req.json(),
-    );
+    const parsed = parsePayload(exerciseCreateSchema, await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error }, { status: 400 });
+    }
+    const { name, muscle_group, equipment, category, instructions } = parsed.data;
 
     // Generate a unique slug
     const slug = name
@@ -47,7 +48,6 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
-    if (error instanceof NextResponse) return error;
     logger.error("POST /api/exercises error:", error);
     return NextResponse.json({ error: "Failed to create exercise" }, { status: 500 });
   }

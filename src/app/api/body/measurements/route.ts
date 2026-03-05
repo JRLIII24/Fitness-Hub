@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
-import { parsePayload } from "@/lib/validation/parse-payload";
+import { parsePayload } from "@/lib/validation/parse";
 import {
   bodyMeasurementCreateSchema,
   bodyMeasurementUpdateSchema,
@@ -54,7 +54,11 @@ export async function POST(req: NextRequest) {
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
-    const body = parsePayload(bodyMeasurementCreateSchema, await req.json());
+    const parsed = parsePayload(bodyMeasurementCreateSchema, await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
 
     const { data, error } = await supabase
       .from("body_measurements")
@@ -79,7 +83,7 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
     return NextResponse.json(data);
   } catch (error) {
-    if (error instanceof NextResponse) return error;
+
     logger.error("POST /api/body/measurements error:", error);
     return NextResponse.json(
       { error: "Failed to save measurement" },
@@ -94,7 +98,11 @@ export async function PUT(req: NextRequest) {
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
-    const body = parsePayload(bodyMeasurementUpdateSchema, await req.json());
+    const parsed = parsePayload(bodyMeasurementUpdateSchema, await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error }, { status: 400 });
+    }
+    const body = parsed.data;
 
     const { data, error } = await supabase
       .from("body_measurements")
@@ -131,7 +139,7 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
-    if (error instanceof NextResponse) return error;
+
     logger.error("PUT /api/body/measurements error:", error);
     return NextResponse.json(
       { error: "Failed to update measurement" },

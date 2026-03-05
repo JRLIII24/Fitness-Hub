@@ -15,13 +15,20 @@ import {
   isSameDay,
   isToday,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Pencil, Trash2, CalendarClock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Trash2, CalendarClock, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { usePrimaryColor } from "@/hooks/use-primary-color";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { weightToDisplay } from "@/lib/units";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/page-header";
@@ -257,7 +264,7 @@ export default function HistoryPage() {
 
       <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
         {/* ── Custom Calendar ────────────────────────────────────────── */}
-        <div className="h-fit rounded-2xl border border-border/60 bg-card/30 p-4">
+        <div className="h-fit glass-surface rounded-2xl p-4">
           {/* Month navigation */}
           <div className="mb-4 flex items-center justify-between">
             <button
@@ -370,7 +377,7 @@ export default function HistoryPage() {
         </div>
 
         {/* ── Selected Day Details ───────────────────────────────────── */}
-        <div className="rounded-2xl border border-border/60 bg-card/30 p-5">
+        <div className="glass-surface rounded-2xl p-5">
           <div className="mb-4">
             <h3 className="text-[13px] font-bold text-foreground">{format(selectedDay, "EEEE, MMMM d")}</h3>
           </div>
@@ -400,7 +407,7 @@ export default function HistoryPage() {
               }
 
               return (
-                <div key={session.id} className="rounded-2xl border border-border/60 bg-card/30 p-5">
+                <div key={session.id} className="glass-surface rounded-2xl p-5">
                   <div className="pb-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
@@ -409,51 +416,47 @@ export default function HistoryPage() {
                           Template: {session.workout_templates?.name ?? "No template"}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-xl border border-border/50 bg-card/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                          <span className="glass-chip px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#94A3B8]">
                             {totalSets} sets
                           </span>
-                          <span className="rounded-xl border border-border/50 bg-card/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                          <span className="glass-chip px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#94A3B8]">
                             {totalReps} reps
                           </span>
-                          <span className="max-w-[200px] truncate rounded-xl border border-border/50 bg-card/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                          <span className="max-w-[200px] truncate glass-chip px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#94A3B8]">
                             {muscleGroups.length > 0 ? muscleGroups.join(", ") : "N/A"}
                           </span>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-1.5 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 rounded-xl"
-                          onClick={() => router.push(`/history/${session.id}/edit`)}
-                        >
-                          <Pencil className="size-3.5" />
-                          <span className="hidden sm:inline ml-1.5">Edit</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 rounded-xl"
-                          onClick={() => handleOpenDateDialog(session)}
-                        >
-                          <CalendarClock className="size-3.5" />
-                          <span className="hidden sm:inline ml-1.5">Change Date</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="h-9 rounded-xl"
-                          onClick={() => handleDeleteSession(session.id)}
-                        >
-                          <Trash2 className="size-3.5" />
-                          <span className="hidden sm:inline ml-1.5">Delete</span>
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="size-9 shrink-0">
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => router.push(`/history/${session.id}/edit`)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit session
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenDateDialog(session)}>
+                            <CalendarClock className="mr-2 h-4 w-4" />
+                            Change date
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteSession(session.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                   <div className="space-y-2">
                     {[...byExercise.entries()].map(([exerciseName, sets]) => (
-                      <div key={exerciseName} className="rounded-xl border border-border/50 bg-card/40 p-3 text-sm">
+                      <div key={exerciseName} className="glass-inner rounded-xl p-3 text-sm">
                         <p className="min-w-0 truncate font-medium text-foreground">{exerciseName}</p>
                         <div className="mt-1.5 flex flex-wrap gap-1">
                           {sets.map((set, i) => (

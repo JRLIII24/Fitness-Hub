@@ -269,13 +269,24 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
         { onConflict: "id" }
       );
 
-    setIsSaving(false);
-
     if (error) {
+      setIsSaving(false);
       toast.error("Failed to save profile: " + error.message);
-    } else {
-      toast.success("Profile updated successfully.");
+      return;
     }
+
+    // Log weight to body history if it changed
+    if (weightKg !== null && weightKg !== initialWeightKg) {
+      const today = new Date().toISOString().split("T")[0];
+      await fetch("/api/body/weight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logged_date: today, weight_kg: weightKg }),
+      });
+    }
+
+    setIsSaving(false);
+    toast.success("Profile updated successfully.");
   }
 
   async function handleUnitChange(newUnit: "metric" | "imperial") {

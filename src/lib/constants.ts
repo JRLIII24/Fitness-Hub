@@ -42,10 +42,17 @@ export const MEAL_TYPES = [
 export const REST_PRESETS = [30, 60, 90, 120, 180] as const;
 
 export const MACRO_COLORS = {
-  protein: "text-blue-400",
-  carbs: "text-yellow-400",
-  fat: "text-pink-400",
-  fiber: "text-green-400",
+  protein: "text-[var(--macro-protein)]",
+  carbs: "text-[var(--macro-carbs)]",
+  fat: "text-[var(--macro-fat)]",
+  fiber: "text-[var(--macro-fiber)]",
+} as const;
+
+export const MACRO_BG_COLORS = {
+  protein: "bg-[var(--macro-protein)]",
+  carbs: "bg-[var(--macro-carbs)]",
+  fat: "bg-[var(--macro-fat)]",
+  fiber: "bg-[var(--macro-fiber)]",
 } as const;
 
 export const MUSCLE_GROUP_LABELS: Record<string, string> = {

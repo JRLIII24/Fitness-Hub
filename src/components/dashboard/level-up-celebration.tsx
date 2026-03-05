@@ -44,7 +44,7 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
             transition={{ type: "spring", stiffness: 280, damping: 22 }}
             className="relative my-auto w-full max-w-sm"
           >
-            <Card className="relative max-h-[min(92dvh,42rem)] overflow-y-auto overflow-x-clip rounded-3xl border border-primary/35 bg-gradient-to-br from-card via-card to-primary/10 p-6 shadow-2xl">
+            <Card className="relative max-h-[min(92dvh,42rem)] overflow-y-auto overflow-x-clip rounded-3xl glass-surface-elevated p-6 shadow-2xl">
               {/* Animated Background Glow */}
               <motion.div
                 className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-primary/15 via-accent/10 to-primary/5"
@@ -68,6 +68,7 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
                 size="icon"
                 className="absolute right-3 top-3 z-10 h-8 w-8 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
                 onClick={onClose}
+                aria-label="Close level-up celebration"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -110,7 +111,7 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
                   <h2 className="text-xs font-bold uppercase tracking-[0.22em] text-primary">
                     Level Up!
                   </h2>
-                  <p className="mt-1 text-3xl font-black tracking-tight">
+                  <p className="mt-1 text-3xl font-black tracking-tight text-[#F0F4FF]">
                     You reached
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -123,10 +124,10 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4, type: "spring", stiffness: 300, damping: 20 }}
-                  className="rounded-2xl border border-primary/35 bg-gradient-to-r from-primary/20 to-accent/20 p-6"
+                  className="rounded-2xl glass-inner p-6"
                 >
                   <div className="flex flex-col items-center justify-center gap-1">
-                    <span className="text-7xl font-black tabular-nums text-primary">
+                    <span className="font-display text-7xl font-black tabular-nums text-primary">
                       {newLevel}
                     </span>
                     <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-muted-foreground">

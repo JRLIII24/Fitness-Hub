@@ -297,50 +297,6 @@ export async function getAlternativeTemplates(userId: string, limit: number = 3)
 }
 
 /**
- * Enrich a launcher prediction with AI reasoning.
- * Makes a server-side call to /api/ai/suggest and attaches the result.
- * Returns the original prediction unchanged if AI is unavailable or times out.
- */
-export async function enrichWithAI(
-  prediction: LauncherPrediction,
-  baseUrl: string
-): Promise<LauncherPrediction> {
-  try {
-    if (!process.env.GEMINI_API_KEY) {
-      return prediction;
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-
-    const res = await fetch(`${baseUrl}/api/ai/suggest`, {
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) return prediction;
-
-    const suggestion = await res.json() as {
-      reasoning?: string;
-      coaching_note?: string;
-      intensity_recommendation?: 'high' | 'moderate' | 'recovery';
-    } | null;
-
-    if (!suggestion) return prediction;
-
-    return {
-      ...prediction,
-      ai_reasoning: suggestion.reasoning,
-      ai_coaching_note: suggestion.coaching_note,
-      ai_intensity: suggestion.intensity_recommendation,
-    };
-  } catch {
-    // Timeout, network error, or parse failure — always fall back gracefully
-    return prediction;
-  }
-}
-
-/**
  * Log launcher event
  */
 export async function logLauncherEvent(

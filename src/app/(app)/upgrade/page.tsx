@@ -81,7 +81,7 @@ export default function UpgradePage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
-        className="relative overflow-hidden rounded-3xl glass-surface-elevated glass-highlight p-6"
+        className="relative overflow-hidden rounded-3xl glass-surface-hero p-6"
       >
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
         <div className="pointer-events-none absolute -left-12 bottom-0 h-36 w-36 rounded-full bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.15))] blur-3xl" />
@@ -91,7 +91,7 @@ export default function UpgradePage() {
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Coming Soon</p>
-            <h1 className="text-2xl font-black tracking-tight text-foreground">Pro Performance Layer</h1>
+            <h1 className="text-2xl font-display font-black tracking-tight text-[#F0F4FF]">Pro Performance Layer</h1>
             <p className="mt-2 text-[13px] text-muted-foreground max-w-[300px] leading-relaxed">
               Coaching-grade analytics and AI systems built on top of your existing training data.
             </p>
@@ -100,7 +100,7 @@ export default function UpgradePage() {
       </motion.div>
 
       {/* Feature cards */}
-      <div className="rounded-2xl border border-border/60 bg-card/30 overflow-hidden">
+      <div className="glass-surface rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-border/40">
           <p className="text-[13px] font-bold text-foreground">What&apos;s included</p>
         </div>
@@ -133,7 +133,7 @@ export default function UpgradePage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="rounded-2xl border border-border/60 bg-card/30 p-5 space-y-4"
+        className="glass-surface rounded-2xl p-5 space-y-4"
       >
         {joined ? (
           <div className="flex flex-col items-center gap-2 py-4 text-center">
@@ -159,7 +159,7 @@ export default function UpgradePage() {
                   className="pl-9 h-10 text-sm"
                 />
               </div>
-              <Button type="submit" size="sm" className="h-10 px-4 motion-press" disabled={submitting}>
+              <Button type="submit" variant="volt" size="sm" className="h-10 px-4 motion-press" disabled={submitting}>
                 {submitting ? "Joining…" : "Join"}
               </Button>
             </form>

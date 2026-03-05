@@ -8,6 +8,16 @@ import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
+export interface NutritionPlan {
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  fitness_goal: "build_muscle" | "lose_weight" | "maintain" | "improve_endurance";
+  rationale: string;
+}
+
 export interface OnboardingData {
   accentColor: string;
   fitnessGoal: "build_muscle" | "lose_weight" | "maintain" | "improve_endurance" | null;
@@ -21,6 +31,8 @@ export interface OnboardingData {
   showWeight: boolean;
   equipmentAvailable: string[];
   experienceLevel: "beginner" | "intermediate" | "advanced" | null;
+  activityLevel: "sedentary" | "lightly_active" | "moderately_active" | "very_active" | "extra_active" | null;
+  aiNutritionPlan: NutritionPlan | null;
 }
 
 const initialData: OnboardingData = {
@@ -36,6 +48,8 @@ const initialData: OnboardingData = {
   showWeight: true,
   equipmentAvailable: [],
   experienceLevel: null,
+  activityLevel: null,
+  aiNutritionPlan: null,
 };
 
 const APP_THEME_STORAGE_KEY = "fithub-color-theme";
@@ -84,10 +98,11 @@ function parseAccentSelection(raw: string): AccentSelection {
 function isMissingProfilesColumnError(error: unknown, columnName: string): boolean {
   const e = (error ?? {}) as { code?: string; message?: string };
   const message = (e.message ?? "").toLowerCase();
+  const col = columnName.toLowerCase();
   return (
-    e.code === "PGRST204" &&
+    (e.code === "PGRST204" || e.code === "42703" || message.includes(col)) &&
     message.includes("profiles") &&
-    message.includes(columnName.toLowerCase())
+    message.includes(col)
   );
 }
 
@@ -124,7 +139,7 @@ export function useOnboarding() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
-  const totalSteps = 8;
+  const totalSteps = 10;
 
   const ensureProfileExists = useCallback(async () => {
     const response = await fetch("/api/auth/ensure-profile", {
@@ -197,13 +212,12 @@ export function useOnboarding() {
   };
 
   // Validate current step
+  // New flow: 0=Accent, 1=Height, 2=Weight, 3=DOB, 4=Gender, 5=Activity, 6=Equipment, 7=Experience, 8=AI Coach, 9=Summary
   const canProceed = (): boolean => {
     switch (currentStep) {
       case 0: // Accent color
         return !!data.accentColor;
-      case 1: // Fitness goal
-        return !!data.fitnessGoal;
-      case 2: // Height
+      case 1: // Height
         return (
           data.heightFeet !== null &&
           data.heightFeet >= 3 &&
@@ -212,23 +226,29 @@ export function useOnboarding() {
           data.heightInches >= 0 &&
           data.heightInches < 12
         );
-      case 3: // Weight
+      case 2: // Weight
         return (
           data.currentWeight !== null &&
           data.currentWeight > 0 &&
           data.goalWeight !== null &&
           data.goalWeight > 0
         );
-      case 4: // Date of birth
+      case 3: // Date of birth
         if (!data.dateOfBirth) return false;
         const age = new Date().getFullYear() - data.dateOfBirth.getFullYear();
         return age >= 13 && age <= 120;
-      case 5: // Gender
+      case 4: // Gender
         return !!data.gender;
+      case 5: // Activity level
+        return !!data.activityLevel;
       case 6: // Equipment
         return data.equipmentAvailable.length > 0;
       case 7: // Experience level
         return data.experienceLevel !== null;
+      case 8: // AI Coach (auto-advances when plan generated)
+        return data.aiNutritionPlan !== null;
+      case 9: // Nutrition summary (final step)
+        return data.aiNutritionPlan !== null;
       default:
         return false;
     }
@@ -275,6 +295,8 @@ export function useOnboarding() {
 
   useEffect(() => {
     applyOnboardingAccentPreview(data.accentColor);
+    const selection = parseAccentSelection(data.accentColor);
+    setAppThemeClass(selection.customHex ? "custom" : selection.themePreference);
   }, [applyOnboardingAccentPreview, data.accentColor]);
 
   // Submit onboarding data to Supabase
@@ -319,10 +341,13 @@ export function useOnboarding() {
 
       const accentSelection = parseAccentSelection(data.accentColor);
 
+      // Use AI-derived fitness goal if available, otherwise fallback to manual selection
+      const fitnessGoal = data.aiNutritionPlan?.fitness_goal ?? data.fitnessGoal;
+
       // Prepare update data
       const profileData: Record<string, unknown> = {
         id: user.id,
-        fitness_goal: data.fitnessGoal,
+        fitness_goal: fitnessGoal,
         unit_preference: data.unitPreference,
         height_cm: heightCm,
         current_weight_kg: data.currentWeight,
@@ -334,55 +359,101 @@ export function useOnboarding() {
         theme_preference: accentSelection.themePreference,
         equipment_available: data.equipmentAvailable,
         experience_level: data.experienceLevel,
+        activity_level: data.activityLevel,
       };
 
       if (accentSelection.customHex) {
         profileData.accent_color = accentSelection.customHex;
       }
 
-      // Upsert so onboarding succeeds even if the profile row did not exist yet.
-      let { error: updateError } = await supabase
-        .from("profiles")
-        .upsert(profileData, { onConflict: "id" })
-        .select("id")
-        .single();
+      // Optional columns that may be absent on older DB instances.
+      // PostgREST reports ONE missing column per attempt, so we loop — stripping
+      // the offending column each time — until the upsert succeeds or we hit a
+      // non-column error.
+      const OPTIONAL_COLUMNS = [
+        "accent_color",
+        "theme_preference",
+        "unit_preference",
+        "activity_level",
+        "equipment_available",
+        "experience_level",
+        "show_weight",
+        "current_weight_kg",
+        "goal_weight_kg",
+        "date_of_birth",
+        "fitness_goal",
+        "gender",
+        "height_cm",
+      ];
 
-      // Handle projects where optional migrations haven't been applied yet.
-      if (updateError && isMissingProfilesColumnError(updateError, "accent_color")) {
-        delete profileData.accent_color;
-        const retry = await supabase
+      let updateError: unknown = null;
+      for (let attempt = 0; attempt <= OPTIONAL_COLUMNS.length; attempt++) {
+        const { error } = await supabase
           .from("profiles")
           .upsert(profileData, { onConflict: "id" })
           .select("id")
           .single();
-        updateError = retry.error;
-      }
 
-      if (updateError && isMissingProfilesColumnError(updateError, "theme_preference")) {
-        delete profileData.theme_preference;
-        const retry = await supabase
-          .from("profiles")
-          .upsert(profileData, { onConflict: "id" })
-          .select("id")
-          .single();
-        updateError = retry.error;
-      }
+        if (!error) { updateError = null; break; }
 
-      if (updateError && isMissingProfilesColumnError(updateError, "unit_preference")) {
-        delete profileData.unit_preference;
-        const retry = await supabase
-          .from("profiles")
-          .upsert(profileData, { onConflict: "id" })
-          .select("id")
-          .single();
-        updateError = retry.error;
+        const missingCol = OPTIONAL_COLUMNS.find(col =>
+          isMissingProfilesColumnError(error, col)
+        );
+        if (missingCol) {
+          delete profileData[missingCol];
+          updateError = error;
+          continue;
+        }
+
+        // Non-column error — stop retrying
+        updateError = error;
+        break;
       }
 
       if (updateError) {
+        const e = (updateError ?? {}) as { message?: string };
         console.error("Update error:", updateError);
         throw new Error(
-          `Failed to save profile: ${updateError.message || "Unknown error"}`
+          `Failed to save profile: ${e.message || "Unknown error"}`
         );
+      }
+
+      // Log initial weight to body_weight_logs
+      if (data.currentWeight) {
+        const todayDate = new Date().toISOString().slice(0, 10);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: weightLogError } = await (supabase as any)
+          .from("body_weight_logs")
+          .upsert(
+            { user_id: user.id, logged_date: todayDate, weight_kg: data.currentWeight },
+            { onConflict: "user_id,logged_date" }
+          );
+        if (weightLogError) {
+          console.warn("Failed to log initial weight:", weightLogError);
+          // Non-fatal — profile was saved
+        }
+      }
+
+      // Save AI-generated nutrition goals
+      if (data.aiNutritionPlan) {
+        const today = new Date().toISOString().slice(0, 10);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: goalError } = await (supabase as any)
+          .from("nutrition_goals")
+          .insert({
+            user_id: user.id,
+            calories_target: data.aiNutritionPlan.calories,
+            protein_g_target: data.aiNutritionPlan.protein_g,
+            carbs_g_target: data.aiNutritionPlan.carbs_g,
+            fat_g_target: data.aiNutritionPlan.fat_g,
+            fiber_g_target: data.aiNutritionPlan.fiber_g,
+            effective_from: today,
+          });
+
+        if (goalError) {
+          console.warn("Failed to save nutrition goals:", goalError);
+          // Non-fatal — profile was saved, just warn
+        }
       }
 
       const themeToApply = accentSelection.customHex

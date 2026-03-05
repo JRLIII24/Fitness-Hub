@@ -49,7 +49,7 @@ export function TemplateCard({ template, isSaved, onSave, onPreview, currentUser
     <motion.div
       whileTap={{ scale: 0.97 }}
       onClick={onPreview}
-      className="cursor-pointer overflow-hidden rounded-2xl border border-border/60 bg-card/30 transition-colors hover:border-border/80"
+      className="cursor-pointer overflow-hidden rounded-2xl glass-surface shimmer-target transition-colors"
     >
       {/* ── Gradient header ─────────────────────────────────────────────── */}
       <div
@@ -65,8 +65,8 @@ export function TemplateCard({ template, isSaved, onSave, onPreview, currentUser
             return (
               <span
                 key={cat}
-                className="rounded-full px-2 py-0.5 text-[9px] font-bold capitalize backdrop-blur-sm"
-                style={{ background: "rgba(0,0,0,0.40)", color: catGc.labelColor }}
+                className="glass-chip rounded-full px-2 py-0.5 text-[9px] font-bold capitalize"
+                style={{ color: catGc.labelColor }}
               >
                 {cat.replace(/_/g, " ")}
               </span>
@@ -105,8 +105,8 @@ export function TemplateCard({ template, isSaved, onSave, onPreview, currentUser
               return (
                 <span
                   key={g}
-                  className="rounded-full px-[6px] py-[2px] text-[10px] font-semibold capitalize"
-                  style={{ background: mgc.bgAlpha, color: mgc.labelColor, border: `1px solid ${mgc.borderAlpha}` }}
+                  className="glass-chip rounded-full px-[6px] py-[2px] text-[10px] font-semibold capitalize"
+                  style={{ color: mgc.labelColor }}
                 >
                   {g}
                 </span>
@@ -180,7 +180,7 @@ export function TemplateCard({ template, isSaved, onSave, onPreview, currentUser
 
 export function TemplateCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/30">
+    <div className="overflow-hidden rounded-2xl glass-surface">
       <div className="h-[48px] animate-pulse bg-card/70" />
       <div className="px-3 pb-3.5 pt-2.5">
         <div className="mb-1.5 h-3 w-12 animate-pulse rounded-full bg-card/70" />

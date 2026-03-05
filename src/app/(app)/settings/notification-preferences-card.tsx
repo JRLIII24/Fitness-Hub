@@ -128,11 +128,13 @@ export function NotificationPreferencesCard() {
                 Workout Reminder
               </p>
               <div className="flex items-center gap-3">
-                <label className="text-[12px] font-medium text-muted-foreground">Remind at</label>
+                <label htmlFor="reminder-hour" className="text-[12px] font-medium text-muted-foreground">Remind at</label>
                 <select
+                  id="reminder-hour"
                   value={reminderHour}
                   onChange={(e) => setReminderHour(Number(e.target.value))}
                   className="rounded-lg border border-border/60 bg-card/40 px-2 py-1.5 text-[13px]"
+                  aria-label="Hour"
                 >
                   {Array.from({ length: 24 }, (_, h) => (
                     <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
@@ -140,9 +142,11 @@ export function NotificationPreferencesCard() {
                 </select>
                 <span className="text-muted-foreground">:</span>
                 <select
+                  id="reminder-minute"
                   value={reminderMinute}
                   onChange={(e) => setReminderMinute(Number(e.target.value))}
                   className="rounded-lg border border-border/60 bg-card/40 px-2 py-1.5 text-[13px]"
+                  aria-label="Minute"
                 >
                   {[0, 15, 30, 45].map((m) => (
                     <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
@@ -225,6 +229,7 @@ export function NotificationPreferencesCard() {
                     value={prefs.quiet_hours_start ?? 22}
                     onChange={(e) => updatePref({ quiet_hours_start: Number(e.target.value) })}
                     className="rounded-lg border border-border/60 bg-card/40 px-2 py-1.5 text-[13px]"
+                    aria-label="Quiet hours start"
                   >
                     {Array.from({ length: 24 }, (_, h) => (
                       <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
@@ -235,6 +240,7 @@ export function NotificationPreferencesCard() {
                     value={prefs.quiet_hours_end ?? 7}
                     onChange={(e) => updatePref({ quiet_hours_end: Number(e.target.value) })}
                     className="rounded-lg border border-border/60 bg-card/40 px-2 py-1.5 text-[13px]"
+                    aria-label="Quiet hours end"
                   >
                     {Array.from({ length: 24 }, (_, h) => (
                       <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>

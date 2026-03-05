@@ -10,7 +10,7 @@ export const SectionCard = React.memo(function SectionCard({ children, className
   return (
     <div
       className={cn(
-        "overflow-hidden glass-surface glass-highlight rounded-2xl",
+        "overflow-hidden glass-surface shimmer-target rounded-2xl",
         className
       )}
     >

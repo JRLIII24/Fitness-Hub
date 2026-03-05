@@ -36,7 +36,7 @@ export function PingInbox({
   }
 
   return (
-    <Card className="border-border/70 bg-card/85">
+    <Card className="glass-surface">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -72,10 +72,10 @@ export function PingInbox({
             {pings.map((ping) => (
               <li
                 key={ping.id}
-                className={`rounded-xl border p-3 text-sm ${
+                className={`glass-inner rounded-xl p-3 text-sm ${
                   !ping.read_at
-                    ? "border-primary/30 bg-primary/10"
-                    : "border-border/60 bg-background/40"
+                    ? "border-primary/30"
+                    : ""
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -103,10 +103,10 @@ export function PingInbox({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 shrink-0"
+                    className="h-8 w-8 shrink-0"
                     onClick={() => handleDelete(ping.id)}
                     disabled={deleting === ping.id}
-                    title="Delete ping"
+                    aria-label="Delete ping"
                   >
                     <X className="h-4 w-4" />
                   </Button>

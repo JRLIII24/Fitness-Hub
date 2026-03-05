@@ -17,7 +17,6 @@ interface UnitPreferenceState {
   splitDistanceM: number;
   unitLabel: "kg" | "lbs";
   heightLabel: "cm" | "inches";
-  distanceLabel: "mi" | "km";
   paceLabel: "/mi" | "/km";
 }
 
@@ -26,7 +25,6 @@ function getDerivedUnitState(preference: UnitPreference) {
     splitDistanceM: preference === "imperial" ? 1609.34 : 1000,
     unitLabel: preference === "imperial" ? ("lbs" as const) : ("kg" as const),
     heightLabel: preference === "imperial" ? ("inches" as const) : ("cm" as const),
-    distanceLabel: preference === "imperial" ? ("mi" as const) : ("km" as const),
     paceLabel: preference === "imperial" ? ("/mi" as const) : ("/km" as const),
   };
 }

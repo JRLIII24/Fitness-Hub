@@ -127,7 +127,7 @@ export async function getPodChallengeLeaderboard(
   return {
     challenge:  challenge as PodChallenge,
     entries,
-    score_unit: scoreUnit(challenge.challenge_type),
+    score_unit: scoreUnit(challenge.challenge_type as PodChallenge['challenge_type']),
     is_active:  isChallengeActive(challenge as PodChallenge),
   };
 }

@@ -6,6 +6,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { exerciseSearchSchema } from "@/lib/validation/api.schemas";
 
 export const dynamic = "force-dynamic";
 const FREE_EXERCISE_DB_IMAGE_BASE =
@@ -33,14 +34,30 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Parse query parameters
-    const query = searchParams.get("query") || "";
-    const muscleGroups = searchParams.get("muscle_groups") || searchParams.get("muscle_group") || "";
-    const equipment = searchParams.get("equipment") || "";
-    const category = searchParams.get("category") || "";
-    const source = searchParams.get("source") || "";
-    const rawLimit = searchParams.get("limit");
-    const limit = Math.min(10000, Math.max(1, parseInt(rawLimit ?? '100', 10)));
+    // Validate and coerce query parameters via the shared schema.
+    // This enforces the 200-row limit cap and the source enum in one place,
+    // keeping the route handler free of ad-hoc parsing logic.
+    const parseResult = exerciseSearchSchema.safeParse(
+      Object.fromEntries(searchParams.entries()),
+    );
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: "Invalid query parameters", details: parseResult.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    // Prefer muscle_groups over muscle_group when both are supplied (legacy compat)
+    const {
+      query,
+      muscle_groups,
+      muscle_group,
+      equipment,
+      category,
+      source,
+      limit,
+    } = parseResult.data;
+    const muscleGroups = muscle_groups || muscle_group;
 
     // Create Supabase client
     const supabase = await createClient();
@@ -54,18 +71,18 @@ export async function GET(request: Request) {
     if (muscleGroups) {
       const groups = muscleGroups.split(",").map((g) => g.trim()).filter(Boolean);
       if (groups.length === 1) {
-        supabaseQuery = supabaseQuery.eq("muscle_group", groups[0]);
+        supabaseQuery = supabaseQuery.eq("muscle_group", groups[0] as any);
       } else if (groups.length > 1) {
-        supabaseQuery = supabaseQuery.in("muscle_group", groups);
+        supabaseQuery = supabaseQuery.in("muscle_group", groups as any);
       }
     }
 
     if (equipment) {
-      supabaseQuery = supabaseQuery.eq("equipment", equipment);
+      supabaseQuery = supabaseQuery.eq("equipment", equipment as any);
     }
 
     if (category) {
-      supabaseQuery = supabaseQuery.eq("category", category);
+      supabaseQuery = supabaseQuery.eq("category", category as any);
     }
 
     if (source) {

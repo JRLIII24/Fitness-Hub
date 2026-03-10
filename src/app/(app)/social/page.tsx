@@ -2,15 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   Search,
   Settings,
-  Video,
   Bell,
   Inbox,
   Sparkles,
-  ArrowUpRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSupabase } from "@/hooks/use-supabase";
@@ -21,9 +18,11 @@ import { trackPodAccountabilityPingOpened } from "@/lib/retention-events";
 import { UserCard, type UserCardUser } from "@/components/social/user-card";
 import { PingInbox } from "@/components/social/ping-inbox";
 import { SharedItemCard } from "@/components/social/shared-item-card";
+import { ActivityFeed } from "@/components/social/activity-feed";
 import { PodsTabContent } from "@/components/pods/pods-tab-content";
 import { PodInvitesSection } from "@/components/pods/pod-invites-section";
 import { ProfileTabContent } from "@/components/social/profile-tab-content";
+import { SOCIAL_FEED_ENABLED } from "@/lib/features";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,9 +30,10 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PillSelector } from "@/components/ui/pill-selector";
 import { Card, CardContent } from "@/components/ui/card";
 
-type SocialTab = "discover" | "following" | "pings" | "shared" | "pods" | "sets" | "profile";
+type SocialTab = "feed" | "discover" | "following" | "pings" | "shared" | "pods" | "profile";
 
 const PRIMARY_TABS: Array<{ value: SocialTab; label: string }> = [
+  ...(SOCIAL_FEED_ENABLED ? [{ value: "feed" as SocialTab, label: "Feed" }] : []),
   { value: "discover", label: "Discover" },
   { value: "following", label: "Following" },
   { value: "pings", label: "Pings" },
@@ -42,7 +42,6 @@ const PRIMARY_TABS: Array<{ value: SocialTab; label: string }> = [
 
 const SECONDARY_TABS: Array<{ value: SocialTab; label: string }> = [
   { value: "pods", label: "Pods" },
-  { value: "sets", label: "Sets" },
   { value: "profile", label: "Profile" },
 ];
 
@@ -50,7 +49,7 @@ export default function SocialPage() {
   const router = useRouter();
   const supabase = useSupabase();
 
-  const [activeTab, setActiveTab] = useState<SocialTab>("discover");
+  const [activeTab, setActiveTab] = useState<SocialTab>(SOCIAL_FEED_ENABLED ? "feed" : "discover");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserCardUser[]>([]);
@@ -121,7 +120,7 @@ export default function SocialPage() {
 
       const { data: followData } = await supabase
         .from("user_follows")
-        .select(`following_id, profiles!user_follows_following_id_fkey(id, display_name, username, bio, fitness_goal)`)
+        .select(`following_id, profiles!user_follows_following_id_fkey(id, display_name, username, bio, fitness_goal, avatar_url)`)
         .eq("follower_id", user.id);
 
       if (followData) {
@@ -184,7 +183,7 @@ export default function SocialPage() {
       const q = searchQuery.trim();
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, display_name, username, bio, fitness_goal")
+        .select("id, display_name, username, bio, fitness_goal, avatar_url")
         .eq("is_public", true)
         .neq("id", currentUserId ?? "")
         .or(`display_name.ilike.%${q}%,username.ilike.%${q}%`)
@@ -295,6 +294,12 @@ export default function SocialPage() {
       </section>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SocialTab)}>
+        {SOCIAL_FEED_ENABLED && (
+          <TabsContent value="feed" className="mt-0 space-y-2">
+            <ActivityFeed />
+          </TabsContent>
+        )}
+
         <TabsContent value="discover" className="mt-0 space-y-3">
           <Card className="border-border/70 bg-card/85">
             <CardContent className="pt-4">
@@ -423,36 +428,6 @@ export default function SocialPage() {
 
         <TabsContent value="pods" className="mt-0">
           <PodsTabContent onInviteUpdate={handleInviteUpdate} />
-        </TabsContent>
-
-        <TabsContent value="sets" className="mt-0">
-          <Card className="overflow-hidden border-border/70 bg-card/85">
-            <CardContent className="relative py-8">
-              <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/15 blur-3xl" />
-              <div className="relative flex flex-col items-center gap-4 text-center">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/15">
-                  <Video className="size-7 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold tracking-tight">Sets Feed</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Watch short training clips, track performance cues, and post your own hard sets.
-                  </p>
-                </div>
-                <div className="flex gap-3">
-                  <Link href="/sets">
-                    <Button className="motion-press gap-1.5">
-                      Open Sets
-                      <ArrowUpRight className="size-4" />
-                    </Button>
-                  </Link>
-                  <Link href="/sets/upload">
-                    <Button variant="outline" className="motion-press">Post a Set</Button>
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="profile" className="mt-0">

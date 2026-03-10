@@ -6,8 +6,19 @@ import { ArrowLeft, UserPlus, Target, MessageSquare, Trash2, LogOut, Plus, Troph
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { usePodDetail } from "@/hooks/use-pods";
 import { InviteMemberDialog } from "@/components/pods/invite-member-dialog";
 import { SetCommitmentDialog } from "@/components/pods/set-commitment-dialog";
@@ -15,6 +26,7 @@ import { SendMessageDialog } from "@/components/pods/send-message-dialog";
 import { CreateChallengeDialog } from "@/components/pods/create-challenge-dialog";
 import { PodLeaderboard } from "@/components/pods/pod-leaderboard";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 import { POD_CHALLENGES_ENABLED } from "@/lib/features";
 import type { PodChallenge } from "@/types/pods";
 
@@ -35,6 +47,7 @@ function ChallengesSection({ podId, currentUserId }: { podId: string; currentUse
   const [challenges, setChallenges] = useState<(PodChallenge & { is_active: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteChallengeId, setDeleteChallengeId] = useState<string | null>(null);
 
   const fetchChallenges = useCallback(async () => {
     setLoading(true);
@@ -56,11 +69,11 @@ function ChallengesSection({ podId, currentUserId }: { podId: string; currentUse
   }, [fetchChallenges]);
 
   async function handleDelete(challengeId: string) {
-    if (!confirm("Delete this challenge?")) return;
     const res = await fetch(`/api/pods/${podId}/challenges/${challengeId}`, { method: "DELETE" });
     if (res.ok) {
       setChallenges((prev) => prev.filter((c) => c.id !== challengeId));
     }
+    setDeleteChallengeId(null);
   }
 
   const activeChallenges = challenges.filter((c) => c.is_active);
@@ -119,7 +132,7 @@ function ChallengesSection({ podId, currentUserId }: { podId: string; currentUse
                     </Badge>
                     {currentUserId === challenge.created_by && (
                       <button
-                        onClick={() => handleDelete(challenge.id)}
+                        onClick={() => setDeleteChallengeId(challenge.id)}
                         className="text-muted-foreground/50 hover:text-destructive transition-colors text-xs"
                       >
                         ✕
@@ -148,7 +161,7 @@ function ChallengesSection({ podId, currentUserId }: { podId: string; currentUse
                         </span>
                         {currentUserId === challenge.created_by && (
                           <button
-                            onClick={() => handleDelete(challenge.id)}
+                            onClick={() => setDeleteChallengeId(challenge.id)}
                             className="text-muted-foreground/50 hover:text-destructive transition-colors text-xs"
                           >
                             ✕
@@ -170,6 +183,24 @@ function ChallengesSection({ podId, currentUserId }: { podId: string; currentUse
         onClose={() => setCreateOpen(false)}
         onCreated={fetchChallenges}
       />
+
+      <AlertDialog open={!!deleteChallengeId} onOpenChange={(o) => !o && setDeleteChallengeId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete challenge?</AlertDialogTitle>
+            <AlertDialogDescription>This will remove the challenge and all its data.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteChallengeId && handleDelete(deleteChallengeId)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -184,6 +215,8 @@ export default function PodDetailPage({ params }: PageProps) {
   const [commitmentOpen, setCommitmentOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<string | null>(null);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
@@ -195,13 +228,11 @@ export default function PodDetailPage({ params }: PageProps) {
   const currentUserProgress = pod?.members_progress.find((m) => m.user_id === currentUserId);
 
   async function handleLeave() {
-    if (!confirm("Are you sure you want to leave this pod?")) return;
     const success = await leavePod();
     if (success) router.push("/pods");
   }
 
   async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this pod? This cannot be undone.")) return;
     const success = await deletePod(podId);
     if (success) router.push("/pods");
   }
@@ -216,8 +247,8 @@ export default function PodDetailPage({ params }: PageProps) {
     }
   }
 
-  async function handleSetCommitment(workouts: number) {
-    const success = await setCommitment(workouts);
+  async function handleSetCommitment(workouts: number, plannedDays?: string[]) {
+    const success = await setCommitment(workouts, plannedDays);
     if (success) setCommitmentOpen(false);
   }
 
@@ -265,11 +296,11 @@ export default function PodDetailPage({ params }: PageProps) {
         </Button>
         <div className="flex items-center gap-2">
           {isCreator ? (
-            <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive">
+            <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)} className="text-destructive">
               <Trash2 className="h-4 w-4" />
             </Button>
           ) : (
-            <Button variant="ghost" size="sm" onClick={handleLeave}>
+            <Button variant="ghost" size="sm" onClick={() => setLeaveConfirmOpen(true)}>
               <LogOut className="h-4 w-4 mr-2" />
               Leave
             </Button>
@@ -313,53 +344,83 @@ export default function PodDetailPage({ params }: PageProps) {
 
       {/* Member Progress */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground">This Week&apos;s Progress</h2>
+        <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">This Week&apos;s Progress</h2>
         {pod.members_progress.map((member) => {
           const isCurrentUser = member.user_id === currentUserId;
+          const dayLabels: Record<string, string> = { mon: "M", tue: "T", wed: "W", thu: "T", fri: "F", sat: "S", sun: "S" };
+          const allDays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
           return (
-            <Card key={member.user_id} className={isCurrentUser ? "border-primary" : ""}>
+            <Card key={member.user_id} className={isCurrentUser ? "border-primary/40" : ""}>
               <CardContent className="pt-4 space-y-3">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar className="size-8 shrink-0">
+                      {member.avatar_url && (
+                        <AvatarImage src={member.avatar_url} alt={member.display_name || "User"} />
+                      )}
+                      <AvatarFallback className="text-xs font-semibold bg-primary/15 text-primary">
+                        {(member.display_name || member.username || "U").slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                    <p className="text-[13px] font-bold text-foreground">
                       {member.display_name || member.username || "Unknown"}
-                      {isCurrentUser && <span className="text-xs text-muted-foreground ml-2">(You)</span>}
+                      {isCurrentUser && <span className="text-[10px] font-medium text-muted-foreground ml-1.5">(You)</span>}
                     </p>
                     {member.commitment > 0 ? (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {member.completed} / {member.commitment} workouts
                       </p>
                     ) : (
-                      <p className="text-sm text-muted-foreground italic">No goal set yet</p>
+                      <p className="text-xs text-muted-foreground/50 italic mt-0.5">No goal set yet</p>
                     )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {member.streak > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        <Flame className="inline h-3 w-3" /> {member.streak} week{member.streak !== 1 ? "s" : ""}
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
+                        <Flame className="inline h-3 w-3" /> {member.streak}wk
                       </Badge>
                     )}
                     {!isCurrentUser && (
                       <Button
-                        size="sm"
+                        size="icon-xs"
                         variant="ghost"
                         onClick={() => {
                           setSelectedRecipient(member.user_id);
                           setMessageOpen(true);
                         }}
                       >
-                        <MessageSquare className="h-4 w-4" />
+                        <MessageSquare className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
                 </div>
+                {/* Day dots */}
+                {member.planned_days && member.planned_days.length > 0 && (
+                  <div className="flex gap-1">
+                    {allDays.map((d) => (
+                      <div
+                        key={d}
+                        className={cn(
+                          "flex h-6 w-6 items-center justify-center rounded-md text-[9px] font-bold",
+                          member.planned_days.includes(d)
+                            ? "bg-primary/15 text-primary border border-primary/30"
+                            : "bg-card/20 text-muted-foreground/30 border border-transparent"
+                        )}
+                      >
+                        {dayLabels[d]}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {member.commitment > 0 && (
                   <div className="space-y-1">
                     <Progress
                       value={member.progress_percentage}
                       className={member.is_on_track ? "[&>div]:bg-green-500" : ""}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] text-muted-foreground">
                       {member.is_on_track ? <span className="inline-flex items-center gap-1">On track <Dumbbell className="inline h-3 w-3" /></span> : `${member.commitment - member.completed} to go`}
                     </p>
                   </div>
@@ -381,18 +442,18 @@ export default function PodDetailPage({ params }: PageProps) {
       {/* Recent Messages */}
       {pod.recent_messages.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground">Recent Messages</h2>
+          <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Recent Messages</h2>
           <div className="space-y-2">
             {pod.recent_messages.map((msg) => (
               <Card key={msg.id}>
                 <CardContent className="pt-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
                       {(msg.sender_name || "?")[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2">
-                        <p className="text-sm font-semibold">{msg.sender_name}</p>
+                        <p className="text-[13px] font-bold">{msg.sender_name}</p>
                         {msg.recipient_id && (
                           <span className="text-xs text-muted-foreground">
                             → {msg.recipient_name}
@@ -426,6 +487,7 @@ export default function PodDetailPage({ params }: PageProps) {
         onClose={() => setCommitmentOpen(false)}
         onSetCommitment={handleSetCommitment}
         currentCommitment={currentUserProgress?.commitment}
+        currentPlannedDays={currentUserProgress?.planned_days}
       />
 
       <SendMessageDialog
@@ -438,6 +500,37 @@ export default function PodDetailPage({ params }: PageProps) {
         members={pod.members}
         recipientId={selectedRecipient}
       />
+
+      <AlertDialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave this pod?</AlertDialogTitle>
+            <AlertDialogDescription>You can rejoin by invite if you change your mind.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLeave}>Leave</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this pod?</AlertDialogTitle>
+            <AlertDialogDescription>This permanently deletes the pod, all members, messages, and challenges. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

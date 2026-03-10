@@ -133,7 +133,7 @@ export async function clearExpiredCache(): Promise<void> {
           deletedCount++;
           cursor.continue();
         } else {
-          console.log(`[Launcher Cache] Cleared ${deletedCount} expired entries`);
+          logger.log(`[Launcher Cache] Cleared ${deletedCount} expired entries`);
           resolve();
         }
       };

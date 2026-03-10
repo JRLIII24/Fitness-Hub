@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Clock, Dumbbell, TrendingUp, X, Star, Zap, Ghost, Flame } from "lucide-react";
+import { Trophy, Clock, Dumbbell, TrendingUp, X, Star, Zap, Ghost, Flame, Share2, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { WorkoutRecapCard } from "./workout-recap-card";
+import type { WorkoutRecap } from "./workout-recap-card";
+import { WorkoutShareCard } from "./workout-share-card";
 
 export interface WorkoutStats {
   duration: string; // e.g., "1h 23m"
@@ -31,14 +35,80 @@ interface WorkoutCompleteCelebrationProps {
   stats: WorkoutStats;
   onClose: () => void;
   confettiStyle?: "gold" | "regular" | "auto";
+  recapData?: WorkoutRecap | null;
+  recapLoading?: boolean;
+  workoutName?: string;
 }
 
 export function WorkoutCompleteCelebration({
   stats,
   onClose,
   confettiStyle = "auto",
+  recapData,
+  recapLoading,
+  workoutName,
 }: WorkoutCompleteCelebrationProps) {
   const [showStats, setShowStats] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const shareCardRef = useRef<HTMLDivElement>(null);
+
+  const handleShare = useCallback(async () => {
+    if (!shareCardRef.current || isSharing) return;
+    setIsSharing(true);
+
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(shareCardRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: null,
+        logging: false,
+      });
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/png", 1.0)
+      );
+
+      if (!blob) {
+        toast.error("Failed to generate share image");
+        return;
+      }
+
+      // Try native Web Share API with files support
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.share &&
+        navigator.canShare?.({
+          files: [new File([blob], "workout.png", { type: "image/png" })],
+        })
+      ) {
+        const file = new File([blob], "fit-hub-workout.png", { type: "image/png" });
+        await navigator.share({
+          title: "My Workout Summary",
+          text: `Just crushed a workout! ${stats.totalVolume.toLocaleString()} ${stats.unitLabel} total volume.`,
+          files: [file],
+        });
+      } else {
+        // Fallback: download the image
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "fit-hub-workout.png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("Workout image saved!");
+      }
+    } catch (err) {
+      // User cancelled share dialog — not an error
+      if (err instanceof Error && err.name === "AbortError") return;
+      console.error("Share failed:", err);
+      toast.error("Could not share workout");
+    } finally {
+      setIsSharing(false);
+    }
+  }, [isSharing, stats.totalVolume, stats.unitLabel]);
   const recapItems = stats.exercises
     .map((exercise) => ({
       name: exercise.name,
@@ -289,6 +359,11 @@ export function WorkoutCompleteCelebration({
                 </div>
               </div>
 
+              {/* AI Recap */}
+              {(recapData || recapLoading) && (
+                <WorkoutRecapCard recap={recapData ?? null} loading={recapLoading ?? false} />
+              )}
+
               {/* PR Badge */}
               {stats.prCount > 0 && (
                 <motion.div
@@ -325,16 +400,30 @@ export function WorkoutCompleteCelebration({
                 </motion.div>
               )}
 
-              {/* Continue Button */}
+              {/* Action Buttons */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 1.0 }}
-                className="relative mt-6"
+                className="relative mt-6 flex gap-3"
               >
                 <Button
+                  variant="outline"
+                  size="lg"
+                  className="motion-press rounded-xl"
+                  onClick={handleShare}
+                  disabled={isSharing}
+                >
+                  {isSharing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Share2 className="h-4 w-4" />
+                  )}
+                  <span className="ml-2">{isSharing ? "Sharing..." : "Share"}</span>
+                </Button>
+                <Button
                   onClick={onClose}
-                  className="motion-press w-full rounded-xl"
+                  className="motion-press flex-1 rounded-xl"
                   size="lg"
                 >
                   Continue Training
@@ -344,6 +433,20 @@ export function WorkoutCompleteCelebration({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Hidden share card — rendered off-screen for html2canvas capture */}
+      <div
+        aria-hidden
+        style={{
+          position: "fixed",
+          left: "-9999px",
+          top: 0,
+          pointerEvents: "none",
+          zIndex: -1,
+        }}
+      >
+        <WorkoutShareCard ref={shareCardRef} stats={stats} workoutName={workoutName} />
+      </div>
     </div>
   );
 }

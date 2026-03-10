@@ -38,7 +38,7 @@ export function useExerciseTrendlines(
 
     async function fetch() {
       const { data, error } = await supabase.rpc("get_exercise_trendlines", {
-        p_user_id: userId,
+        p_user_id: userId!,
         p_exercise_ids: exerciseIds,
       });
 

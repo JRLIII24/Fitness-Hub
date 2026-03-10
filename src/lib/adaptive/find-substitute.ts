@@ -64,12 +64,12 @@ export async function findSubstitute(
     let query = supabase
       .from('exercises')
       .select('id, name, muscle_group, equipment')
-      .in('muscle_group', safeAlternatives)
+      .in('muscle_group', safeAlternatives as any)
       .eq('is_custom', false)
       .limit(5);
 
     if (equipment) {
-      query = query.eq('equipment', equipment);
+      query = query.eq('equipment', equipment as any);
     }
 
     const { data: candidates } = await query;

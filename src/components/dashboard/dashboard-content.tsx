@@ -29,6 +29,7 @@ import { PodsDashboardCard } from "@/components/pods/pods-dashboard-card";
 import { XpProgressBar } from "@/components/profile/xp-progress-bar";
 import { WeightLogWidget } from "@/components/dashboard/weight-log-widget";
 import { MuscleRecoveryCard } from "@/components/dashboard/muscle-recovery-card";
+import { ReadinessScoreCard } from "@/components/dashboard/readiness-score-card";
 import { WeeklyReviewModal } from "@/components/dashboard/weekly-review-modal";
 
 import { StatPill } from "@/components/dashboard/stat-pill";
@@ -362,6 +363,7 @@ export function DashboardContent({
     launcher: <SmartLauncherWidget key="launcher" />,
     fatigue: <FatigueLevelCard key="fatigue" initialSnapshot={fatigueSnapshot} />,
     muscleRecovery: <MuscleRecoveryCard key="muscleRecovery" />,
+    recovery: <ReadinessScoreCard key="recovery" />,
     weight: <WeightLogWidget key="weight" />,
     ninetyDay: ninetyDayCard,
     nutrition: nutritionCard,

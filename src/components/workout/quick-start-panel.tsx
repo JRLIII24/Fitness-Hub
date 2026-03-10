@@ -68,7 +68,7 @@ export function QuickStartPanel({
                 key={preset.id}
                 type="button"
                 onClick={() => onPresetChange(preset.id)}
-                className={`rounded-xl border px-3 py-2 text-left transition ${active
+                className={`rounded-xl border px-3 py-2.5 text-left transition ${active
                   ? "border-primary/40 bg-primary/10"
                   : "border-border/70 bg-card/70 hover:bg-card"
                   }`}
@@ -86,20 +86,18 @@ export function QuickStartPanel({
                     {preset.category}
                   </span>
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[10px] italic text-muted-foreground/70 leading-tight mb-1">
+                  {preset.label}
+                </p>
+                <p className="text-[10px] text-muted-foreground mb-1">
                   {preset.liftNames.length} exercises
                 </p>
-                <div className="mt-1.5 space-y-0.5">
-                  {preset.liftNames.slice(0, 2).map((lift) => (
+                <div className="space-y-0.5">
+                  {preset.liftNames.map((lift) => (
                     <p key={lift} className="truncate text-[10px] text-muted-foreground/90">
                       {"\u2022"} {lift}
                     </p>
                   ))}
-                  {preset.liftNames.length > 2 ? (
-                    <p className="text-[10px] text-muted-foreground/80">
-                      +{preset.liftNames.length - 2} more
-                    </p>
-                  ) : null}
                 </div>
               </button>
             );

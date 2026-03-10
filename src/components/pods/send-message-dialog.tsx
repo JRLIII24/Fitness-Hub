@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, MessageSquare } from "lucide-react";
 import {
   Dialog,
@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -19,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface Member {
   user_id: string;
@@ -53,6 +53,12 @@ export function SendMessageDialog({
   const [selectedRecipient, setSelectedRecipient] = useState<string>(recipientId || "all");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (open && recipientId) {
+      setSelectedRecipient(recipientId);
+    }
+  }, [open, recipientId]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (message.trim().length === 0) return;
@@ -66,29 +72,27 @@ export function SendMessageDialog({
     setMessage("");
   }
 
-  function handlePresetClick(preset: string) {
-    setMessage(preset);
-  }
-
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 mb-1">
             <MessageSquare className="h-5 w-5 text-primary" />
-            Send Encouragement
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          </div>
+          <DialogTitle className="text-center text-lg">Send Encouragement</DialogTitle>
+          <p className="text-sm text-muted-foreground text-center">
             Motivate your pod members
           </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Recipient Selector */}
-          <div className="space-y-2">
-            <Label htmlFor="recipient">Send to</Label>
+          {/* Recipient */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Send to
+            </label>
             <Select value={selectedRecipient} onValueChange={setSelectedRecipient}>
-              <SelectTrigger id="recipient">
+              <SelectTrigger className="bg-card/30 border-border/40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -102,37 +106,45 @@ export function SendMessageDialog({
             </Select>
           </div>
 
-          {/* Preset Messages */}
-          <div className="space-y-2">
-            <Label>Quick messages</Label>
-            <div className="flex flex-wrap gap-2">
+          {/* Quick messages */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Quick messages
+            </label>
+            <div className="flex flex-wrap gap-1.5">
               {PRESET_MESSAGES.map((preset) => (
-                <Button
+                <button
                   key={preset}
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePresetClick(preset)}
+                  onClick={() => setMessage(preset)}
+                  className={cn(
+                    "rounded-xl border px-3 py-1.5 text-xs font-medium transition-all duration-200 active:scale-95",
+                    message === preset
+                      ? "border-primary/40 bg-primary/15 text-primary"
+                      : "border-border/40 bg-card/30 text-muted-foreground hover:border-border/60"
+                  )}
                 >
                   {preset}
-                </Button>
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Custom Message */}
-          <div className="space-y-2">
-            <Label htmlFor="message">Message</Label>
+          {/* Custom message */}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Message
+            </label>
             <Textarea
-              id="message"
               placeholder="Write a custom message..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               maxLength={280}
               rows={3}
+              className="bg-card/30 border-border/40 resize-none"
             />
-            <p className="text-xs text-muted-foreground">
-              {message.length}/280 characters
+            <p className="text-[10px] text-muted-foreground tabular-nums text-right">
+              {message.length}/280
             </p>
           </div>
 

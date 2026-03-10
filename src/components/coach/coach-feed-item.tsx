@@ -14,10 +14,13 @@ import {
   Zap,
   ChevronRight,
 } from "lucide-react";
-import type { CoachMessage, AutoregulationPrescription } from "@/lib/coach/types";
+import type { CoachMessage, AutoregulationPrescription, PendingAction } from "@/lib/coach/types";
 import { isMutationAction } from "@/lib/coach/types";
 import { PrescriptionCard } from "./prescription-card";
 import { ExerciseHistoryCard } from "./exercise-history-card";
+import { MealSuggestionCard } from "./meal-suggestion-card";
+import { MacroBreakdownCard } from "./macro-breakdown-card";
+import { ActionConfirmationCard } from "./action-confirmation-card";
 
 // ── Typewriter hook ─────────────────────────────────────────────────────────
 
@@ -143,15 +146,24 @@ interface CoachFeedItemProps {
   isLatest: boolean;
   index: number;
   totalCount: number;
+  onConfirmAction?: (msgId: string, pending: PendingAction) => void;
+  onDismissAction?: (msgId: string) => void;
+  isConfirming?: boolean;
 }
 
-export function CoachFeedItem({ message, isLatest, index, totalCount }: CoachFeedItemProps) {
+export function CoachFeedItem({ message, isLatest, index, totalCount, onConfirmAction, onDismissAction, isConfirming }: CoachFeedItemProps) {
   const isUser = message.role === "user";
   const hasMutation = message.action ? isMutationAction(message.action) : false;
+  // When streaming, text arrives progressively — skip typewriter and render directly.
+  // Only use typewriter for non-streaming assistant messages (e.g. from history).
+  const isStreaming = message.isStreaming === true;
   const { displayed, done } = useTypewriter(
     message.content,
-    !isUser && isLatest,
+    !isUser && isLatest && !isStreaming,
   );
+  // For streaming messages, show content directly and treat as "not done" while streaming
+  const shownText = isStreaming ? message.content : displayed;
+  const isComplete = isStreaming ? !isStreaming : done;
 
   // Fade older messages
   const fadeSteps = totalCount - 1 - index; // 0 = latest, 1 = second latest, etc.
@@ -210,7 +222,7 @@ export function CoachFeedItem({ message, isLatest, index, totalCount }: CoachFee
       animate={{ opacity }}
       transition={{ duration: 0.25 }}
       style={{
-        ...(isLatest && !done ? { animation: "hud-execute-flash 0.4s ease-out" } : {}),
+        ...(isLatest && !isComplete ? { animation: "hud-execute-flash 0.4s ease-out" } : {}),
         background: `linear-gradient(135deg, ${T.glassElevated}, ${T.glassCard})`,
         border: `1px solid ${T.glassBorder}`,
         backdropFilter: "blur(24px)",
@@ -222,7 +234,7 @@ export function CoachFeedItem({ message, isLatest, index, totalCount }: CoachFee
       }}
     >
       {/* Scan-line overlay on latest while typing */}
-      {isLatest && !done && (
+      {isLatest && !isComplete && (
         <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg">
           <div
             className="absolute inset-0 h-full w-1/3"
@@ -277,19 +289,19 @@ export function CoachFeedItem({ message, isLatest, index, totalCount }: CoachFee
 
       {/* Response text */}
       <p className="text-[12px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
-        {displayed}
-        {!done && (
+        {shownText}
+        {!isComplete && (
           <span className="inline-block w-[5px] h-[13px] bg-primary/60 ml-0.5 animate-pulse" />
         )}
       </p>
 
       {/* Inline action data */}
-      {hasMutation && message.action && done && (
+      {hasMutation && message.action && isComplete && (
         <ActionDataGrid action={message.action} data={message.data} />
       )}
 
       {/* Display action cards */}
-      {message.action === "show_prescription" && !!message.data?.prescription && done && (
+      {message.action === "show_prescription" && !!message.data?.prescription && isComplete && (
         <div className="mt-2.5">
           <PrescriptionCard
             prescription={message.data.prescription as AutoregulationPrescription}
@@ -297,7 +309,19 @@ export function CoachFeedItem({ message, isLatest, index, totalCount }: CoachFee
         </div>
       )}
 
-      {message.action === "show_exercise_history" && !!message.data?.exercise_history && done && (
+      {message.action === "show_meal_suggestion" && isComplete && (
+        <div className="mt-2.5">
+          <MealSuggestionCard data={message.data} />
+        </div>
+      )}
+
+      {message.action === "show_macro_breakdown" && isComplete && (
+        <div className="mt-2.5">
+          <MacroBreakdownCard data={message.data} />
+        </div>
+      )}
+
+      {message.action === "show_exercise_history" && !!message.data?.exercise_history && isComplete && (
         <div className="mt-2.5">
           <ExerciseHistoryCard
             data={
@@ -310,6 +334,34 @@ export function CoachFeedItem({ message, isLatest, index, totalCount }: CoachFee
               }
             }
           />
+        </div>
+      )}
+
+      {/* Pending action confirmation */}
+      {message.pendingAction && !message.dismissed && !message.actionResult && isComplete && (
+        <ActionConfirmationCard
+          pending={message.pendingAction}
+          onAccept={() => onConfirmAction?.(message.id, message.pendingAction!)}
+          onDismiss={() => onDismissAction?.(message.id)}
+          isExecuting={isConfirming}
+        />
+      )}
+
+      {/* Dismissed badge */}
+      {message.dismissed && (
+        <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 800,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: T.text2,
+              opacity: 0.5,
+            }}
+          >
+            Action dismissed
+          </span>
         </div>
       )}
 

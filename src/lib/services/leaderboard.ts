@@ -24,7 +24,7 @@ export const getLeaderboardRankings = unstable_cache(
 
         // Call the PostgreSQL function get_challenge_leaderboards 
         // This assumes `get_challenge_leaderboards` function exists in DB
-        const { data: leaderboards, error } = await supabase
+        const { data: leaderboards, error } = await (supabase as any)
             .rpc('get_challenge_leaderboards', { p_pod_id: podId });
 
         if (error) {

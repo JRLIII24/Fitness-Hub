@@ -16,6 +16,7 @@ import {
   Share2,
   BookmarkPlus,
   MoreHorizontal,
+  CalendarDays,
 } from "lucide-react";
 import { addDays, subDays, format } from "date-fns";
 import { toast } from "sonner";
@@ -29,7 +30,7 @@ import {
 import { FoodLogCard } from "@/components/nutrition/food-log-card";
 import { MealTemplateSheet } from "@/components/nutrition/meal-template-sheet";
 import { Camera, Utensils, ShoppingCart } from "lucide-react";
-import { MENU_SCANNER_ENABLED, FOOD_SCANNER_ENABLED, GROCERY_GENERATOR_ENABLED } from "@/lib/features";
+import { MENU_SCANNER_ENABLED, FOOD_SCANNER_ENABLED, GROCERY_GENERATOR_ENABLED, MEAL_PLANNING_ENABLED } from "@/lib/features";
 import { SendMealDialog } from "@/components/social/send-meal-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { MacroRing } from "@/components/ui/macro-ring";
@@ -320,7 +321,7 @@ export default function NutritionPage() {
       const { error } = await supabase
         .from("food_log")
         .update({
-          meal_type: updates.meal_type,
+          meal_type: updates.meal_type as "breakfast" | "lunch" | "dinner" | "snack",
           servings: updates.servings,
           calories_consumed: nextNutrition.calories,
           protein_g: nextNutrition.protein,
@@ -447,11 +448,13 @@ export default function NutritionPage() {
 
   const handleLoadTemplate = async (items: MealTemplateItem[]) => {
     if (!currentUserId) return;
+    const userId = currentUserId;
     const now = new Date();
     try {
       for (const item of items) {
+        if (!item.food_item_id) continue;
         const { error } = await supabase.from("food_log").insert({
-          user_id: currentUserId,
+          user_id: userId,
           food_item_id: item.food_item_id,
           meal_type: "snack",
           servings: item.servings,
@@ -524,6 +527,14 @@ export default function NutritionPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {MEAL_PLANNING_ENABLED && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/nutrition/meal-plan">
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                          Meal Plan
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => setMealSheetOpen(true)}>
                       <BookmarkPlus className="mr-2 h-4 w-4" />
                       Saved meals

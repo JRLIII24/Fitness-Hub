@@ -5,9 +5,8 @@
  * Photograph a restaurant menu → top 3 meal recommendations
  * based on remaining daily macros.
  *
- * Model: Sonnet (vision)
+ * Model: Sonnet (vision — menu analysis + macro matching)
  * Runtime: nodejs (NOT edge — Vercel edge has 4MB body limit)
- * Rate limit: 10/day
  */
 
 export const runtime = "nodejs";
@@ -15,13 +14,9 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
-import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import {
-  getAnthropicClient,
-  ANTHROPIC_SONNET,
-} from "@/lib/anthropic-client";
-import { callAnthropicWithTool } from "@/lib/anthropic-helper";
+import { generateObject } from "ai";
+import { getAnthropicProvider, SONNET } from "@/lib/ai-sdk";
 import { MENU_SCAN_PROMPT } from "@/lib/ai-prompts/vision";
 import {
   MenuScanResultSchema,
@@ -29,41 +24,7 @@ import {
 } from "@/lib/menu-scanner/types";
 import { getUserTimezone } from "@/lib/timezone";
 
-const DAILY_LIMIT = 10;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB
-
-const TOOL_SCHEMA = {
-  type: "object" as const,
-  properties: {
-    top_3_recommendations: {
-      type: "array",
-      maxItems: 5,
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          reason: { type: "string" },
-          estimated_calories: { type: "number" },
-          estimated_protein_g: { type: "number" },
-          estimated_carbs_g: { type: "number" },
-          estimated_fat_g: { type: "number" },
-          modification_tip: { type: "string" },
-        },
-        required: [
-          "name",
-          "reason",
-          "estimated_calories",
-          "estimated_protein_g",
-          "estimated_carbs_g",
-          "estimated_fat_g",
-        ],
-      },
-    },
-    overall_tip: { type: "string" },
-  },
-  required: ["top_3_recommendations", "overall_tip"],
-};
 
 function getImageMediaType(
   image: string,
@@ -80,23 +41,14 @@ function extractBase64Data(image: string): string {
 
 export async function POST(request: Request) {
   try {
-    const client = getAnthropicClient();
-    if (!client) {
+    const provider = getAnthropicProvider();
+    if (!provider) {
       return NextResponse.json({ error: "AI unavailable" }, { status: 503 });
     }
 
     const supabase = await createClient();
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
-
-    const allowed = await rateLimit(
-      `ai:menu-scan:${user.id}`,
-      DAILY_LIMIT,
-      ONE_DAY_MS,
-    );
-    if (!allowed) {
-      return NextResponse.json({ limitReached: true }, { status: 429 });
-    }
 
     const body = await request.json();
     const image: string | undefined = body?.image;
@@ -131,7 +83,7 @@ export async function POST(request: Request) {
       }),
       supabase
         .from("nutrition_goals")
-        .select("calories, protein_g, carbs_g, fat_g")
+        .select("calories_target, protein_g_target, carbs_g_target, fat_g_target")
         .eq("user_id", user.id)
         .single(),
     ]);
@@ -143,20 +95,20 @@ export async function POST(request: Request) {
       total_fat_g: 0,
     };
     const goals = goalsResult.data ?? {
-      calories: 2000,
-      protein_g: 150,
-      carbs_g: 250,
-      fat_g: 65,
+      calories_target: 2000,
+      protein_g_target: 150,
+      carbs_g_target: 250,
+      fat_g_target: 65,
     };
 
     const remaining = {
-      calories: Math.max(0, goals.calories - (consumed.total_calories ?? 0)),
+      calories: Math.max(0, (goals.calories_target ?? 2000) - (consumed.total_calories ?? 0)),
       protein_g: Math.max(
         0,
-        goals.protein_g - (consumed.total_protein_g ?? 0),
+        (goals.protein_g_target ?? 150) - (consumed.total_protein_g ?? 0),
       ),
-      carbs_g: Math.max(0, goals.carbs_g - (consumed.total_carbs_g ?? 0)),
-      fat_g: Math.max(0, goals.fat_g - (consumed.total_fat_g ?? 0)),
+      carbs_g: Math.max(0, (goals.carbs_g_target ?? 250) - (consumed.total_carbs_g ?? 0)),
+      fat_g: Math.max(0, (goals.fat_g_target ?? 65) - (consumed.total_fat_g ?? 0)),
     };
 
     const systemPrompt = MENU_SCAN_PROMPT.replace(
@@ -166,21 +118,17 @@ export async function POST(request: Request) {
 
     const mediaType = getImageMediaType(image);
 
-    const result = await callAnthropicWithTool<MenuScanResult>({
-      client,
-      model: ANTHROPIC_SONNET,
-      systemPrompt,
+    const { object } = await generateObject({
+      model: provider(SONNET),
+      schema: MenuScanResultSchema,
+      system: systemPrompt,
       messages: [
         {
           role: "user",
           content: [
             {
               type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType,
-                data: base64Data,
-              },
+              image: `data:${mediaType};base64,${base64Data}`,
             },
             {
               type: "text",
@@ -189,22 +137,10 @@ export async function POST(request: Request) {
           ],
         },
       ],
-      toolName: "menu_recommendations",
-      toolDescription:
-        "Provide menu recommendations based on nutritional analysis",
-      toolSchema: TOOL_SCHEMA,
-      zodSchema: MenuScanResultSchema,
-      maxTokens: 2048,
+      maxOutputTokens: 2048,
     });
 
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status },
-      );
-    }
-
-    return NextResponse.json(result.data);
+    return NextResponse.json(object);
   } catch (error) {
     logger.error("Menu scan API error:", error);
     return NextResponse.json(

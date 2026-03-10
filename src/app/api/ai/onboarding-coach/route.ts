@@ -15,12 +15,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import {
-  getAnthropicClient,
-  ANTHROPIC_HAIKU,
-} from "@/lib/anthropic-client";
-import { callAnthropicWithTool } from "@/lib/anthropic-helper";
+import { generateObject } from "ai";
+import { getAnthropicProvider, HAIKU } from "@/lib/ai-sdk";
 import { ONBOARDING_SYSTEM_PROMPT } from "@/lib/ai-prompts/onboarding";
+import { kgToLbs } from "@/lib/units";
 
 const DAILY_LIMIT = 10;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -41,61 +39,12 @@ const PlanDataSchema = z.object({
 });
 
 const OnboardingCoachResponseSchema = z.object({
-  reply: z.string().max(2000),
+  reply: z.string(),
   action: z.enum(["ask_question", "generate_plan"]),
   plan_data: PlanDataSchema.optional().nullable(),
 });
 
 type OnboardingCoachResponse = z.infer<typeof OnboardingCoachResponseSchema>;
-
-const TOOL_SCHEMA = {
-  type: "object" as const,
-  properties: {
-    reply: {
-      type: "string",
-      maxLength: 2000,
-      description: "Your conversational reply to the user.",
-    },
-    action: {
-      type: "string",
-      enum: ["ask_question", "generate_plan"],
-      description:
-        "ask_question = continue conversation, generate_plan = return final nutrition plan with plan_data.",
-    },
-    plan_data: {
-      type: "object",
-      nullable: true,
-      description:
-        "Required when action is generate_plan. Contains the calculated nutrition targets.",
-      properties: {
-        calories: { type: "number", description: "Daily calorie target" },
-        protein_g: { type: "number", description: "Daily protein in grams" },
-        carbs_g: { type: "number", description: "Daily carbs in grams" },
-        fat_g: { type: "number", description: "Daily fat in grams" },
-        fiber_g: { type: "number", description: "Daily fiber in grams" },
-        fitness_goal: {
-          type: "string",
-          enum: ["build_muscle", "lose_weight", "maintain", "improve_endurance"],
-          description: "The user's chosen fitness goal",
-        },
-        rationale: {
-          type: "string",
-          description: "Brief explanation of the calculation approach",
-        },
-      },
-      required: [
-        "calories",
-        "protein_g",
-        "carbs_g",
-        "fat_g",
-        "fiber_g",
-        "fitness_goal",
-        "rationale",
-      ],
-    },
-  },
-  required: ["reply", "action"],
-};
 
 interface OnboardingCoachRequest {
   message: string;
@@ -113,8 +62,8 @@ interface OnboardingCoachRequest {
 
 export async function POST(request: Request) {
   try {
-    const client = getAnthropicClient();
-    if (!client) {
+    const provider = getAnthropicProvider();
+    if (!provider) {
       return NextResponse.json({ error: "AI unavailable" }, { status: 503 });
     }
 
@@ -145,11 +94,11 @@ export async function POST(request: Request) {
       ? (() => {
           const isImperial = s.unit_preference === 'imperial';
           const weightDisplay = isImperial
-            ? `${Math.round(s.weight_kg * 2.20462)} lb`
+            ? `${Math.round(kgToLbs(s.weight_kg))} lb`
             : `${s.weight_kg} kg`;
           const goalDisplay = s.goal_weight_kg != null
             ? isImperial
-              ? `${Math.round(s.goal_weight_kg * 2.20462)} lb`
+              ? `${Math.round(kgToLbs(s.goal_weight_kg))} lb`
               : `${s.goal_weight_kg} kg`
             : 'not set';
           const heightDisplay = isImperial
@@ -170,27 +119,15 @@ export async function POST(request: Request) {
       },
     ];
 
-    const result = await callAnthropicWithTool<OnboardingCoachResponse>({
-      client,
-      model: ANTHROPIC_HAIKU,
-      systemPrompt: ONBOARDING_SYSTEM_PROMPT,
+    const { object } = await generateObject({
+      model: provider(HAIKU),
+      schema: OnboardingCoachResponseSchema,
+      system: ONBOARDING_SYSTEM_PROMPT,
       messages,
-      toolName: "onboarding_response",
-      toolDescription:
-        "Respond to the user during onboarding. Use ask_question to continue the conversation, or generate_plan to finalize their nutrition plan with calculated targets.",
-      toolSchema: TOOL_SCHEMA,
-      zodSchema: OnboardingCoachResponseSchema,
-      maxTokens: 1024,
+      maxOutputTokens: 1024,
     });
 
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status },
-      );
-    }
-
-    return NextResponse.json(result.data);
+    return NextResponse.json(object);
   } catch (error) {
     logger.error("Onboarding coach API error:", error);
     return NextResponse.json(

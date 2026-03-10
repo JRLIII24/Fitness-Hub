@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { TrainingAnalytics } from "@/components/analytics/training-analytics";
 import {
   BarChart3,
   TrendingUp,
@@ -156,10 +157,23 @@ export default async function AnalyticsPage() {
     <div className="mx-auto w-full max-w-4xl space-y-5 px-4 pb-28 pt-6 md:px-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-          Launcher Analytics
+          Analytics
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Performance metrics for your Smart Workout Launcher
+          Training insights, body trends, and launcher performance
+        </p>
+      </div>
+
+      {/* Training Analytics — Volume, Muscle Balance, Body Composition */}
+      <TrainingAnalytics />
+
+      {/* Launcher Analytics Section Header */}
+      <div className="pt-2">
+        <h2 className="text-[13px] font-bold text-foreground">
+          Smart Launcher
+        </h2>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          Suggestion accuracy and pattern detection
         </p>
       </div>
 

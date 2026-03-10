@@ -34,12 +34,13 @@ export default function NutritionScanPage() {
   useEffect(() => {
     if (!quickFoodId) return;
     if (selectedFood?.id === quickFoodId) return;
+    const foodId = quickFoodId;
 
     async function loadQuickFood() {
       const { data, error } = await supabase
         .from("food_items")
         .select("*")
-        .eq("id", quickFoodId)
+        .eq("id", foodId)
         .maybeSingle();
 
       if (error || !data) return;

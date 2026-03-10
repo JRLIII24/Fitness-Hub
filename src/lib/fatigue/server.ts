@@ -158,14 +158,14 @@ export async function computeAndCacheFatigueSnapshot(
   for (const rows of lifts.values()) {
     const topSet = rows
       .filter((r) => r.reps != null && r.weight_kg != null)
-      .sort((a, b) => e1rm(b.weight_kg, b.reps) - e1rm(a.weight_kg, a.reps))[0];
+      .sort((a, b) => e1rm(b.weight_kg!, b.reps!) - e1rm(a.weight_kg!, a.reps!))[0];
 
     if (!topSet) continue;
 
-    const topSetDate = new Date(topSet.completed_at).getTime();
+    const topSetDate = new Date(topSet.completed_at!).getTime();
     const baselineStart = topSetDate - 14 * 86400000;
     const baselineCandidates = rows.filter((r) => {
-      const t = new Date(r.completed_at).getTime();
+      const t = new Date(r.completed_at!).getTime();
       return t < topSetDate && t >= baselineStart;
     });
 
@@ -176,7 +176,7 @@ export async function computeAndCacheFatigueSnapshot(
     const baselineMedian = median(baselineE1rms);
     if (!baselineMedian || baselineMedian <= 0) continue;
 
-    const topE1rm = e1rm(topSet.weight_kg, topSet.reps);
+    const topE1rm = e1rm(topSet.weight_kg!, topSet.reps!);
     const delta = (topE1rm - baselineMedian) / baselineMedian;
 
     const baselineWithEffort = baselineCandidates.find(
@@ -293,7 +293,7 @@ export async function getCachedOrComputeFatigueSnapshot(
       loadSubscore: cached.load_subscore,
       recoverySubscore: cached.recovery_subscore,
       performanceSubscore: cached.performance_subscore,
-      confidence: cached.confidence,
+      confidence: cached.confidence as FatigueSnapshot["confidence"],
       recommendation: {
         label: cached.recommendation as FatigueSnapshot["recommendation"]["label"],
         guidance:

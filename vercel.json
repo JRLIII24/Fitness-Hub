@@ -1,8 +1,20 @@
 {
+  "functions": {
+    "src/app/api/ai/program-builder/route.ts": { "maxDuration": 60 },
+    "src/app/api/ai/coach/route.ts": { "maxDuration": 60 }
+  },
   "crons": [
     {
       "path": "/api/cron/streak-check",
       "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/cron/form-video-retention",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-report",
+      "schedule": "0 20 * * 0"
     }
   ]
 }

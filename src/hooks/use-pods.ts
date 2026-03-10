@@ -37,7 +37,6 @@ export function usePods(): UsePods {
         throw new Error(errorData.details || errorData.error || 'Failed to load pods');
       }
       const data = await res.json();
-      console.log('✅ Pods loaded:', data.pods);
       setPods(data.pods || []);
     } catch (err) {
       console.error('Fetch pods error:', err);
@@ -66,7 +65,6 @@ export function usePods(): UsePods {
       }
 
       const data = await res.json();
-      console.log('✅ Pod created:', data.pod);
       await fetchPods(); // Refresh list
       return data.pod.id;
     } catch (err) {
@@ -112,7 +110,7 @@ interface UsePodDetail {
   error: string | null;
   refetch: () => Promise<void>;
   inviteMember: (username: string) => Promise<{ success: boolean; message: string }>;
-  setCommitment: (workoutsPerWeek: number) => Promise<boolean>;
+  setCommitment: (workoutsPerWeek: number, plannedDays?: string[]) => Promise<boolean>;
   sendMessage: (message: string, recipientId?: string) => Promise<boolean>;
   leavePod: () => Promise<boolean>;
   deletePod: (podId: string) => Promise<boolean>;
@@ -204,12 +202,12 @@ export function usePodDetail(podId: string): UsePodDetail {
     }
   };
 
-  const setCommitment = async (workoutsPerWeek: number): Promise<boolean> => {
+  const setCommitment = async (workoutsPerWeek: number, plannedDays?: string[]): Promise<boolean> => {
     try {
       const res = await fetch(`/api/pods/${podId}/commitment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workouts_per_week: workoutsPerWeek })
+        body: JSON.stringify({ workouts_per_week: workoutsPerWeek, planned_days: plannedDays })
       });
 
       if (!res.ok) throw new Error('Failed to set commitment');

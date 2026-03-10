@@ -1,12 +1,14 @@
 /**
  * Jarvis TTS — ElevenLabs with Web Speech API fallback.
  *
+ * Supports two modes:
+ *   1. speakAsJarvis(text)           – speak full text at once
+ *   2. createSentenceQueue()         – streaming: queue sentences as they arrive,
+ *                                      plays them sequentially with overlap prefetch
+ *
  * Priority:
  *   1. ElevenLabs via POST /api/ai/tts  (if ELEVENLABS_API_KEY is configured)
  *   2. Web Speech API fallback           (free, browser-native, slightly robotic)
- *
- * To use ElevenLabs: set ELEVENLABS_API_KEY in .env.local
- * To use the free fallback: leave ELEVENLABS_API_KEY unset
  */
 
 // ── Web Audio API state (ElevenLabs) ─────────────────────────────────────────
@@ -39,16 +41,12 @@ function pickVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
   if (voices.length === 0) return null;
-  // 1. "Daniel" — British English male on macOS/iOS
   const daniel = voices.find((v) => v.name === "Daniel");
   if (daniel) return daniel;
-  // 2. Any en-GB voice
   const enGB = voices.find((v) => v.lang === "en-GB");
   if (enGB) return enGB;
-  // 3. en-US fallback
   const enUS = voices.find((v) => v.lang === "en-US");
   if (enUS) return enUS;
-  // 4. Any English voice
   return voices.find((v) => v.lang.startsWith("en")) ?? null;
 }
 
@@ -110,14 +108,14 @@ function cleanForSpeech(text: string): string {
     .trim();
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-
 // ── Speaking state callback ───────────────────────────────────────────────────
 
 let _onSpeakingChange: ((speaking: boolean) => void) | null = null;
 
 /** Register a callback that fires when speaking starts/stops. */
-export function onSpeakingStateChange(cb: ((speaking: boolean) => void) | null): void {
+export function onSpeakingStateChange(
+  cb: ((speaking: boolean) => void) | null,
+): void {
   _onSpeakingChange = cb;
 }
 
@@ -125,29 +123,40 @@ function setSpeaking(v: boolean) {
   _onSpeakingChange?.(v);
 }
 
+// ── Stop ─────────────────────────────────────────────────────────────────────
+
 /** Cancel any currently-playing or in-flight speech */
 export function stopSpeaking(): void {
-  // Abort any pending ElevenLabs fetch
   currentAbort?.abort();
   currentAbort = null;
 
-  // Stop any playing Web Audio node
   if (currentSource) {
-    try { currentSource.stop(); } catch { /* already stopped */ }
+    try {
+      currentSource.stop();
+    } catch {
+      /* already stopped */
+    }
     currentSource = null;
   }
 
-  // Stop any Web Speech API utterance
   if (typeof window !== "undefined" && window.speechSynthesis) {
     window.speechSynthesis.cancel();
+  }
+
+  // Stop any active sentence queue
+  if (_activeSentenceQueue) {
+    _activeSentenceQueue.cancel();
+    _activeSentenceQueue = null;
   }
 
   setSpeaking(false);
 }
 
+// ── Single-shot speak (unchanged API) ────────────────────────────────────────
+
 /**
  * Speak text using ElevenLabs if configured, otherwise fall back to
- * the browser's built-in Web Speech API (Daniel voice, British accent).
+ * the browser's built-in Web Speech API.
  */
 export async function speakAsJarvis(text: string): Promise<void> {
   if (typeof window === "undefined") return;
@@ -156,7 +165,6 @@ export async function speakAsJarvis(text: string): Promise<void> {
 
   stopSpeaking();
 
-  // ── Attempt ElevenLabs ──────────────────────────────────────────────────
   const ctx = getAudioContext();
   if (ctx) {
     const abort = new AbortController();
@@ -173,7 +181,6 @@ export async function speakAsJarvis(text: string): Promise<void> {
       if (abort.signal.aborted) return;
 
       if (res.ok) {
-        // ElevenLabs succeeded — play via Web Audio API
         const arrayBuffer = await res.arrayBuffer();
         if (abort.signal.aborted || !arrayBuffer.byteLength) return;
 
@@ -192,20 +199,186 @@ export async function speakAsJarvis(text: string): Promise<void> {
         };
         setSpeaking(true);
         source.start();
-        return; // done — don't fall through to Web Speech
+        return;
       }
 
-      // 503 = API key not configured → fall through to Web Speech API
-      // Any other error → also fall through
       currentAbort = null;
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       currentAbort = null;
-      // Network error → fall through to Web Speech API
     }
   }
 
-  // ── Fallback: Web Speech API ────────────────────────────────────────────
   await ensureVoices();
   speakWithWebSpeech(cleaned);
+}
+
+// ── Sentence-based streaming TTS queue ───────────────────────────────────────
+// Designed for streaming coach responses: as each sentence completes,
+// it's sent to ElevenLabs and queued for playback. The first sentence
+// starts playing immediately; subsequent ones overlap prefetch.
+
+let _activeSentenceQueue: SentenceQueue | null = null;
+
+interface SentenceQueue {
+  /** Push a complete sentence to be spoken. */
+  push(sentence: string): void;
+  /** Signal that no more sentences will arrive. */
+  finish(): void;
+  /** Cancel all pending/playing audio. */
+  cancel(): void;
+}
+
+/**
+ * Create a sentence-based TTS queue. Each sentence is fetched and played
+ * in order with prefetch overlap for seamless playback.
+ */
+export function createSentenceQueue(): SentenceQueue {
+  // Cancel any existing queue
+  if (_activeSentenceQueue) {
+    _activeSentenceQueue.cancel();
+  }
+
+  const ctx = getAudioContext();
+  let cancelled = false;
+  let finished = false;
+  const pending: string[] = [];
+  let isPlaying = false;
+
+  async function fetchAudio(
+    text: string,
+    signal: AbortSignal,
+  ): Promise<AudioBuffer | null> {
+    if (!ctx) return null;
+    try {
+      const res = await fetch("/api/ai/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: cleanForSpeech(text) }),
+        signal,
+      });
+      if (!res.ok || signal.aborted) return null;
+      const arrayBuf = await res.arrayBuffer();
+      if (signal.aborted || !arrayBuf.byteLength) return null;
+      return await ctx.decodeAudioData(arrayBuf);
+    } catch {
+      return null;
+    }
+  }
+
+  function playBuffer(buffer: AudioBuffer): Promise<void> {
+    return new Promise((resolve) => {
+      if (!ctx || cancelled) {
+        resolve();
+        return;
+      }
+      if (ctx.state === "suspended") ctx.resume().catch(() => undefined);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      currentSource = source;
+      source.onended = () => {
+        if (currentSource === source) currentSource = null;
+        resolve();
+      };
+      source.start();
+    });
+  }
+
+  async function processQueue() {
+    if (isPlaying || cancelled) return;
+    isPlaying = true;
+    setSpeaking(true);
+
+    const abort = new AbortController();
+    currentAbort = abort;
+
+    while (pending.length > 0 && !cancelled) {
+      const sentence = pending.shift()!;
+
+      // Prefetch next sentence while current one plays
+      const nextSentence = pending.length > 0 ? pending[0] : null;
+      const [currentBuf, nextBufPromise] = await Promise.all([
+        fetchAudio(sentence, abort.signal),
+        nextSentence
+          ? fetchAudio(nextSentence, abort.signal)
+          : Promise.resolve(null),
+      ]);
+
+      if (cancelled || abort.signal.aborted) break;
+
+      if (currentBuf) {
+        await playBuffer(currentBuf);
+      }
+
+      if (cancelled || abort.signal.aborted) break;
+
+      // If we prefetched the next one, play it directly
+      if (nextBufPromise && pending.length > 0 && pending[0] === nextSentence) {
+        pending.shift(); // remove the prefetched sentence
+        const nextBuf = nextBufPromise;
+        if (nextBuf && !cancelled) {
+          await playBuffer(nextBuf);
+        }
+      }
+    }
+
+    isPlaying = false;
+    currentAbort = null;
+    if (!cancelled) setSpeaking(false);
+  }
+
+  const queue: SentenceQueue = {
+    push(sentence: string) {
+      if (cancelled || finished) return;
+      const cleaned = cleanForSpeech(sentence);
+      if (!cleaned || cleaned.length < 2) return;
+      pending.push(cleaned);
+      processQueue();
+    },
+    finish() {
+      finished = true;
+    },
+    cancel() {
+      cancelled = true;
+      pending.length = 0;
+      currentAbort?.abort();
+      currentAbort = null;
+      if (currentSource) {
+        try {
+          currentSource.stop();
+        } catch {
+          /* */
+        }
+        currentSource = null;
+      }
+      setSpeaking(false);
+    },
+  };
+
+  _activeSentenceQueue = queue;
+  return queue;
+}
+
+// ── Sentence boundary detection ──────────────────────────────────────────────
+
+/**
+ * Detect sentence boundaries in streaming text.
+ * Returns [completeSentences, remainder].
+ */
+export function extractSentences(text: string): [string[], string] {
+  const sentences: string[] = [];
+  // Match sentences ending with . ! or ? followed by space/end
+  // Also match at common pause points like : and —
+  const re = /[^.!?\n]+[.!?]+(?:\s|$)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = re.exec(text)) !== null) {
+    sentences.push(match[0].trim());
+    lastIndex = re.lastIndex;
+  }
+
+  const remainder = text.slice(lastIndex);
+  return [sentences, remainder];
 }

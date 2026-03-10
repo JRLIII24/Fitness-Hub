@@ -5,8 +5,9 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useShallow } from "zustand/shallow";
 import { useTimerStore } from "@/stores/timer-store";
-import { Pause, Play, X, Plus, Minus, BellOff, CheckCircle2 } from "lucide-react";
+import { Pause, Play, X, Plus, Minus, BellOff, CheckCircle2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getCoachingCue } from "@/lib/coaching-cues";
 
 interface RestTimerPillProps {
   className?: string;
@@ -45,6 +46,9 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
   const prevTimerIdRef = useRef<string | null>(null);
   // Set when user taps X so we don't show the "done" splash on manual dismiss
   const manuallyDismissedRef = useRef(false);
+  // Coaching cue — computed once per timer start (stable for the duration)
+  const coachingCueRef = useRef<string>("");
+  const cueTimerIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
@@ -55,6 +59,12 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
 
   // Keep exercise name fresh while the timer exists
   if (timer) lastExerciseNameRef.current = timer.exerciseName;
+
+  // Generate a coaching cue once per new timer (not on every render)
+  if (timer && timer.id !== cueTimerIdRef.current) {
+    cueTimerIdRef.current = timer.id;
+    coachingCueRef.current = getCoachingCue(timer.exerciseName);
+  }
 
   const now = lastTickMs || Date.now();
   const remainingSeconds = timer
@@ -221,6 +231,14 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
                         <p className="mt-0.5 truncate text-[14px] font-bold leading-tight text-foreground">
                           {timer?.exerciseName}
                         </p>
+                        {coachingCueRef.current && (
+                          <div className="mt-1.5 flex items-start gap-1.5">
+                            <Sparkles className="mt-0.5 h-3 w-3 shrink-0 text-primary/60" />
+                            <p className="text-[11px] leading-snug text-muted-foreground">
+                              {coachingCueRef.current}
+                            </p>
+                          </div>
+                        )}
                       </div>
                       <motion.button
                         whileTap={{ scale: 0.85 }}

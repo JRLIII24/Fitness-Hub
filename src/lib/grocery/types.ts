@@ -1,27 +1,28 @@
 import { z } from "zod";
 
+// NOTE: No .min()/.max() — Anthropic rejects these in structured output schemas.
 export const GroceryItemSchema = z.object({
-  name: z.string().max(200),
-  quantity: z.string().max(50),
-  unit: z.string().max(30),
-  note: z.string().max(200).optional(),
+  name: z.string(),
+  quantity: z.string(),
+  unit: z.string(),
+  note: z.string().optional(),
   checked: z.boolean().default(false),
 });
 
 export const GroceryCategorySchema = z.object({
-  category: z.string().max(50),
-  items: z.array(GroceryItemSchema).max(30),
+  category: z.string(),
+  items: z.array(GroceryItemSchema),
 });
 
 export const GroceryAIOutputSchema = z.object({
-  categories: z.array(GroceryCategorySchema).max(12),
-  summary: z.string().max(300),
-  estimated_weekly_calories: z.number().min(0).optional(),
-  estimated_weekly_protein_g: z.number().min(0).optional(),
+  categories: z.array(GroceryCategorySchema),
+  summary: z.string(),
+  estimated_weekly_calories: z.number().optional(),
+  estimated_weekly_protein_g: z.number().optional(),
 });
 
 export const GroceryPatchSchema = z.object({
-  items: z.array(GroceryCategorySchema).max(12),
+  items: z.array(GroceryCategorySchema),
 });
 
 export type GroceryItem = z.infer<typeof GroceryItemSchema>;

@@ -119,7 +119,7 @@ export function CustomFoodDialog({
         fat_g: parsedFat,
         fiber_g: parsedFiber,
         sodium_mg: parsedSodium,
-        source: "manual",
+        source: "manual" as const,
         created_by: user.id,
       };
 

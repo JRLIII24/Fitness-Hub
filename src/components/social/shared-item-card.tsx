@@ -157,7 +157,7 @@ export function SharedItemCard({
               set_number: s.set_number,
               reps: s.reps,
               weight_kg: s.weight_kg,
-              set_type: s.set_type ?? "working",
+              set_type: (s.set_type ?? "working") as "warmup" | "working" | "dropset" | "failure",
               rest_seconds: s.rest_seconds,
             }))
           );

@@ -18,7 +18,11 @@ import type {
   NavigateToScreen,
   CreateTemplateActionData,
   StartWorkoutFromTemplateActionData,
+  LogQuickMealActionData,
+  CreateProgramActionData,
+  PendingAction,
 } from "./types";
+import { isDestructiveAction } from "./types";
 import type { Exercise, WorkoutSet } from "@/types/workout";
 
 /** Allowed navigation screens mapped to their app routes */
@@ -32,6 +36,9 @@ const SCREEN_ROUTES: Record<NavigateToScreen, string> = {
   pods: "/pods",
   exercises: "/exercises",
   settings: "/settings",
+  form_check: "/workout/form-check",
+  programs: "/programs",
+  reports: "/reports",
 };
 
 // Store API interfaces (subset of what we need from the Zustand stores)
@@ -63,6 +70,35 @@ export interface RouterApi {
 export interface ActionResult {
   success: boolean;
   message: string;
+  /** Set when a destructive action needs user confirmation before executing */
+  pending?: PendingAction;
+}
+
+/** Generate a human-readable description of a destructive action */
+function describeDestructiveAction(
+  action: CoachAction,
+  data: Record<string, unknown> | null | undefined,
+  workout: WorkoutStoreApi,
+): string {
+  if (action === "swap_exercise") {
+    const d = data as unknown as SwapExerciseActionData;
+    const currentName = d?.current_exercise_name ?? "exercise";
+    const newName = d?.new_exercise_name ?? "another exercise";
+    return `Swap ${currentName} → ${newName}`;
+  }
+  if (action === "remove_exercise") {
+    const d = data as unknown as RemoveExerciseActionData;
+    return `Remove ${d?.exercise_name ?? "exercise"}`;
+  }
+  if (action === "update_set") {
+    const d = data as unknown as UpdateSetActionData;
+    const parts: string[] = [];
+    if (d?.updates?.weight_kg != null) parts.push(`${d.updates.weight_kg}kg`);
+    if (d?.updates?.reps != null) parts.push(`${d.updates.reps} reps`);
+    const detail = parts.length > 0 ? ` to ${parts.join(", ")}` : "";
+    return `Update set ${d?.set_number ?? "?"} on ${d?.exercise_name ?? "exercise"}${detail}`;
+  }
+  return `Execute ${action}`;
 }
 
 /** Search for an exercise by name via the API */
@@ -118,7 +154,8 @@ function findExerciseIndex(
 
 /**
  * Execute a coach action on the stores.
- * Returns a result indicating success/failure and a human-readable message.
+ * Destructive actions (swap, remove, update) return a `pending` result
+ * requiring user confirmation before the mutation runs.
  */
 export async function executeCoachAction(
   action: CoachAction,
@@ -126,6 +163,19 @@ export async function executeCoachAction(
   stores: { workout: WorkoutStoreApi; timer: TimerStoreApi; router: RouterApi; userId?: string },
 ): Promise<ActionResult> {
   const { workout, timer, router } = stores;
+
+  // Intercept destructive actions — return pending confirmation instead of executing
+  if (isDestructiveAction(action)) {
+    return {
+      success: true,
+      message: "",
+      pending: {
+        action,
+        data: (data as Record<string, unknown>) ?? null,
+        description: describeDestructiveAction(action, data, workout),
+      },
+    };
+  }
 
   switch (action) {
     case "add_exercise": {
@@ -199,69 +249,8 @@ export async function executeCoachAction(
       };
     }
 
-    case "swap_exercise": {
-      const d = data as unknown as SwapExerciseActionData;
-      if (!d?.current_exercise_name || !d?.new_exercise_name) {
-        return { success: false, message: "Missing exercise names for swap" };
-      }
-      if (!workout.activeWorkout) return { success: false, message: "No active workout" };
-
-      const exIdx = findExerciseIndex(workout.activeWorkout, d.current_exercise_name);
-      if (exIdx < 0) return { success: false, message: `"${d.current_exercise_name}" not in workout` };
-
-      const newExercise = await searchExercise(d.new_exercise_name);
-      if (!newExercise) return { success: false, message: `Exercise "${d.new_exercise_name}" not found` };
-
-      const oldName = workout.activeWorkout.exercises[exIdx].exercise.name;
-      workout.swapExercise(exIdx, newExercise);
-
-      return {
-        success: true,
-        message: `Swapped ${oldName} → ${newExercise.name}`,
-      };
-    }
-
-    case "update_set": {
-      const d = data as unknown as UpdateSetActionData;
-      if (!d?.exercise_name || d?.set_number == null) {
-        return { success: false, message: "Missing exercise name or set number" };
-      }
-      if (!workout.activeWorkout) return { success: false, message: "No active workout" };
-
-      const exIdx = findExerciseIndex(workout.activeWorkout, d.exercise_name);
-      if (exIdx < 0) return { success: false, message: `"${d.exercise_name}" not in workout` };
-
-      const setIdx = d.set_number - 1; // Convert 1-indexed to 0-indexed
-      const ex = workout.activeWorkout.exercises[exIdx];
-      if (setIdx < 0 || setIdx >= ex.sets.length) {
-        return { success: false, message: `Set ${d.set_number} doesn't exist` };
-      }
-
-      workout.updateSet(exIdx, setIdx, {
-        weight_kg: d.updates?.weight_kg ?? undefined,
-        reps: d.updates?.reps ?? undefined,
-        rpe: d.updates?.rpe ?? undefined,
-        rir: d.updates?.rir ?? undefined,
-      });
-
-      return {
-        success: true,
-        message: `Updated set ${d.set_number} on ${ex.exercise.name}`,
-      };
-    }
-
-    case "remove_exercise": {
-      const d = data as unknown as RemoveExerciseActionData;
-      if (!d?.exercise_name) return { success: false, message: "No exercise name provided" };
-      if (!workout.activeWorkout) return { success: false, message: "No active workout" };
-
-      const exIdx = findExerciseIndex(workout.activeWorkout, d.exercise_name);
-      if (exIdx < 0) return { success: false, message: `"${d.exercise_name}" not in workout` };
-
-      const name = workout.activeWorkout.exercises[exIdx].exercise.name;
-      workout.removeExercise(exIdx);
-      return { success: true, message: `Removed ${name}` };
-    }
+    // swap_exercise, update_set, remove_exercise are intercepted above as destructive
+    // and handled via confirmAction() after user approval
 
     case "create_and_add_exercise": {
       const d = data as unknown as CreateAndAddExerciseActionData;
@@ -326,6 +315,18 @@ export async function executeCoachAction(
         return { success: false, message: "Missing template name or exercises" };
       }
 
+      // Normalize exercises — AI may omit muscle_group or use non-standard names
+      const normalizedExercises = d.exercises.map((ex) => ({
+        exercise_name: ex.exercise_name,
+        muscle_group: ex.muscle_group || d.primary_muscle_group || "chest",
+        target_sets: ex.target_sets || 3,
+        target_reps: String(ex.target_reps || "8-12"),
+        target_weight_kg: ex.target_weight_kg,
+        rest_seconds: ex.rest_seconds || 90,
+        equipment: ex.equipment,
+        category: ex.category,
+      }));
+
       try {
         const res = await fetch("/api/templates/create", {
           method: "POST",
@@ -336,24 +337,56 @@ export async function executeCoachAction(
             primary_muscle_group: d.primary_muscle_group,
             estimated_duration_min: d.estimated_duration_min,
             difficulty_level: d.difficulty_level,
-            exercises: d.exercises,
+            exercises: normalizedExercises,
           }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           return { success: false, message: (err as { error?: string }).error || "Failed to create template" };
         }
-        const result = await res.json() as { template_id: string };
+        const result = await res.json() as { template_id: string; exercise_count: number };
         // Store template_id so AI can reference it for follow-up start action
         if (data) {
           (data as Record<string, unknown>).created_template_id = result.template_id;
         }
+
+        // If the AI requested immediate start, kick off the workout right now
+        if (d.start_immediately && !workout.activeWorkout && stores.userId) {
+          try {
+            const teRes = await fetch(`/api/templates/${result.template_id}/exercises`);
+            if (teRes.ok) {
+              const { template_name, exercises: templateExercises } = await teRes.json() as {
+                template_name: string;
+                exercises: Array<{ exercises: Exercise; target_sets: number | null }>;
+              };
+              workout.startWorkout(template_name || d.template_name, stores.userId, result.template_id);
+              for (const te of templateExercises) {
+                const exercise = te.exercises;
+                if (!exercise) continue;
+                workout.addExercise(exercise);
+                const exIdx = workout.activeWorkout!.exercises.length - 1;
+                const targetSets = te.target_sets || 3;
+                for (let s = 1; s < targetSets; s++) {
+                  workout.addSet(exIdx);
+                }
+              }
+              router.push("/workout");
+              return {
+                success: true,
+                message: `Created and started "${d.template_name}" with ${result.exercise_count} exercises`,
+              };
+            }
+          } catch {
+            // Fall through — template was still saved successfully
+          }
+        }
+
         return {
           success: true,
-          message: `Created "${d.template_name}" with ${d.exercises.length} exercises`,
+          message: `Created "${d.template_name}" with ${result.exercise_count} exercises`,
         };
-      } catch {
-        return { success: false, message: "Failed to create template" };
+      } catch (e) {
+        return { success: false, message: `Failed to create template: ${e instanceof Error ? e.message : "network error"}` };
       }
     }
 
@@ -411,6 +444,105 @@ export async function executeCoachAction(
       }
     }
 
+    case "log_quick_meal": {
+      const d = data as unknown as LogQuickMealActionData;
+      if (!d?.description) return { success: false, message: "No meal description" };
+      try {
+        const res = await fetch("/api/nutrition/quick-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description: d.description, meal_type: d.meal_type || "snack" }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { success: false, message: (err as { error?: string }).error || "Failed to log meal" };
+        }
+        const result = await res.json() as { logged: number };
+        return { success: true, message: `Logged ${result.logged} item${result.logged !== 1 ? "s" : ""}` };
+      } catch {
+        return { success: false, message: "Network error logging meal" };
+      }
+    }
+
+    case "create_program": {
+      const d = data as unknown as CreateProgramActionData;
+      if (!d?.goal || !d?.weeks || !d?.days_per_week) {
+        return { success: false, message: "Missing program parameters" };
+      }
+      try {
+        const res = await fetch("/api/ai/program-builder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(d),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          let errMsg = "Failed to generate program";
+          try { errMsg = (JSON.parse(text) as { error?: string }).error || errMsg; } catch { /* SSE or non-JSON */ }
+          return { success: false, message: errMsg };
+        }
+        // The program builder returns an SSE stream — read events until "done" or "error"
+        const reader = res.body?.getReader();
+        if (!reader) return { success: false, message: "No response stream" };
+        const decoder = new TextDecoder();
+        let programId: string | null = null;
+        let errorMsg: string | null = null;
+        let buffer = "";
+        // Robust SSE parser: accumulate event + data, finalize on blank line
+        let currentEvent = "";
+        let currentData = "";
+        const processEvent = () => {
+          if (!currentEvent || !currentData) { currentEvent = ""; currentData = ""; return; }
+          try {
+            const payload = JSON.parse(currentData);
+            if (currentEvent === "done" && payload.program_id) {
+              programId = payload.program_id as string;
+            } else if (currentEvent === "error") {
+              errorMsg = (payload.error as string) || "Program generation failed";
+            }
+          } catch { /* malformed JSON */ }
+          currentEvent = "";
+          currentData = "";
+        };
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (value) buffer += decoder.decode(value, { stream: true });
+          // Split on newlines, keep incomplete trailing line in buffer
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (line === "") {
+              // Blank line = end of SSE event
+              processEvent();
+            } else if (line.startsWith("event: ")) {
+              currentEvent = line.slice(7).trim();
+            } else if (line.startsWith("data: ")) {
+              currentData = line.slice(6);
+            }
+          }
+          if (errorMsg) return { success: false, message: errorMsg };
+          if (done) break;
+        }
+        // Process any remaining buffered event
+        processEvent();
+        if (errorMsg) return { success: false, message: errorMsg };
+        if (!programId) {
+          console.error("[create_program] Stream ended without program_id");
+          return { success: false, message: "Program generation failed" };
+        }
+        if (data) {
+          (data as Record<string, unknown>).program_id = programId;
+        }
+        router.push(`/programs/${programId}`);
+        return { success: true, message: "Program created successfully" };
+      } catch (err) {
+        console.error("[create_program] Network error:", err);
+        return { success: false, message: "Network error generating program" };
+      }
+    }
+
+    // save_memory is handled server-side in the coach API route — no client action needed
+    case "save_memory":
     // Display-only actions — no store mutation needed
     case "show_exercise_history":
     case "generate_workout":
@@ -418,10 +550,85 @@ export async function executeCoachAction(
     case "show_readiness":
     case "show_recovery":
     case "show_prescription":
+    case "show_meal_suggestion":
+    case "show_macro_breakdown":
     case "none":
       return { success: true, message: "" };
 
     default:
       return { success: false, message: `Unknown action: ${action}` };
+  }
+}
+
+/**
+ * Confirm and execute a previously-pending destructive action.
+ * Called when the user taps "Accept" on a confirmation card.
+ */
+export async function confirmAction(
+  pending: PendingAction,
+  stores: { workout: WorkoutStoreApi; timer: TimerStoreApi; router: RouterApi; userId?: string },
+): Promise<ActionResult> {
+  const { workout } = stores;
+  const { action, data } = pending;
+
+  switch (action) {
+    case "swap_exercise": {
+      const d = data as unknown as SwapExerciseActionData;
+      if (!d?.current_exercise_name || !d?.new_exercise_name) {
+        return { success: false, message: "Missing exercise names for swap" };
+      }
+      if (!workout.activeWorkout) return { success: false, message: "No active workout" };
+
+      const exIdx = findExerciseIndex(workout.activeWorkout, d.current_exercise_name);
+      if (exIdx < 0) return { success: false, message: `"${d.current_exercise_name}" not in workout` };
+
+      const newExercise = await searchExercise(d.new_exercise_name);
+      if (!newExercise) return { success: false, message: `Exercise "${d.new_exercise_name}" not found` };
+
+      const oldName = workout.activeWorkout.exercises[exIdx].exercise.name;
+      workout.swapExercise(exIdx, newExercise);
+      return { success: true, message: `Swapped ${oldName} → ${newExercise.name}` };
+    }
+
+    case "remove_exercise": {
+      const d = data as unknown as RemoveExerciseActionData;
+      if (!d?.exercise_name) return { success: false, message: "No exercise name provided" };
+      if (!workout.activeWorkout) return { success: false, message: "No active workout" };
+
+      const exIdx = findExerciseIndex(workout.activeWorkout, d.exercise_name);
+      if (exIdx < 0) return { success: false, message: `"${d.exercise_name}" not in workout` };
+
+      const name = workout.activeWorkout.exercises[exIdx].exercise.name;
+      workout.removeExercise(exIdx);
+      return { success: true, message: `Removed ${name}` };
+    }
+
+    case "update_set": {
+      const d = data as unknown as UpdateSetActionData;
+      if (!d?.exercise_name || d?.set_number == null) {
+        return { success: false, message: "Missing exercise name or set number" };
+      }
+      if (!workout.activeWorkout) return { success: false, message: "No active workout" };
+
+      const exIdx = findExerciseIndex(workout.activeWorkout, d.exercise_name);
+      if (exIdx < 0) return { success: false, message: `"${d.exercise_name}" not in workout` };
+
+      const setIdx = d.set_number - 1;
+      const ex = workout.activeWorkout.exercises[exIdx];
+      if (setIdx < 0 || setIdx >= ex.sets.length) {
+        return { success: false, message: `Set ${d.set_number} doesn't exist` };
+      }
+
+      workout.updateSet(exIdx, setIdx, {
+        weight_kg: d.updates?.weight_kg ?? undefined,
+        reps: d.updates?.reps ?? undefined,
+        rpe: d.updates?.rpe ?? undefined,
+        rir: d.updates?.rir ?? undefined,
+      });
+      return { success: true, message: `Updated set ${d.set_number} on ${ex.exercise.name}` };
+    }
+
+    default:
+      return { success: false, message: `Cannot confirm non-destructive action: ${action}` };
   }
 }

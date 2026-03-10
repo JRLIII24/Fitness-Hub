@@ -1,14 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { calcSuggestedWeight } from "@/lib/progressive-overload";
+import { calcSuggestedWeight, calcSmartSuggestion, type OverloadSuggestion } from "@/lib/progressive-overload";
+
+export type GhostSetData = {
+  setNumber: number;
+  reps: number | null;
+  weight: number | null;
+  rir: number | null;
+};
 
 export type GhostWorkoutData = {
   sessionDate: string;
-  exercises: Record<
-    string,
-    Array<{ setNumber: number; reps: number | null; weight: number | null }>
-  >;
+  exercises: Record<string, GhostSetData[]>;
 } | null;
+
+/**
+ * Per-exercise, per-set overload suggestion with intent metadata.
+ * `weightKg` is always in kg; `intent` tells the UI whether it's an increase or maintain.
+ */
+export type SuggestionMap = Record<string, Record<number, OverloadSuggestion>>;
 
 /**
  * Manages ghost workout loading: fetches the most recent completed session
@@ -20,7 +30,9 @@ export function useGhostSession(
   supabase: SupabaseClient,
   userId: string | null,
   selectedTemplateId: string,
-  preference: "metric" | "imperial"
+  preference: "metric" | "imperial",
+  /** Optional map of exerciseId -> muscleGroup for smarter increment sizing */
+  exerciseMuscleGroups?: Record<string, string>,
 ) {
   const [ghostWorkoutData, setGhostWorkoutData] = useState<GhostWorkoutData>(null);
   const [ghostIsLoading, setGhostIsLoading] = useState(false);
@@ -51,10 +63,10 @@ export function useGhostSession(
           return;
         }
 
-        // Fetch all sets from that session
+        // Fetch all sets from that session (now including rir)
         const { data: ghostSets, error: setsError } = await supabase
           .from("workout_sets")
-          .select("exercise_id, set_number, reps, weight_kg")
+          .select("exercise_id, set_number, reps, weight_kg, rir")
           .eq("session_id", ghostSession.id)
           .order("set_number", { ascending: true });
 
@@ -64,10 +76,7 @@ export function useGhostSession(
         }
 
         // Group sets by exercise_id
-        const exerciseMap: Record<
-          string,
-          Array<{ setNumber: number; reps: number | null; weight: number | null }>
-        > = {};
+        const exerciseMap: Record<string, GhostSetData[]> = {};
         for (const set of ghostSets) {
           if (!exerciseMap[set.exercise_id]) {
             exerciseMap[set.exercise_id] = [];
@@ -76,6 +85,7 @@ export function useGhostSession(
             setNumber: set.set_number,
             reps: set.reps,
             weight: set.weight_kg,
+            rir: set.rir ?? null,
           });
         }
 
@@ -99,8 +109,9 @@ export function useGhostSession(
   }, [selectedTemplateId, userId, supabase]);
 
   // Derived: suggested weights from ghost data -- always in kg; SetRow converts for display
+  // Legacy flat map (exerciseId -> setIndex -> kg) for backward compat
   const suggestedWeightsByKey = useMemo(() => {
-    const map: Record<string, Record<number, number>> = {}; // exerciseId -> setIndex -> kg
+    const map: Record<string, Record<number, number>> = {};
     if (!ghostWorkoutData) return map;
     for (const [exId, sets] of Object.entries(ghostWorkoutData.exercises)) {
       map[exId] = {};
@@ -113,6 +124,26 @@ export function useGhostSession(
     return map;
   }, [ghostWorkoutData, preference]);
 
+  // Smart suggestions with intent metadata (increase vs maintain)
+  const smartSuggestions = useMemo<SuggestionMap>(() => {
+    const map: SuggestionMap = {};
+    if (!ghostWorkoutData) return map;
+    for (const [exId, sets] of Object.entries(ghostWorkoutData.exercises)) {
+      map[exId] = {};
+      const muscleGroup = exerciseMuscleGroups?.[exId];
+      sets.forEach((s, idx) => {
+        if (s.weight != null) {
+          map[exId][idx] = calcSmartSuggestion(
+            { weightKg: s.weight, reps: s.reps, rir: s.rir },
+            preference,
+            muscleGroup,
+          );
+        }
+      });
+    }
+    return map;
+  }, [ghostWorkoutData, preference, exerciseMuscleGroups]);
+
   /**
    * Patch ghost data for a single exercise (used after swap).
    * Only re-fetches ghost data for the swapped-in exercise, not the whole session.
@@ -123,15 +154,16 @@ export function useGhostSession(
 
       const { data: ghostSets } = await supabase
         .from("workout_sets")
-        .select("exercise_id, set_number, reps, weight_kg, session_id")
+        .select("exercise_id, set_number, reps, weight_kg, rir, session_id")
         .eq("exercise_id", exerciseId)
         .order("set_number", { ascending: true });
 
       if (ghostSets && ghostSets.length > 0) {
-        const patchSets = ghostSets.map((s) => ({
+        const patchSets: GhostSetData[] = ghostSets.map((s) => ({
           setNumber: s.set_number,
           reps: s.reps,
           weight: s.weight_kg,
+          rir: s.rir ?? null,
         }));
         setGhostWorkoutData((prev) => {
           if (!prev) return prev;
@@ -160,6 +192,7 @@ export function useGhostSession(
     ghostWorkoutData,
     ghostIsLoading,
     suggestedWeightsByKey,
+    smartSuggestions,
     patchGhostForExercise,
   };
 }

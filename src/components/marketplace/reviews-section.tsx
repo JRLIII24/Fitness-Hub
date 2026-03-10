@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Trash2, Send, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StarRatingInput } from "./star-rating-input";
 import type { TemplateReview } from "@/types/pods";
 
@@ -74,16 +75,21 @@ function ReviewCard({ review, index }: { review: TemplateReview; index: number }
         >
             <div className="flex items-start gap-2.5">
                 {/* Avatar */}
-                <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold"
-                    style={{
-                        background: "rgba(200,255,0,0.1)",
-                        borderColor: "rgba(200,255,0,0.25)",
-                        color: "hsl(var(--primary))",
-                    }}
-                >
-                    {ini}
-                </div>
+                <Avatar className="size-7 shrink-0">
+                    {review.reviewer?.avatar_url && (
+                        <AvatarImage src={review.reviewer.avatar_url} alt={name} />
+                    )}
+                    <AvatarFallback
+                        className="text-[9px] font-bold"
+                        style={{
+                            background: "rgba(200,255,0,0.1)",
+                            borderColor: "rgba(200,255,0,0.25)",
+                            color: "hsl(var(--primary))",
+                        }}
+                    >
+                        {ini}
+                    </AvatarFallback>
+                </Avatar>
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">

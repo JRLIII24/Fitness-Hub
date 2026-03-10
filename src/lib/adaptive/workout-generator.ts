@@ -325,7 +325,7 @@ async function createPresetWorkout(
   const { data: exercises } = await supabase
     .from('exercises')
     .select('id, name, muscle_group, equipment')
-    .in('muscle_group', muscleGroups)
+    .in('muscle_group', muscleGroups as any)
     .eq('category', 'compound')
     .limit(recommendation === 'REST' ? 3 : 5);
 

@@ -9,25 +9,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
-
-const VALID_EQUIPMENT = ["barbell", "dumbbell", "cable", "machine", "bodyweight", "band"] as const;
-const VALID_CATEGORY = ["compound", "isolation", "cardio", "stretch"] as const;
-
-function toValidEquipment(val?: string): (typeof VALID_EQUIPMENT)[number] {
-  if (val && (VALID_EQUIPMENT as readonly string[]).includes(val)) return val as (typeof VALID_EQUIPMENT)[number];
-  return "barbell";
-}
-
-function toValidCategory(val?: string): (typeof VALID_CATEGORY)[number] {
-  if (val && (VALID_CATEGORY as readonly string[]).includes(val)) return val as (typeof VALID_CATEGORY)[number];
-  return "compound";
-}
+import { logger } from "@/lib/logger";
+import { resolveExercise } from "@/lib/program-service";
 
 interface ExerciseInput {
   exercise_name: string;
   muscle_group: string;
   target_sets: number;
-  target_reps: string;
+  target_reps: string | number;
   target_weight_kg?: number;
   rest_seconds?: number;
   equipment?: string;
@@ -61,60 +50,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Maximum 20 exercises per template" }, { status: 400 });
     }
 
-    // Resolve exercise names to IDs
+    // Resolve exercise names to IDs using shared service
     const resolvedExercises: Array<{ id: string; index: number }> = [];
+    const failedExercises: string[] = [];
 
     for (let i = 0; i < body.exercises.length; i++) {
       const ex = body.exercises[i];
+      const exerciseId = await resolveExercise(supabase, user.id, {
+        exercise_name: ex.exercise_name,
+        muscle_group: ex.muscle_group,
+        equipment: ex.equipment,
+        category: ex.category,
+      }, i);
 
-      // Search by name (case-insensitive exact match)
-      const { data: found } = await supabase
-        .from("exercises")
-        .select("id")
-        .ilike("name", ex.exercise_name)
-        .limit(1);
-
-      if (found && found.length > 0) {
-        resolvedExercises.push({ id: found[0].id, index: i });
-        continue;
-      }
-
-      // Try fuzzy match
-      const { data: fuzzy } = await supabase
-        .from("exercises")
-        .select("id")
-        .ilike("name", `%${ex.exercise_name}%`)
-        .limit(1);
-
-      if (fuzzy && fuzzy.length > 0) {
-        resolvedExercises.push({ id: fuzzy[0].id, index: i });
-        continue;
-      }
-
-      // Not found — create as custom exercise
-      const slug = `${ex.exercise_name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80)}-${Date.now()}-${i}`;
-      const { data: created, error: createErr } = await supabase
-        .from("exercises")
-        .insert({
-          name: ex.exercise_name.trim(),
-          slug,
-          muscle_group: ex.muscle_group || "chest",
-          equipment: toValidEquipment(ex.equipment),
-          category: toValidCategory(ex.category),
-          is_custom: true,
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
-
-      if (created && !createErr) {
-        resolvedExercises.push({ id: created.id, index: i });
+      if (exerciseId) {
+        resolvedExercises.push({ id: exerciseId, index: i });
+      } else {
+        failedExercises.push(ex.exercise_name || `Exercise ${i + 1}`);
       }
     }
 
     if (resolvedExercises.length === 0) {
       return NextResponse.json(
-        { error: "Could not resolve any exercises" },
+        { error: `Could not resolve any exercises. Failed: ${failedExercises.join(", ")}` },
         { status: 400 },
       );
     }
@@ -135,8 +93,9 @@ export async function POST(request: Request) {
       .single();
 
     if (templateErr || !template) {
+      logger.error("Failed to insert workout_templates:", templateErr);
       return NextResponse.json(
-        { error: "Failed to create template" },
+        { error: `Failed to create template: ${templateErr?.message ?? "unknown error"}` },
         { status: 500 },
       );
     }
@@ -147,19 +106,26 @@ export async function POST(request: Request) {
       exercise_id: re.id,
       sort_order: re.index,
       target_sets: body.exercises[re.index].target_sets || 3,
-      target_reps: body.exercises[re.index].target_reps || "8-12",
+      target_reps: String(body.exercises[re.index].target_reps || "8-12"),
       target_weight_kg: body.exercises[re.index].target_weight_kg || null,
       rest_seconds: body.exercises[re.index].rest_seconds || 90,
     }));
 
-    await supabase.from("template_exercises").insert(templateExercises);
+    const { error: exerciseInsertErr } = await supabase
+      .from("template_exercises")
+      .insert(templateExercises);
+
+    if (exerciseInsertErr) {
+      logger.error("Failed to insert template_exercises:", exerciseInsertErr);
+    }
 
     return NextResponse.json({
       template_id: template.id,
       template_name: body.name.trim(),
       exercise_count: resolvedExercises.length,
     });
-  } catch {
+  } catch (error) {
+    logger.error("Template creation error:", error);
     return NextResponse.json(
       { error: "Failed to create template" },
       { status: 500 },

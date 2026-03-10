@@ -6,7 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { SendPingDialog } from "@/components/social/send-ping-dialog";
-import { MiniDashboardCard, type MiniDashboardProfile, type MiniTemplate, type ProfileClip } from "@/components/social/mini-dashboard-card";
+import { MiniDashboardCard, type MiniDashboardProfile, type MiniTemplate } from "@/components/social/mini-dashboard-card";
 import { useTemplateFavorites } from "@/hooks/use-template-favorites";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -20,7 +20,6 @@ export default function UserProfilePage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<MiniDashboardProfile | null>(null);
   const [templates, setTemplates] = useState<MiniTemplate[]>([]);
-  const [clips, setClips] = useState<ProfileClip[]>([]);
   const [favoritedTemplates, setFavoritedTemplates] = useState<MiniTemplate[]>([]);
   const [activeWorkout, setActiveWorkout] = useState<{ session_name: string; started_at: string; exercise_count: number } | null>(null);
   const [workoutDays, setWorkoutDays] = useState<Date[]>([]);
@@ -41,7 +40,7 @@ export default function UserProfilePage() {
       // Load profile (with streak)
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("id, display_name, username, bio, fitness_goal, current_streak, is_public")
+        .select("id, display_name, username, bio, fitness_goal, current_streak, is_public, avatar_url")
         .eq("id", profileUserId)
         .eq("is_public", true)
         .single();
@@ -85,15 +84,6 @@ export default function UserProfilePage() {
           }))
         );
       }
-
-      // Load user's clips
-      const { data: clipData } = await supabase
-        .from("workout_clips")
-        .select("id, video_url, thumbnail_url, clip_category, like_count")
-        .eq("user_id", profileUserId)
-        .order("created_at", { ascending: false })
-        .limit(6);
-      setClips(clipData ?? []);
 
       // Load templates this user has favorited
       const { data: favData } = await supabase
@@ -319,7 +309,6 @@ export default function UserProfilePage() {
 
         <MiniDashboardCard
           profile={profile}
-          clips={clips}
           templates={templatesWithFavorites}
           favoritedTemplates={favoritedTemplates}
           activeWorkout={activeWorkout}

@@ -32,7 +32,7 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
     .from('pod_members')
     .select(`
       user_id,
-      profiles!inner(display_name, username)
+      profiles!inner(display_name, username, avatar_url)
     `)
     .eq('pod_id', podId)
     .eq('status', 'active');
@@ -42,15 +42,30 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
     return [];
   }
 
-  // Get commitments for this week
-  const { data: commitments } = await supabase
+  // Get commitments for this week (planned_days may not exist yet pre-migration)
+  let commitments: Array<{ user_id: string; workouts_per_week: number; planned_days?: string[] }> | null = null;
+  const weekDate = weekStart.toISOString().split('T')[0];
+
+  const fullQuery = await supabase
     .from('pod_commitments')
-    .select('user_id, workouts_per_week')
+    .select('user_id, workouts_per_week, planned_days')
     .eq('pod_id', podId)
-    .eq('week_start_date', weekStart.toISOString().split('T')[0]);
+    .eq('week_start_date', weekDate);
+
+  if (fullQuery.error?.message?.includes('planned_days')) {
+    // Column doesn't exist yet — query without it
+    const fallback = await supabase
+      .from('pod_commitments')
+      .select('user_id, workouts_per_week')
+      .eq('pod_id', podId)
+      .eq('week_start_date', weekDate);
+    commitments = (fallback.data || []).map(c => ({ ...c, planned_days: [] }));
+  } else {
+    commitments = fullQuery.data || [];
+  }
 
   const commitmentMap = new Map(
-    (commitments || []).map(c => [c.user_id, c.workouts_per_week])
+    commitments.map(c => [c.user_id, { workouts_per_week: c.workouts_per_week, planned_days: c.planned_days ?? [] }])
   );
 
   // Get workout counts for this week
@@ -70,7 +85,8 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
   // Calculate progress for each member
   const progress: MemberProgress[] = await Promise.all(
     members.map(async (member) => {
-      const commitment = commitmentMap.get(member.user_id) || 0;
+      const entry = commitmentMap.get(member.user_id) || { workouts_per_week: 0, planned_days: [] };
+      const commitment = entry.workouts_per_week;
       const completed = workoutCounts.get(member.user_id) || 0;
       const progress_percentage = commitment > 0 ? Math.min(100, Math.round((completed / commitment) * 100)) : 0;
       const is_on_track = completed >= commitment;
@@ -84,7 +100,9 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
         user_id: member.user_id,
         display_name: profile?.display_name || null,
         username: profile?.username || null,
+        avatar_url: profile?.avatar_url || null,
         commitment,
+        planned_days: entry.planned_days,
         completed,
         progress_percentage,
         is_on_track,
@@ -162,7 +180,7 @@ export async function findUserByUsername(username: string): Promise<{ id: string
     .eq('username', username)
     .maybeSingle();
 
-  return profile;
+  return profile as { id: string; username: string; display_name: string | null } | null;
 }
 
 /**

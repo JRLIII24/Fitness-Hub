@@ -53,7 +53,7 @@ export function MenuScanner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const today = new Date().toISOString().slice(0, 10);
-      const { data: profile } = await supabase
+      const { data: profile } = await (supabase as any)
         .from("profiles")
         .select("calorie_goal, protein_goal_g, carb_goal_g, fat_goal_g")
         .eq("id", user.id)
@@ -178,7 +178,7 @@ export function MenuScanner() {
       if (!user) throw new Error("Not authenticated");
 
       // 1. Create food_items entry for this menu item
-      const { data: foodItem, error: fiErr } = await supabase
+      const { data: foodItem, error: fiErr } = await (supabase as any)
         .from("food_items")
         .insert({
           name: item.name,

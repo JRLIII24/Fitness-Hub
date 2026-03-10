@@ -123,7 +123,7 @@ export default function TemplatesPage() {
 
           const lpMap: Record<string, string> = {};
           for (const row of lpData ?? []) {
-            if (row.last_performed_at) {
+            if (row.template_id && row.last_performed_at) {
               lpMap[row.template_id] = row.last_performed_at;
             }
           }

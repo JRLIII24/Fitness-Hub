@@ -106,8 +106,6 @@ export function usePings(userId: string | null) {
     const readIds = pings.filter((p) => !!p.read_at).map((p) => p.id);
     if (readIds.length === 0) return;
 
-    console.log("🗑️ Clearing", readIds.length, "read pings:", readIds);
-
     const { error } = await supabase
       .from("pings")
       .delete()
@@ -118,7 +116,6 @@ export function usePings(userId: string | null) {
       throw error;
     }
 
-    console.log("✅ Pings cleared successfully");
     setPings((prev) => prev.filter((p) => !p.read_at));
   }, [userId, supabase, pings]);
 

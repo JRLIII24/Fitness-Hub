@@ -100,14 +100,35 @@ export type NutritionSearchQuery = z.infer<typeof nutritionSearchSchema>;
 
 // ── Exercise Search (query params) ────────────────────────────────────────────
 
+/**
+ * Valid values for the `source` filter on the exercises table.
+ *
+ * "free-exercise-db" — exercises seeded from the yuhonas/free-exercise-db repo
+ * "custom"           — user-created exercises (exercises.is_custom = true)
+ *
+ * Keeping this as an explicit enum (rather than z.string()) prevents callers
+ * from probing arbitrary source values against the database, which could be
+ * used to enumerate internal data categories or cause unexpected query plans.
+ *
+ * When a new source type is introduced (e.g. from a new import pipeline),
+ * add it here and update the exercise creation route accordingly.
+ */
+const VALID_EXERCISE_SOURCES = ["free-exercise-db", "custom"] as const;
+
 export const exerciseSearchSchema = z.object({
   query: z.string().optional().default(""),
   muscle_groups: z.string().optional().default(""),
   muscle_group: z.string().optional().default(""),
   equipment: z.string().optional().default(""),
   category: z.string().optional().default(""),
-  source: z.string().optional().default(""),
-  limit: z.coerce.number().int().min(1).max(10000).optional().default(100),
+
+  // Strict enum — rejects arbitrary strings; omitting the field returns all sources
+  source: z.enum(VALID_EXERCISE_SOURCES).optional(),
+
+  // Cap at 200: sufficient for paginated UI (largest known page size is 50).
+  // The previous max of 10,000 allowed a single request to stream the entire
+  // exercises table, constituting a lightweight DoS / data-exfiltration vector.
+  limit: z.coerce.number().int().min(1).max(200).optional().default(100),
 });
 
 export type ExerciseSearchQuery = z.infer<typeof exerciseSearchSchema>;
@@ -160,3 +181,34 @@ export const mealTemplateCreateSchema = z.object({
 });
 
 export type MealTemplateCreate = z.infer<typeof mealTemplateCreateSchema>;
+
+// ── Meal Plans ────────────────────────────────────────────────────────────────
+
+export const mealPlanCreateSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  week_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
+  notes: z.string().max(500).nullable().optional(),
+});
+
+export const mealPlanDayEntryCreateSchema = z.object({
+  day_of_week: z.number().int().min(0).max(6),
+  meal_type: z.enum(["breakfast", "lunch", "dinner", "snack"]),
+  food_item_id: z.string().uuid().nullable().optional(),
+  custom_name: z.string().max(200).nullable().optional(),
+  servings: z.number().positive().max(99),
+  calories: z.number().min(0).nullable().optional(),
+  protein_g: z.number().min(0).nullable().optional(),
+  carbs_g: z.number().min(0).nullable().optional(),
+  fat_g: z.number().min(0).nullable().optional(),
+}).refine(
+  (d) => d.food_item_id != null || (d.custom_name != null && d.custom_name.length > 0),
+  { message: "Either food_item_id or custom_name is required" }
+);
+
+export const mealPlanDayEntryDeleteSchema = z.object({
+  entry_id: z.string().uuid("Invalid entry ID"),
+});
+
+export type MealPlanCreate = z.infer<typeof mealPlanCreateSchema>;
+export type MealPlanDayEntryCreate = z.infer<typeof mealPlanDayEntryCreateSchema>;
+export type MealPlanDayEntryDelete = z.infer<typeof mealPlanDayEntryDeleteSchema>;

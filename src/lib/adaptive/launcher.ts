@@ -91,14 +91,39 @@ export async function computeLauncherWorkout(userId: string): Promise<LauncherPr
     return getPresetWorkout();
   }
 
-  // Process history
-  const workoutHistory: WorkoutHistory[] = history.map(w => ({
-    id: w.id,
-    template_id: w.template_id,
-    started_at: w.started_at,
-    duration_mins: 45, // TODO: Calculate from sets
-    day_of_week: getDayOfWeekInTimezone(new Date(w.started_at), timezone)
-  }));
+  // Fetch set counts per session to estimate duration
+  const sessionIds = history.map(w => w.id);
+  const { data: setCounts } = await supabase
+    .from('workout_sets')
+    .select('session_id')
+    .in('session_id', sessionIds);
+
+  // Build a map of session_id → total sets
+  const setCountMap = new Map<string, number>();
+  if (setCounts) {
+    for (const row of setCounts) {
+      setCountMap.set(row.session_id, (setCountMap.get(row.session_id) || 0) + 1);
+    }
+  }
+
+  // Process history with calculated duration
+  const workoutHistory: WorkoutHistory[] = history.map(w => {
+    const totalSets = setCountMap.get(w.id) || 0;
+    // Estimate exercise count: ~3-4 sets per exercise on average
+    const estimatedExercises = totalSets > 0 ? Math.max(1, Math.round(totalSets / 3.5)) : 0;
+    // Formula: 2.5 min per set (work + rest) + 1.5 min transition per exercise
+    const calculatedDuration = totalSets > 0
+      ? Math.round((totalSets * 2.5) + (estimatedExercises * 1.5))
+      : 45; // fallback when no set data
+
+    return {
+      id: w.id,
+      template_id: w.template_id,
+      started_at: w.started_at,
+      duration_mins: calculatedDuration,
+      day_of_week: getDayOfWeekInTimezone(new Date(w.started_at), timezone),
+    };
+  });
 
   // Strategy 1: Find most common template for this day of week
   const todayWorkouts = workoutHistory.filter(w => w.day_of_week === dayOfWeek);
@@ -292,7 +317,7 @@ export async function getAlternativeTemplates(userId: string, limit: number = 3)
     id: t.id,
     name: t.name,
     exercise_count: Array.isArray(t.template_exercises) ? t.template_exercises.length : 0,
-    last_used: t.updated_at
+    last_used_at: t.updated_at
   }));
 }
 

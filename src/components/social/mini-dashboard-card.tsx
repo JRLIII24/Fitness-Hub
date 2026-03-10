@@ -1,23 +1,11 @@
 "use client";
 
-
-import Link from "next/link";
-import Image from "next/image";
-import { Flame, Dumbbell, Copy, Heart, Play, Activity } from "lucide-react";
+import { Flame, Dumbbell, Copy, Heart, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { CATEGORY_LABELS } from "@/lib/clip-categories";
 import { ProfileWorkoutCalendar } from "./profile-workout-calendar";
-
-export interface ProfileClip {
-  id: string;
-  video_url: string;
-  thumbnail_url: string | null;
-  clip_category: string | null;
-  like_count: number;
-}
 
 export interface MiniTemplate {
   id: string;
@@ -35,11 +23,11 @@ export interface MiniDashboardProfile {
   fitness_goal: string | null;
   current_streak: number;
   is_public: boolean;
+  avatar_url?: string | null;
 }
 
 interface MiniDashboardCardProps {
   profile: MiniDashboardProfile;
-  clips: ProfileClip[];
   templates: MiniTemplate[];
   favoritedTemplates: MiniTemplate[];
   activeWorkout?: { session_name: string; started_at: string; exercise_count: number } | null;
@@ -61,52 +49,8 @@ const GOAL_LABELS: Record<string, string> = {
   sport_performance: "Sport Performance",
 };
 
-function ClipThumb({ clip }: { clip: ProfileClip }) {
-  return (
-    <Link
-      href="/sets"
-      className="relative shrink-0 w-[110px] h-[185px] rounded-xl overflow-hidden bg-black block"
-      aria-label="View Sets"
-    >
-      {clip.thumbnail_url ? (
-        <Image
-          src={clip.thumbnail_url}
-          alt=""
-          fill
-          sizes="110px"
-          unoptimized
-          className="w-full h-full object-cover"
-        />
-      ) : (
-        <video
-          src={clip.video_url}
-          className="w-full h-full object-cover"
-          muted
-          playsInline
-          preload="metadata"
-        />
-      )}
-      {clip.clip_category && (
-        <span className="absolute top-1.5 left-1.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] text-white leading-tight">
-          {CATEGORY_LABELS[clip.clip_category] ?? clip.clip_category}
-        </span>
-      )}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="rounded-full bg-black/50 p-2.5">
-          <Play className="size-4 text-white fill-white" />
-        </div>
-      </div>
-      <div className="absolute bottom-1.5 left-0 right-0 flex items-center justify-center gap-1">
-        <Heart className="size-3 text-white fill-white" />
-        <span className="text-[10px] text-white font-medium">{clip.like_count}</span>
-      </div>
-    </Link>
-  );
-}
-
 export function MiniDashboardCard({
   profile,
-  clips,
   templates,
   favoritedTemplates,
   activeWorkout,
@@ -132,6 +76,9 @@ export function MiniDashboardCard({
         <CardContent className="pt-5 space-y-4">
           <div className="flex items-start gap-3">
             <Avatar className="size-14 shrink-0">
+              {profile.avatar_url && (
+                <AvatarImage src={profile.avatar_url} alt={displayName} />
+              )}
               <AvatarFallback className="text-base font-semibold bg-primary text-primary-foreground">
                 {initials}
               </AvatarFallback>
@@ -209,20 +156,6 @@ export function MiniDashboardCard({
       {workoutDays && workoutDays.length > 0 && (
         <ProfileWorkoutCalendar workoutDays={workoutDays} />
       )}
-
-      {/* Sets clips strip */}
-      <div className="space-y-2">
-        <p className="text-sm font-semibold text-muted-foreground px-1">Sets</p>
-        {clips.length === 0 ? (
-          <p className="text-xs text-muted-foreground px-1">No Sets posted yet.</p>
-        ) : (
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {clips.map((clip) => (
-              <ClipThumb key={clip.id} clip={clip} />
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Shared templates */}
       {templates.length > 0 && (

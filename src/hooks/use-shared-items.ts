@@ -139,8 +139,6 @@ export function useSharedItems(userId: string | null) {
     const readIds = items.filter((i) => !!i.read_at).map((i) => i.id);
     if (readIds.length === 0) return;
 
-    console.log("🗑️ Clearing", readIds.length, "read shared items:", readIds);
-
     const { error } = await supabase
       .from("shared_items")
       .delete()
@@ -151,7 +149,6 @@ export function useSharedItems(userId: string | null) {
       throw error;
     }
 
-    console.log("✅ Shared items cleared successfully");
     setItems((prev) => prev.filter((i) => !i.read_at));
   }, [userId, supabase, items]);
 
@@ -198,7 +195,7 @@ export function useSharedItems(userId: string | null) {
         recipient_id: recipientId,
         item_type: "template",
         template_id: template.id,
-        item_snapshot: snapshot,
+        item_snapshot: snapshot as unknown as import("@/types/database").Json,
         message: message || null,
       });
 
@@ -228,7 +225,7 @@ export function useSharedItems(userId: string | null) {
         recipient_id: recipientId,
         item_type: "meal_day",
         template_id: null,
-        item_snapshot: snapshot,
+        item_snapshot: snapshot as unknown as import("@/types/database").Json,
         message: message || null,
       });
 

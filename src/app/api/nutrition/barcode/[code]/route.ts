@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
+import { rateLimit } from "@/lib/rate-limit";
 
 interface OpenFoodFactsNutriments {
   "energy-kcal_100g"?: number;
@@ -215,6 +216,17 @@ export async function GET(
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
+    // Rate limit: 200 barcode lookups per user per hour.
+    // Keyed by user ID (not IP) since auth is already confirmed above.
+    // Falls back to in-memory enforcement if Redis is unavailable.
+    const allowed = await rateLimit(`barcode:${user!.id}`, 200, 60 * 60 * 1000);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. You may scan up to 200 barcodes per hour." },
+        { status: 429 },
+      );
+    }
+
     // 1. Check local database first
     const { data: existingItem, error: dbError } = await supabase
       .from("food_items")
@@ -273,13 +285,13 @@ export async function GET(
     const { data: inserted, error: insertError } = existingItem
       ? await supabase
           .from("food_items")
-          .update(parsed)
+          .update(parsed as any)
           .eq("id", existingItem.id)
           .select("*")
           .single()
       : await supabase
           .from("food_items")
-          .insert(parsed)
+          .insert(parsed as any)
           .select("*")
           .single();
 

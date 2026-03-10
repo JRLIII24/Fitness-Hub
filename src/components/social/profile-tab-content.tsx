@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Edit, Settings, Flame, Lock, Globe, Target, Trophy } from "lucide-react";
+import { Edit, Settings, Flame, Lock, Globe, Target, Trophy, Users as UsersIcon } from "lucide-react";
 import { useSupabase } from "@/hooks/use-supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/ui/stat-card";
-import { SetsPreviewCard } from "@/components/social/sets-preview-card";
 
 interface ProfileData {
   id: string;
@@ -23,29 +22,15 @@ interface ProfileData {
 }
 
 interface ActivityStats {
-  setsPosted: number;
   templatesShared: number;
   podsJoined: number;
-}
-
-interface ClipPreview {
-  id: string;
-  video_url: string;
-  thumbnail_url: string | null;
-  caption: string | null;
-  clip_category: string | null;
-  like_count: number | null;
-  comment_count: number | null;
-  created_at: string;
 }
 
 export function ProfileTabContent() {
   const router = useRouter();
   const supabase = useSupabase();
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [stats, setStats] = useState<ActivityStats>({ setsPosted: 0, templatesShared: 0, podsJoined: 0 });
-  const [clips, setClips] = useState<ClipPreview[]>([]);
-  const [pinnedClips, setPinnedClips] = useState<ClipPreview[]>([]);
+  const [stats, setStats] = useState<ActivityStats>({ templatesShared: 0, podsJoined: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -53,7 +38,6 @@ export function ProfileTabContent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch profile data
       const { data } = await supabase
         .from("profiles")
         .select("id, display_name, username, bio, fitness_goal, is_public, current_streak")
@@ -72,53 +56,23 @@ export function ProfileTabContent() {
           current_streak: data.current_streak ?? 0,
         });
 
-        // Fetch activity stats in parallel
-        const [clipsCount, templatesCount, podsCount, clipsResult] = await Promise.all([
-          // Sets posted
-          supabase
-            .from("workout_clips")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user.id),
-
-          // Templates shared
+        const [templatesCount, podsCount] = await Promise.all([
           supabase
             .from("workout_templates")
             .select("*", { count: "exact", head: true })
             .eq("user_id", user.id)
             .eq("is_shared", true),
-
-          // Pods joined
           supabase
             .from("pod_members")
             .select("*", { count: "exact", head: true })
             .eq("user_id", user.id)
             .eq("status", "active"),
-
-          // Sets preview
-          supabase
-            .from("workout_clips")
-            .select("id, video_url, thumbnail_url, caption, clip_category, like_count, comment_count, created_at")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(18),
         ]);
 
         setStats({
-          setsPosted: clipsCount.count ?? 0,
           templatesShared: templatesCount.count ?? 0,
           podsJoined: podsCount.count ?? 0,
         });
-        const loadedClips = (clipsResult.data ?? []) as ClipPreview[];
-        setClips(loadedClips);
-        setPinnedClips(
-          [...loadedClips]
-            .sort(
-              (a, b) =>
-                ((b.like_count ?? 0) * 1.4 + (b.comment_count ?? 0) * 2.2) -
-                ((a.like_count ?? 0) * 1.4 + (a.comment_count ?? 0) * 2.2)
-            )
-            .slice(0, 3)
-        );
       }
       setLoading(false);
     }
@@ -167,7 +121,6 @@ export function ProfileTabContent() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Avatar + Name */}
           <div className="flex items-center gap-3">
             <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
               <span className="text-2xl font-bold text-primary">
@@ -183,12 +136,10 @@ export function ProfileTabContent() {
               </div>
           </div>
 
-          {/* Bio */}
           {profile.bio && (
             <p className="text-sm">{profile.bio}</p>
           )}
 
-          {/* Stats */}
           <div className="flex flex-wrap gap-2">
             {profile.current_streak > 0 && (
               <Badge variant="secondary" className="text-xs">
@@ -240,28 +191,20 @@ export function ProfileTabContent() {
       </Card>
 
       {/* Activity Stats */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <StatCard
           icon={<Trophy className="h-4 w-4 text-primary" />}
-          value={stats.setsPosted}
-          label="Sets Posted"
-          className="border-border/70 bg-card/80"
-        />
-        <StatCard
-          icon={<Edit className="h-4 w-4 text-primary" />}
           value={stats.templatesShared}
           label="Shared"
           className="border-border/70 bg-card/80"
         />
         <StatCard
-          icon={<Settings className="h-4 w-4 text-primary" />}
+          icon={<UsersIcon className="h-4 w-4 text-primary" />}
           value={stats.podsJoined}
           label="Pods"
           className="border-border/70 bg-card/80"
         />
       </div>
-
-      <SetsPreviewCard clips={clips} pinnedClips={pinnedClips} currentUserId={profile.id} />
     </div>
   );
 }

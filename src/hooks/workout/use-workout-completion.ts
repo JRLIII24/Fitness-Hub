@@ -8,7 +8,12 @@ import {
 } from "@/lib/retention-events";
 import type { ActiveWorkout, WorkoutSet } from "@/types/workout";
 import type { WorkoutStats } from "@/components/workout/workout-complete-celebration";
+import type { WorkoutRecap } from "@/components/workout/workout-recap-card";
 import type { GhostWorkoutData } from "./use-ghost-session";
+import { WORKOUT_RECAP_ENABLED } from "@/lib/features";
+import { enqueueMutation } from "@/lib/offline/queue";
+import type { SaveWorkoutPayload } from "@/lib/offline/queue.types";
+import { uuid } from "@/lib/uuid";
 
 function isMissingTableError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -49,12 +54,15 @@ export function useWorkoutCompletion({
   setDbFeaturesAvailable,
 }: UseWorkoutCompletionArgs) {
   const [celebrationStats, setCelebrationStats] = useState<WorkoutStats | null>(null);
+  const [celebrationWorkoutName, setCelebrationWorkoutName] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [levelUpData, setLevelUpData] = useState<{ newLevel: number } | null>(null);
   const [sessionRpePromptOpen, setSessionRpePromptOpen] = useState(false);
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [sessionRpeValue, setSessionRpeValue] = useState(7);
   const [savingSessionRpe, setSavingSessionRpe] = useState(false);
+  const [recapData, setRecapData] = useState<WorkoutRecap | null>(null);
+  const [recapLoading, setRecapLoading] = useState(false);
 
   const handleFinishWorkout = useCallback(async () => {
     if (!userId) return;
@@ -155,7 +163,73 @@ export function useWorkoutCompletion({
       hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
     const nowIso = new Date().toISOString();
+    const isOnline = typeof navigator !== "undefined" && navigator.onLine;
 
+    // Build set rows used for both online save and offline queue
+    let sortOrder = 0;
+    const queueSetRows = workout.exercises.flatMap((exerciseBlock) =>
+      exerciseBlock.sets.map((set) => {
+        sortOrder += 1;
+        return {
+          exerciseId: exerciseBlock.exercise.id,
+          setNumber: set.set_number,
+          setType: set.set_type,
+          weightKg: set.weight_kg,
+          reps: set.reps,
+          rir: set.rir,
+          restSeconds: set.rest_seconds,
+          completedAt: set.completed ? set.completed_at ?? nowIso : null,
+          sortOrder: sortOrder,
+        };
+      })
+    );
+
+    const durationSeconds = Math.max(
+      0,
+      Math.floor((new Date(nowIso).getTime() - new Date(workout.started_at).getTime()) / 1000)
+    );
+
+    // ---- OFFLINE PATH: queue mutation and show celebration immediately ----
+    if (!isOnline) {
+      const offlineSessionId = uuid();
+      const queuePayload: SaveWorkoutPayload = {
+        userId,
+        sessionId: offlineSessionId,
+        templateId: workout.template_id ?? null,
+        name: workout.name,
+        startedAt: workout.started_at,
+        endedAt: nowIso,
+        durationSeconds,
+        totalVolumeKg: Number(totalVolume.toFixed(2)),
+        notes: workout.notes ?? "",
+        setRows: queueSetRows,
+      };
+
+      await enqueueMutation("SAVE_WORKOUT_SESSION", queuePayload, offlineSessionId);
+
+      toast.info("Workout saved offline", {
+        description: "It will sync automatically when you reconnect.",
+        duration: 5000,
+      });
+
+      // Show celebration even when offline
+      setCelebrationWorkoutName(workout.name);
+      setCelebrationStats({
+        duration: durationString,
+        exerciseCount: workout.exercises.length,
+        totalVolume: toDisplayVolume(totalVolume),
+        unitLabel,
+        prCount,
+        totalSets: allSets.length,
+        beatGhostCount: ghostWorkoutData ? beatGhostCount : undefined,
+        exercises: exerciseRecap,
+      });
+      setShowCelebration(true);
+      // No pendingSessionId — RPE prompt will be skipped offline
+      return;
+    }
+
+    // ---- ONLINE PATH: existing Supabase flow ----
     const { data: session, error: sessionError } = await supabase
       .from("workout_sessions")
       .insert({
@@ -173,6 +247,46 @@ export function useWorkoutCompletion({
       .single();
 
     if (sessionError || !session) {
+      // If the online save fails due to network issues, fall back to offline queue
+      if (sessionError && !isMissingTableError(sessionError)) {
+        const offlineSessionId = uuid();
+        const queuePayload: SaveWorkoutPayload = {
+          userId,
+          sessionId: offlineSessionId,
+          templateId: workout.template_id ?? null,
+          name: workout.name,
+          startedAt: workout.started_at,
+          endedAt: nowIso,
+          durationSeconds,
+          totalVolumeKg: Number(totalVolume.toFixed(2)),
+          notes: workout.notes ?? "",
+          setRows: queueSetRows,
+        };
+
+        try {
+          await enqueueMutation("SAVE_WORKOUT_SESSION", queuePayload, offlineSessionId);
+          toast.info("Workout saved offline", {
+            description: "It will sync automatically when you reconnect.",
+            duration: 5000,
+          });
+          setCelebrationWorkoutName(workout.name);
+          setCelebrationStats({
+            duration: durationString,
+            exerciseCount: workout.exercises.length,
+            totalVolume: toDisplayVolume(totalVolume),
+            unitLabel,
+            prCount,
+            totalSets: allSets.length,
+            beatGhostCount: ghostWorkoutData ? beatGhostCount : undefined,
+            exercises: exerciseRecap,
+          });
+          setShowCelebration(true);
+          return;
+        } catch {
+          // If even queueing fails, show the original error
+        }
+      }
+
       if (sessionError && isMissingTableError(sessionError)) {
         setDbFeaturesAvailable(false);
         toast.message(
@@ -184,26 +298,20 @@ export function useWorkoutCompletion({
       return;
     }
 
-    let sortOrder = 0;
-    const setRows = workout.exercises.flatMap((exerciseBlock) =>
-      exerciseBlock.sets.map((set) => {
-        sortOrder += 1;
-        return {
-          session_id: session.id,
-          exercise_id: exerciseBlock.exercise.id,
-          set_number: set.set_number,
-          set_type: set.set_type,
-          reps: set.reps,
-          weight_kg: set.weight_kg,
-          rir: set.rir,
-          rest_seconds: set.rest_seconds,
-          completed_at: set.completed ? set.completed_at ?? nowIso : null,
-          sort_order: sortOrder,
-        };
-      })
-    );
+    const dbSetRows = queueSetRows.map((s) => ({
+      session_id: session.id,
+      exercise_id: s.exerciseId,
+      set_number: s.setNumber,
+      set_type: s.setType,
+      reps: s.reps,
+      weight_kg: s.weightKg,
+      rir: s.rir,
+      rest_seconds: s.restSeconds,
+      completed_at: s.completedAt,
+      sort_order: s.sortOrder,
+    }));
 
-    const { error: setsError } = await supabase.from("workout_sets").insert(setRows);
+    const { error: setsError } = await supabase.from("workout_sets").insert(dbSetRows);
 
     if (setsError) {
       if (isMissingTableError(setsError)) {
@@ -230,10 +338,7 @@ export function useWorkoutCompletion({
       .update({
         status: "completed",
         completed_at: nowIso,
-        duration_seconds: Math.max(
-          0,
-          Math.floor((new Date(nowIso).getTime() - new Date(workout.started_at).getTime()) / 1000)
-        ),
+        duration_seconds: durationSeconds,
         total_volume_kg: Number(totalVolume.toFixed(2)),
         notes: workout.notes,
       })
@@ -243,6 +348,15 @@ export function useWorkoutCompletion({
     if (completeError) {
       toast.error(completeError.message ?? "Workout saved, but completion sync failed.");
       return;
+    }
+
+    // Auto-advance training program if this workout is linked to one (non-blocking)
+    if (workout.template_id) {
+      fetch("/api/programs/advance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_id: workout.template_id }),
+      }).catch(() => {});
     }
 
     const setsCompleted = workout.exercises.flatMap((exercise) => exercise.sets).filter(
@@ -255,10 +369,7 @@ export function useWorkoutCompletion({
       exercise_count: workout.exercises.length,
       completed_sets: setsCompleted,
       total_volume_kg: Number(totalVolume.toFixed(2)),
-      duration_seconds: Math.max(
-        0,
-        Math.floor((new Date(nowIso).getTime() - new Date(workout.started_at).getTime()) / 1000)
-      ),
+      duration_seconds: durationSeconds,
     });
 
     // Investment loop: automatically seed a next-session intent for tomorrow.
@@ -330,6 +441,7 @@ export function useWorkoutCompletion({
     }
 
     // Show celebration modal with stats
+    setCelebrationWorkoutName(workout.name);
     setCelebrationStats({
       duration: durationString,
       exerciseCount: workout.exercises.length,
@@ -342,6 +454,22 @@ export function useWorkoutCompletion({
     });
     setShowCelebration(true);
     setPendingSessionId(session.id);
+
+    // Fire async AI recap (non-blocking)
+    if (WORKOUT_RECAP_ENABLED) {
+      setRecapLoading(true);
+      fetch("/api/ai/workout-recap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: session.id }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.recap) setRecapData(data.recap);
+        })
+        .catch(() => {})
+        .finally(() => setRecapLoading(false));
+    }
   }, [
     userId,
     finishWorkout,
@@ -415,8 +543,12 @@ export function useWorkoutCompletion({
   return {
     // Celebration
     celebrationStats,
+    celebrationWorkoutName,
     showCelebration,
     levelUpData,
+    // AI Recap
+    recapData,
+    recapLoading,
     // RPE prompt
     sessionRpePromptOpen,
     setSessionRpePromptOpen,

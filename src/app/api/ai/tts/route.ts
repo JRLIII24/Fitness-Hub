@@ -1,21 +1,25 @@
 /**
- * Text-to-Speech API
+ * Text-to-Speech API — Streaming
  * POST /api/ai/tts
  *
- * Proxies to ElevenLabs REST API directly (no SDK) so the API key stays
- * server-side. Returns audio/mpeg suitable for Web Audio API playback.
+ * Proxies to ElevenLabs streaming endpoint. Returns chunked audio/mpeg
+ * that can start playing before the full audio is generated.
  *
  * Voice: configurable via ELEVENLABS_VOICE_ID env var
- * Default voice: 6OzrBCQf8cjERkYgzSg
  * Model: eleven_multilingual_v2
+ * Rate limit: 100/day
  */
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
+import { rateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 
-const VOICE_ID = process.env.ELEVENLABS_VOICE_ID ?? "6OzrBCQf8cjERkYgzSg8";
+const DAILY_LIMIT = 100;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+const VOICE_ID = process.env.ELEVENLABS_VOICE_ID ?? "kPzsL2i3teMYv0FxEYQ6";
 const ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech";
 
 const BodySchema = z.object({
@@ -29,8 +33,17 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient();
-  const { response: authErr } = await requireAuth(supabase);
+  const { user, response: authErr } = await requireAuth(supabase);
   if (authErr) return authErr;
+
+  const allowed = await rateLimit(
+    `ai:tts:${user.id}`,
+    DAILY_LIMIT,
+    ONE_DAY_MS,
+  );
+  if (!allowed) {
+    return NextResponse.json({ limitReached: true }, { status: 429 });
+  }
 
   const raw = await request.json().catch(() => null);
   const parsed = BodySchema.safeParse(raw);
@@ -52,38 +65,52 @@ export async function POST(request: Request) {
   }
 
   try {
-    const res = await fetch(`${ELEVENLABS_API_URL}/${VOICE_ID}`, {
+    // Use the streaming endpoint for lower latency
+    const res = await fetch(`${ELEVENLABS_API_URL}/${VOICE_ID}/stream`, {
       method: "POST",
       headers: {
         "xi-api-key": apiKey,
         "Content-Type": "application/json",
-        "Accept": "audio/mpeg",
+        Accept: "audio/mpeg",
       },
       body: JSON.stringify({
         text: cleaned,
         model_id: "eleven_multilingual_v2",
         output_format: "mp3_44100_128",
+        optimize_streaming_latency: 3,
       }),
     });
 
     if (!res.ok) {
       const err = await res.text().catch(() => "unknown error");
       console.error("ElevenLabs API error:", res.status, err);
-      return NextResponse.json({ error: "TTS generation failed" }, { status: 500 });
+      return NextResponse.json(
+        { error: "TTS generation failed" },
+        { status: 500 },
+      );
     }
 
-    const buffer = Buffer.from(await res.arrayBuffer());
+    // Stream the response body directly to the client
+    if (!res.body) {
+      return NextResponse.json(
+        { error: "No audio stream" },
+        { status: 500 },
+      );
+    }
 
-    return new NextResponse(buffer, {
+    return new Response(res.body, {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
-        "Content-Length": String(buffer.byteLength),
+        "Transfer-Encoding": "chunked",
         "Cache-Control": "no-store",
       },
     });
   } catch (error) {
     console.error("ElevenLabs TTS error:", error);
-    return NextResponse.json({ error: "TTS generation failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "TTS generation failed" },
+      { status: 500 },
+    );
   }
 }

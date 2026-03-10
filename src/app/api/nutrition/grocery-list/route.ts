@@ -2,20 +2,15 @@
  * Grocery List Generator API
  * POST /api/nutrition/grocery-list — Generate from food log
  *
- * Model: Sonnet
- * Rate limit: 5/day
+ * Model: Haiku
  */
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
-import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import {
-  getAnthropicClient,
-  ANTHROPIC_SONNET,
-} from "@/lib/anthropic-client";
-import { callAnthropicWithTool } from "@/lib/anthropic-helper";
+import { generateObject } from "ai";
+import { getAnthropicProvider, HAIKU } from "@/lib/ai-sdk";
 import { GROCERY_GENERATION_PROMPT } from "@/lib/ai-prompts/grocery";
 import {
   GroceryAIOutputSchema,
@@ -23,64 +18,16 @@ import {
 } from "@/lib/grocery/types";
 import { getUserTimezone } from "@/lib/timezone";
 
-const DAILY_LIMIT = 5;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-const TOOL_SCHEMA = {
-  type: "object" as const,
-  properties: {
-    categories: {
-      type: "array",
-      maxItems: 12,
-      items: {
-        type: "object",
-        properties: {
-          category: { type: "string" },
-          items: {
-            type: "array",
-            maxItems: 30,
-            items: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                quantity: { type: "string" },
-                unit: { type: "string" },
-                note: { type: "string" },
-                checked: { type: "boolean" },
-              },
-              required: ["name", "quantity", "unit"],
-            },
-          },
-        },
-        required: ["category", "items"],
-      },
-    },
-    summary: { type: "string" },
-    estimated_weekly_calories: { type: "number" },
-    estimated_weekly_protein_g: { type: "number" },
-  },
-  required: ["categories", "summary"],
-};
-
 export async function POST() {
   try {
-    const client = getAnthropicClient();
-    if (!client) {
+    const provider = getAnthropicProvider();
+    if (!provider) {
       return NextResponse.json({ error: "AI unavailable" }, { status: 503 });
     }
 
     const supabase = await createClient();
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
-
-    const allowed = await rateLimit(
-      `ai:grocery:${user.id}`,
-      DAILY_LIMIT,
-      ONE_DAY_MS,
-    );
-    if (!allowed) {
-      return NextResponse.json({ limitReached: true }, { status: 429 });
-    }
 
     // Fetch aggregated food log summary (SQL does the heavy lifting)
     const { data: foodSummary, error: rpcError } = await supabase.rpc(
@@ -126,33 +73,13 @@ export async function POST() {
       summaryTable,
     );
 
-    const result = await callAnthropicWithTool<GroceryAIOutput>({
-      client,
-      model: ANTHROPIC_SONNET,
-      systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content:
-            "Generate my grocery list for this week based on my eating patterns.",
-        },
-      ],
-      toolName: "grocery_list",
-      toolDescription:
-        "Generate a categorized grocery shopping list from food log patterns",
-      toolSchema: TOOL_SCHEMA,
-      zodSchema: GroceryAIOutputSchema,
-      maxTokens: 4096,
+    const { object: aiOutput } = await generateObject({
+      model: provider(HAIKU),
+      schema: GroceryAIOutputSchema,
+      system: systemPrompt,
+      prompt: "Generate my grocery list for this week based on my eating patterns.",
+      maxOutputTokens: 4096,
     });
-
-    if (result.error || !result.data) {
-      return NextResponse.json(
-        { error: result.error ?? "AI returned no data" },
-        { status: result.status ?? 500 },
-      );
-    }
-
-    const aiOutput = result.data;
 
     // Upsert into grocery_lists
     const timezone = await getUserTimezone(user.id);

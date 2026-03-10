@@ -54,7 +54,9 @@ export interface MemberProgress {
   user_id: string;
   display_name: string | null;
   username: string | null;
+  avatar_url?: string | null;
   commitment: number; // workouts per week goal
+  planned_days: string[]; // e.g. ['mon','wed','fri']
   completed: number; // workouts completed this week
   progress_percentage: number; // 0-100
   is_on_track: boolean; // >= commitment

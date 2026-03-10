@@ -35,9 +35,9 @@ export async function POST(req: NextRequest) {
       .insert({
         name: name.trim(),
         slug: `${slug}-${Date.now()}`,
-        muscle_group,
-        equipment,
-        category,
+        muscle_group: muscle_group as any,
+        equipment: equipment as any,
+        category: category as any,
         instructions: instructions?.trim() || null,
         is_custom: true,
         created_by: user.id,

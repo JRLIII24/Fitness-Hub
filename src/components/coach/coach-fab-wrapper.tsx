@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AI_COACH_ENABLED } from "@/lib/features";
+import { AI_COACH_ENABLED, FORM_ANALYSIS_ENABLED } from "@/lib/features";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { CoachFab } from "./coach-fab";
 import { T, orbColors, statusMessages } from "@/lib/coach-tokens";
@@ -10,6 +10,7 @@ import type { OrbState } from "@/lib/coach-tokens";
 import type { CoachContext } from "@/lib/coach/types";
 
 type MacroSummary = CoachContext["daily_macros"];
+type FormReport = CoachContext["latest_form_report"];
 
 /**
  * Thin client wrapper so the server-rendered app layout can mount CoachFab
@@ -25,6 +26,7 @@ export function CoachFabWrapper() {
   // All hooks must be called unconditionally — Rules of Hooks
   const activeWorkout = useWorkoutStore((s) => s.activeWorkout);
   const [dailyMacros, setDailyMacros] = useState<MacroSummary>(null);
+  const [formReport, setFormReport] = useState<FormReport>(null);
   const [orbState, setOrbState] = useState<OrbState>("idle");
   const [showTooltip, setShowTooltip] = useState(false);
 
@@ -39,6 +41,17 @@ export function CoachFabWrapper() {
         if (data.target_calories != null) {
           setDailyMacros(data as MacroSummary);
         }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Fetch latest form analysis report — only when form analysis is enabled
+  useEffect(() => {
+    if (!AI_COACH_ENABLED || !FORM_ANALYSIS_ENABLED) return;
+    fetch("/api/form-check/latest")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setFormReport(data as FormReport);
       })
       .catch(() => undefined);
   }, []);
@@ -77,6 +90,7 @@ export function CoachFabWrapper() {
     experience_level: null,
     daily_macros: dailyMacros,
     recent_prs: null,
+    latest_form_report: formReport,
   };
 
   const orbColor = orbColors[orbState];

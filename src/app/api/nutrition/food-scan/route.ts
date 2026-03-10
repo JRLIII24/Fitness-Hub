@@ -5,9 +5,8 @@
  * Photograph food → macro estimates with portion review.
  * Replaces /api/nutrition/vision.
  *
- * Model: Sonnet (vision)
+ * Model: Sonnet (vision — accurate macro estimation)
  * Runtime: nodejs (NOT edge — Vercel edge has 4MB body limit)
- * Rate limit: 15/day
  */
 
 export const runtime = "nodejs";
@@ -15,56 +14,16 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
-import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import {
-  getAnthropicClient,
-  ANTHROPIC_SONNET,
-} from "@/lib/anthropic-client";
-import { callAnthropicWithTool } from "@/lib/anthropic-helper";
+import { generateObject } from "ai";
+import { getAnthropicProvider, SONNET } from "@/lib/ai-sdk";
 import { FOOD_SCAN_PROMPT } from "@/lib/ai-prompts/vision";
 import {
   FoodScanResultSchema,
   type FoodScanResult,
 } from "@/lib/food-scanner/types";
 
-const DAILY_LIMIT = 15;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB
-
-const TOOL_SCHEMA = {
-  type: "object" as const,
-  properties: {
-    items: {
-      type: "array",
-      maxItems: 20,
-      items: {
-        type: "object",
-        properties: {
-          food_name: { type: "string" },
-          assumed_portion: { type: "string" },
-          confidence: { type: "string", enum: ["high", "medium", "low"] },
-          estimated_calories: { type: "number" },
-          estimated_protein_g: { type: "number" },
-          estimated_carbs_g: { type: "number" },
-          estimated_fat_g: { type: "number" },
-          notes: { type: "string" },
-        },
-        required: [
-          "food_name",
-          "assumed_portion",
-          "confidence",
-          "estimated_calories",
-          "estimated_protein_g",
-          "estimated_carbs_g",
-          "estimated_fat_g",
-        ],
-      },
-    },
-    overall_notes: { type: "string" },
-  },
-  required: ["items"],
-};
 
 function getImageMediaType(
   image: string,
@@ -81,23 +40,14 @@ function extractBase64Data(image: string): string {
 
 export async function POST(request: Request) {
   try {
-    const client = getAnthropicClient();
-    if (!client) {
+    const provider = getAnthropicProvider();
+    if (!provider) {
       return NextResponse.json({ error: "AI unavailable" }, { status: 503 });
     }
 
     const supabase = await createClient();
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
-
-    const allowed = await rateLimit(
-      `ai:food-scan:${user.id}`,
-      DAILY_LIMIT,
-      ONE_DAY_MS,
-    );
-    if (!allowed) {
-      return NextResponse.json({ limitReached: true }, { status: 429 });
-    }
 
     const body = await request.json();
     const image: string | undefined = body?.image;
@@ -131,21 +81,17 @@ export async function POST(request: Request) {
 
     const mediaType = getImageMediaType(image);
 
-    const result = await callAnthropicWithTool<FoodScanResult>({
-      client,
-      model: ANTHROPIC_SONNET,
-      systemPrompt,
+    const { object } = await generateObject({
+      model: provider(SONNET),
+      schema: FoodScanResultSchema,
+      system: systemPrompt,
       messages: [
         {
           role: "user",
           content: [
             {
               type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType,
-                data: base64Data,
-              },
+              image: `data:${mediaType};base64,${base64Data}`,
             },
             {
               type: "text",
@@ -154,22 +100,10 @@ export async function POST(request: Request) {
           ],
         },
       ],
-      toolName: "food_estimation",
-      toolDescription:
-        "Estimate nutritional content for each food item in the photo",
-      toolSchema: TOOL_SCHEMA,
-      zodSchema: FoodScanResultSchema,
-      maxTokens: 2048,
+      maxOutputTokens: 2048,
     });
 
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status },
-      );
-    }
-
-    return NextResponse.json(result.data);
+    return NextResponse.json(object);
   } catch (error) {
     logger.error("Food scan API error:", error);
     return NextResponse.json(

@@ -21,20 +21,21 @@ export async function GET() {
   // Fetch nutrition goals
   const { data: goals } = await supabase
     .from("nutrition_goals")
-    .select("target_calories, target_protein_g, target_carbs_g, target_fat_g")
+    .select("calories_target, protein_g_target, carbs_g_target, fat_g_target")
     .eq("user_id", user.id)
     .single();
 
-  // Sum today's food log entries
+  // Sum today's food log entries (filter by logged_at date)
   const { data: logs } = await supabase
     .from("food_log")
-    .select("calories, protein_g, carbs_g, fat_g")
+    .select("calories_consumed, protein_g, carbs_g, fat_g")
     .eq("user_id", user.id)
-    .eq("logged_date", today);
+    .gte("logged_at", `${today}T00:00:00`)
+    .lt("logged_at", `${today}T23:59:59.999`);
 
   const consumed = (logs ?? []).reduce(
     (acc, row) => ({
-      calories: acc.calories + (row.calories ?? 0),
+      calories: acc.calories + (row.calories_consumed ?? 0),
       protein: acc.protein + (row.protein_g ?? 0),
       carbs: acc.carbs + (row.carbs_g ?? 0),
       fat: acc.fat + (row.fat_g ?? 0),
@@ -43,13 +44,13 @@ export async function GET() {
   );
 
   return NextResponse.json({
-    target_calories: goals?.target_calories ?? null,
+    target_calories: goals?.calories_target ?? null,
     consumed_calories: Math.round(consumed.calories),
-    target_protein: goals?.target_protein_g ?? null,
+    target_protein: goals?.protein_g_target ?? null,
     consumed_protein: Math.round(consumed.protein),
-    target_carbs: goals?.target_carbs_g ?? null,
+    target_carbs: goals?.carbs_g_target ?? null,
     consumed_carbs: Math.round(consumed.carbs),
-    target_fat: goals?.target_fat_g ?? null,
+    target_fat: goals?.fat_g_target ?? null,
     consumed_fat: Math.round(consumed.fat),
   });
 }

@@ -11,6 +11,7 @@ import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-
 import {
   trackSessionIntentSet,
 } from "@/lib/retention-events";
+import { EXERCISE_LIBRARY } from "@/lib/exercise-library";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
 import type { ActiveWorkout, Exercise, WorkoutSet } from "@/types/workout";
@@ -252,13 +253,25 @@ export default function WorkoutPage() {
 
   // --- Extracted hooks ---
 
+  // Build exerciseId -> muscleGroup map for smart overload suggestions
+  const exerciseMuscleGroups = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (activeWorkout) {
+      for (const ex of activeWorkout.exercises) {
+        map[ex.exercise.id] = ex.exercise.muscle_group;
+      }
+    }
+    return map;
+  }, [activeWorkout]);
+
   // Ghost session: loads ghost data for selected template
   const {
     ghostWorkoutData,
     ghostIsLoading,
     suggestedWeightsByKey,
+    smartSuggestions,
     patchGhostForExercise,
-  } = useGhostSession(supabase, userId, selectedTemplateId, preference);
+  } = useGhostSession(supabase, userId, selectedTemplateId, preference, exerciseMuscleGroups);
 
   // Exercise swap: manages swap sheet state + targeted ghost refetch
   const {
@@ -270,8 +283,11 @@ export default function WorkoutPage() {
   // Workout completion: finish, cancel, celebration, RPE
   const {
     celebrationStats,
+    celebrationWorkoutName,
     showCelebration,
     levelUpData,
+    recapData,
+    recapLoading,
     sessionRpePromptOpen,
     setSessionRpePromptOpen,
     sessionRpeValue,
@@ -783,7 +799,7 @@ export default function WorkoutPage() {
       .from("exercises")
       .select(EXERCISE_SELECT_COLS)
       .eq("name", exercise.name)
-      .eq("muscle_group", exercise.muscle_group)
+      .eq("muscle_group", exercise.muscle_group as any)
       .limit(1)
       .maybeSingle();
 
@@ -796,9 +812,9 @@ export default function WorkoutPage() {
       .insert({
         name: exercise.name,
         slug: candidateSlug,
-        muscle_group: exercise.muscle_group,
-        equipment: normalizeEquipment(exercise.equipment),
-        category: exercise.category,
+        muscle_group: exercise.muscle_group as any,
+        equipment: normalizeEquipment(exercise.equipment) as any,
+        category: exercise.category as any,
         instructions: exercise.instructions,
         form_tips: exercise.form_tips,
         image_url: exercise.image_url,
@@ -894,7 +910,7 @@ export default function WorkoutPage() {
 
       const { data: inserted, error: insertError } = await supabase
         .from("exercises")
-        .insert(toInsert)
+        .insert(toInsert as any)
         .select(EXERCISE_SELECT_COLS);
 
       if (insertError) {
@@ -1162,8 +1178,33 @@ export default function WorkoutPage() {
 
       if (presetId !== "custom") {
         const preset = POPULAR_WORKOUTS.find((item) => item.id === presetId);
+        const liftNames = preset?.lifts.map((l) => l.name) ?? [];
+
+        // Fetch exercises by name directly from DB — allExercises may be empty
+        // when the user hasn't browsed the exercise picker yet
+        const { data: presetExercises } = await supabase
+          .from("exercises")
+          .select(EXERCISE_SELECT_COLS)
+          .in("name", liftNames);
+
+        const exerciseByName = new Map<string, Exercise>();
+        for (const row of presetExercises ?? []) {
+          const ex = row as unknown as Exercise;
+          if (!exerciseByName.has(ex.name)) exerciseByName.set(ex.name, ex);
+        }
+
+        // For exercises not yet in DB, use EXERCISE_LIBRARY stubs —
+        // ensureExerciseRecordsBatch will create them
+        const libraryByName = new Map<string, Exercise>();
+        for (const ex of EXERCISE_LIBRARY) {
+          if (!libraryByName.has(ex.name)) libraryByName.set(ex.name, ex);
+        }
+
         const liftsWithExercises = (preset?.lifts ?? [])
-          .map((lift) => ({ lift, exercise: allExercises.find((item) => item.name === lift.name) }))
+          .map((lift) => ({
+            lift,
+            exercise: exerciseByName.get(lift.name) ?? libraryByName.get(lift.name),
+          }))
           .filter((r): r is { lift: typeof r.lift; exercise: Exercise } => r.exercise != null);
 
         const resolved = await ensureExerciseRecordsBatch(liftsWithExercises.map((r) => r.exercise));
@@ -1820,12 +1861,13 @@ export default function WorkoutPage() {
                         ) : null}
                         {activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
                           <ExerciseCard
-                            key={exerciseBlock.exercise.id}
+                            key={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
                             exerciseBlock={exerciseBlock}
                             exerciseIndex={exerciseIndex}
                             ghostSets={ghostWorkoutData?.exercises[exerciseBlock.exercise.id]}
                             previousSets={previousByExerciseId[exerciseBlock.exercise.id]}
                             suggestedWeights={suggestedWeightsByKey[exerciseBlock.exercise.id]}
+                            smartSuggestions={smartSuggestions[exerciseBlock.exercise.id]}
                             trendline={exerciseTrendlines[exerciseBlock.exercise.id]}
                             preference={preference}
                             onUpdateSet={updateSet}
@@ -1930,6 +1972,9 @@ export default function WorkoutPage() {
             stats={celebrationStats}
             confettiStyle="gold"
             onClose={handleCloseWorkoutCelebration}
+            recapData={recapData}
+            recapLoading={recapLoading}
+            workoutName={celebrationWorkoutName ?? undefined}
           />
         )}
 

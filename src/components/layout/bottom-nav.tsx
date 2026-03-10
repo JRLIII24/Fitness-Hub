@@ -8,10 +8,11 @@ import {
   Dumbbell,
   Apple,
   Users,
-  Clapperboard,
-  Plus,
+  ScanLine,
   Settings,
   Store,
+  Target,
+  Calendar,
 } from "lucide-react";
 import type { ElementType } from "react";
 import { cn } from "@/lib/utils";
@@ -43,12 +44,12 @@ export function BottomNav() {
         supabase
           .from("pings")
           .select("id", { count: "exact", head: true })
-          .eq("recipient_id", userId)
+          .eq("recipient_id", userId!)
           .is("read_at", null),
         supabase
           .from("shared_items")
           .select("id", { count: "exact", head: true })
-          .eq("recipient_id", userId)
+          .eq("recipient_id", userId!)
           .is("read_at", null),
       ]);
 
@@ -103,17 +104,22 @@ export function BottomNav() {
       icon: Dumbbell,
       pulse: isWorkoutActive,
     },
-    { href: "/sets/upload", label: "Post", icon: Plus },
-    { href: "/sets", label: "Sets", icon: Clapperboard },
+    { href: "/workout/form-check", label: "Form", icon: ScanLine },
     { href: "/nutrition", label: "Nutrition", icon: Apple },
+    { href: "/pods", label: "Pods", icon: Target },
     { href: "/social", label: "Social", icon: Users, badge: unreadCount },
-    ...(MARKETPLACE_ENABLED ? [{ href: "/marketplace", label: "Marketplace", icon: Store }] : []),
-{ href: "/settings", label: "Settings", icon: Settings },
+    ...(MARKETPLACE_ENABLED ? [{ href: "/marketplace", label: "Templates", icon: Store }] : []),
+    { href: "/programs", label: "Programs", icon: Calendar },
+    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   const isTabActive = (href: string) => {
     if (href === "/dashboard") return pathname.startsWith("/dashboard");
-    if (href === "/sets") return pathname === "/sets" || (pathname.startsWith("/sets/") && !pathname.startsWith("/sets/upload"));
+    // If a more specific tab owns this path, don't mark the parent as active.
+    const superseded = tabs.some(
+      (t) => t.href !== href && t.href.startsWith(href + "/") && pathname.startsWith(t.href)
+    );
+    if (superseded) return false;
     return pathname.startsWith(href);
   };
 

@@ -1,5 +1,259 @@
 import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
+
+// ── Module-level helpers (shared by all PDF generators) ───────────────────────
+
+function hexToRgb(hex: string): [number, number, number] {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return [r, g, b];
+}
+
+function setFill(doc: jsPDF, hex: string) {
+    doc.setFillColor(...hexToRgb(hex));
+}
+
+function setDraw(doc: jsPDF, hex: string) {
+    doc.setDrawColor(...hexToRgb(hex));
+}
+
+function setTextColor(doc: jsPDF, hex: string) {
+    doc.setTextColor(...hexToRgb(hex));
+}
+
+function addPageHeader(doc: jsPDF, title: string, subtitle: string) {
+    const W = doc.internal.pageSize.getWidth();
+    const margin = 16;
+    setFill(doc, "#111827");
+    doc.rect(0, 0, W, 22, "F");
+    setTextColor(doc, "#ffffff");
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(title, margin, 14);
+    setTextColor(doc, "#9ca3af");
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(subtitle, margin, 19);
+}
+
+function addPageFooters(doc: jsPDF) {
+    const margin = 16;
+    const W = doc.internal.pageSize.getWidth();
+    const pageCount = doc.getNumberOfPages();
+    for (let p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        const H = doc.internal.pageSize.getHeight();
+        setDraw(doc, "#e5e7eb");
+        doc.setLineWidth(0.3);
+        doc.line(margin, H - 10, margin + (W - margin * 2), H - 10);
+        setTextColor(doc, "#9ca3af");
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "normal");
+        doc.text("Powered by Fit-Hub • Your personal fitness companion", margin, H - 6);
+        doc.text(`Page ${p} of ${pageCount}`, W - margin, H - 6, { align: "right" });
+    }
+}
+
+// ── Nutrition PDF ─────────────────────────────────────────────────────────────
+
+export interface NutritionPDFData {
+    userName: string;
+    reportDate: Date;
+    period: 7 | 30 | 90;
+    averageCalories: number;
+    averageProtein: number;
+    averageCarbs: number;
+    averageFat: number;
+    goals: { calories_target: number | null; protein_g_target: number | null } | null;
+    dailyRows: {
+        date: string;
+        calories: number;
+        protein_g: number;
+        carbs_g: number;
+        fat_g: number;
+    }[];
+}
+
+/**
+ * Builds a nutrition history PDF programmatically with jsPDF + autotable.
+ * No html2canvas — safe from oklch/lab color parsing issues.
+ */
+export async function generateNutritionPDF(data: NutritionPDFData): Promise<void> {
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    const margin = 16;
+    const contentW = W - margin * 2;
+    let y = margin;
+
+    function checkPageBreak(needed: number) {
+        const H = doc.internal.pageSize.getHeight();
+        if (y + needed > H - margin) {
+            doc.addPage();
+            y = margin;
+        }
+    }
+
+    function sectionTitle(text: string) {
+        checkPageBreak(14);
+        setTextColor(doc, "#111827");
+        doc.setFontSize(13);
+        doc.setFont("helvetica", "bold");
+        doc.text(text, margin, y);
+        y += 2;
+        setDraw(doc, "#e5e7eb");
+        doc.setLineWidth(0.3);
+        doc.line(margin, y, margin + contentW, y);
+        y += 5;
+    }
+
+    function labelValue(label: string, value: string, x: number, boxW: number) {
+        setFill(doc, "#f9fafb");
+        setDraw(doc, "#e5e7eb");
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x, y, boxW, 18, 3, 3, "FD");
+        setTextColor(doc, "#6b7280");
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.text(label, x + 4, y + 5.5);
+        setTextColor(doc, "#111827");
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text(value, x + 4, y + 13.5);
+    }
+
+    // Header
+    addPageHeader(
+        doc,
+        "Fit-Hub Nutrition Report",
+        `${data.userName}  ·  Last ${data.period} days  ·  Generated ${format(data.reportDate, "MMMM d, yyyy")}`
+    );
+    y = 32;
+
+    // Summary stats
+    sectionTitle("Average Daily Intake");
+    const statW = (contentW - 12) / 4;
+    labelValue("Avg Calories", `${Math.round(data.averageCalories)} kcal`, margin, statW);
+    labelValue("Avg Protein", `${Math.round(data.averageProtein)}g`, margin + statW + 4, statW);
+    labelValue("Avg Carbs", `${Math.round(data.averageCarbs)}g`, margin + (statW + 4) * 2, statW);
+    labelValue("Avg Fat", `${Math.round(data.averageFat)}g`, margin + (statW + 4) * 3, statW);
+    y += 22;
+
+    // Goal comparison (if available)
+    if (data.goals) {
+        checkPageBreak(18);
+        y += 4;
+        sectionTitle("vs. Goals");
+
+        const goalPairs = [
+            {
+                label: "Calories",
+                avg: data.averageCalories,
+                target: data.goals.calories_target,
+                unit: "kcal",
+            },
+            {
+                label: "Protein",
+                avg: data.averageProtein,
+                target: data.goals.protein_g_target,
+                unit: "g",
+            },
+        ].filter((p) => p.target != null);
+
+        const gpW = goalPairs.length > 0 ? (contentW - (goalPairs.length - 1) * 4) / goalPairs.length : contentW;
+
+        for (let i = 0; i < goalPairs.length; i++) {
+            const gp = goalPairs[i];
+            const delta = gp.avg - (gp.target ?? 0);
+            const pct = gp.target ? ((delta / gp.target) * 100).toFixed(0) : "0";
+            const positive = delta >= 0;
+            const x = margin + i * (gpW + 4);
+
+            setFill(doc, "#f9fafb");
+            setDraw(doc, "#e5e7eb");
+            doc.setLineWidth(0.3);
+            doc.roundedRect(x, y, gpW, 18, 3, 3, "FD");
+
+            setTextColor(doc, "#6b7280");
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "normal");
+            doc.text(`${gp.label} (target: ${gp.target}${gp.unit})`, x + 4, y + 5.5);
+
+            const badgeColor = positive ? "#d1fae5" : "#fee2e2";
+            const badgeFg = positive ? "#047857" : "#b91c1c";
+            const badgeText = `${positive ? "+" : ""}${pct}%`;
+            const badgeW = doc.getTextWidth(badgeText) + 4;
+            setFill(doc, badgeColor);
+            doc.roundedRect(x + 4, y + 8, badgeW, 5, 1, 1, "F");
+            setTextColor(doc, badgeFg);
+            doc.setFontSize(6);
+            doc.setFont("helvetica", "bold");
+            doc.text(badgeText, x + 6, y + 12);
+        }
+        y += 22;
+    }
+
+    // Daily log table
+    y += 4;
+    sectionTitle("Daily Log");
+
+    if (data.dailyRows.length === 0) {
+        checkPageBreak(10);
+        setTextColor(doc, "#9ca3af");
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        doc.text("No nutrition data logged in this period.", margin, y + 5);
+        y += 14;
+    } else {
+        const tableRows = data.dailyRows.map((r) => [
+            r.date,
+            `${Math.round(r.calories)}`,
+            `${Math.round(r.protein_g)}g`,
+            `${Math.round(r.carbs_g)}g`,
+            `${Math.round(r.fat_g)}g`,
+        ]);
+
+        autoTable(doc, {
+            startY: y,
+            head: [["Date", "Calories", "Protein", "Carbs", "Fat"]],
+            body: tableRows,
+            margin: { left: margin, right: margin },
+            styles: {
+                fontSize: 8,
+                cellPadding: 3,
+                textColor: [17, 24, 39],
+                lineColor: [229, 231, 235],
+                lineWidth: 0.2,
+            },
+            headStyles: {
+                fillColor: [249, 250, 251],
+                textColor: [107, 114, 128],
+                fontStyle: "bold",
+                fontSize: 7,
+            },
+            alternateRowStyles: { fillColor: [249, 250, 251] },
+            columnStyles: {
+                0: { cellWidth: 36 },
+                1: { cellWidth: "auto", halign: "right" },
+                2: { cellWidth: "auto", halign: "right" },
+                3: { cellWidth: "auto", halign: "right" },
+                4: { cellWidth: "auto", halign: "right" },
+            },
+        });
+
+        // Update y after table
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        y = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    addPageFooters(doc);
+
+    const dateStr = format(data.reportDate, "yyyy-MM-dd");
+    doc.save(`FitHub_Nutrition_${data.period}d_${dateStr}.pdf`);
+}
+
+// ── Workout Progress PDF ───────────────────────────────────────────────────────
 
 export interface PDFReportData {
     userName: string;
@@ -30,27 +284,6 @@ export interface PDFReportData {
         volume: string | null;
         exercises: string[];
     }[];
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function hexToRgb(hex: string): [number, number, number] {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return [r, g, b];
-}
-
-function setFill(doc: jsPDF, hex: string) {
-    doc.setFillColor(...hexToRgb(hex));
-}
-
-function setDraw(doc: jsPDF, hex: string) {
-    doc.setDrawColor(...hexToRgb(hex));
-}
-
-function setTextColor(doc: jsPDF, hex: string) {
-    doc.setTextColor(...hexToRgb(hex));
 }
 
 // ─── Main export function ─────────────────────────────────────────────────────
@@ -378,19 +611,7 @@ export async function generateProgressPDF(data: PDFReportData, options?: { retur
 
     // ── Footer ────────────────────────────────────────────────────────────────
 
-    const pageCount = doc.getNumberOfPages();
-    for (let p = 1; p <= pageCount; p++) {
-        doc.setPage(p);
-        const H = doc.internal.pageSize.getHeight();
-        setDraw(doc, "#e5e7eb");
-        doc.setLineWidth(0.3);
-        doc.line(margin, H - 10, margin + contentW, H - 10);
-        setTextColor(doc, "#9ca3af");
-        doc.setFontSize(6.5);
-        doc.setFont("helvetica", "normal");
-        doc.text("Powered by Fit-Hub • Your personal fitness companion", margin, H - 6);
-        doc.text(`Page ${p} of ${pageCount}`, W - margin, H - 6, { align: "right" });
-    }
+    addPageFooters(doc);
 
     // ── Save or return buffer ──────────────────────────────────────────────────
 

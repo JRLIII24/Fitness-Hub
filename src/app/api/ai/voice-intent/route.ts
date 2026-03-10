@@ -10,67 +10,17 @@
  */
 
 import { NextResponse } from "next/server";
+import { generateObject } from "ai";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import {
-  getAnthropicClient,
-  ANTHROPIC_HAIKU,
-} from "@/lib/anthropic-client";
-import { callAnthropicWithTool } from "@/lib/anthropic-helper";
+import { getAnthropicProvider, HAIKU } from "@/lib/ai-sdk";
 import { VOICE_INTENT_PROMPT } from "@/lib/ai-prompts/voice-intent";
 import { VoiceIntentSchema, type VoiceIntent } from "@/lib/coach/types";
 
 const DAILY_LIMIT = 100;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
-const TOOL_SCHEMA = {
-  type: "object" as const,
-  properties: {
-    type: {
-      type: "string",
-      enum: [
-        "log_set",
-        "start_timer",
-        "stop_timer",
-        "swap_exercise",
-        "ask_coach",
-        "unknown",
-      ],
-    },
-    confidence: { type: "number", minimum: 0, maximum: 1 },
-    parsed_data: {
-      type: "object",
-      nullable: true,
-      properties: {
-        sets: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              weight: { type: "number", nullable: true },
-              reps: { type: "number", nullable: true },
-              unit: { type: "string", enum: ["kg", "lbs"], nullable: true },
-              set_type: {
-                type: "string",
-                enum: ["warmup", "working", "dropset", "failure"],
-                nullable: true,
-              },
-              rpe: { type: "number", nullable: true },
-              rir: { type: "number", nullable: true },
-              notes: { type: "string", nullable: true },
-            },
-          },
-        },
-        timer_seconds: { type: "number" },
-        exercise_name: { type: "string" },
-        coach_query: { type: "string" },
-      },
-    },
-  },
-  required: ["type", "confidence"],
-};
 
 /**
  * Try to parse timer commands locally via regex.
@@ -138,8 +88,8 @@ export async function POST(request: Request) {
       return NextResponse.json(localResult);
     }
 
-    const client = getAnthropicClient();
-    if (!client) {
+    const provider = getAnthropicProvider();
+    if (!provider) {
       return NextResponse.json({ error: "AI unavailable" }, { status: 503 });
     }
 
@@ -156,32 +106,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ limitReached: true }, { status: 429 });
     }
 
-    const result = await callAnthropicWithTool<VoiceIntent>({
-      client,
-      model: ANTHROPIC_HAIKU,
-      systemPrompt: VOICE_INTENT_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: `Transcript: "${transcript}"\nhas_active_workout: ${hasActiveWorkout}`,
-        },
-      ],
-      toolName: "classify_intent",
-      toolDescription:
-        "Classify the voice command and extract relevant data",
-      toolSchema: TOOL_SCHEMA,
-      zodSchema: VoiceIntentSchema,
-      maxTokens: 512,
+    const { object } = await generateObject({
+      model: provider(HAIKU),
+      schema: VoiceIntentSchema,
+      system: VOICE_INTENT_PROMPT,
+      prompt: `Transcript: "${transcript}"\nhas_active_workout: ${hasActiveWorkout}`,
+      maxOutputTokens: 512,
     });
 
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status },
-      );
-    }
-
-    return NextResponse.json(result.data);
+    return NextResponse.json(object);
   } catch (error) {
     logger.error("Voice intent API error:", error);
     return NextResponse.json(

@@ -1,95 +1,48 @@
 /**
- * AI Coach Chat API
+ * AI Coach Chat API — STREAMING
  * POST /api/ai/coach
  *
- * Unified coach endpoint — replaces suggest, recovery,
- * progress-insight, nutrition-advice routes.
+ * Returns Server-Sent Events:
+ *   event: text     → { delta: string }   (incremental reply text)
+ *   event: action   → { action, data }    (structured action payload)
+ *   event: done     → {}                  (stream complete)
+ *   event: error    → { error, status? }  (error)
  *
- * Model: Sonnet (multi-turn reasoning)
- * Rate limit: 30/day
+ * Model: Haiku (fast, cost-efficient)
+ * No rate limit (Haiku is cost-efficient)
  */
 
 import { NextResponse } from "next/server";
+import { streamObject } from "ai";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
-import { rateLimit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { getAnthropicProvider, HAIKU } from "@/lib/ai-sdk";
+import { buildCoachSystemPrompt } from "@/lib/ai-prompts/coach";
+import { CoachResponseSchema } from "@/lib/coach/types";
+import type { CoachRequest, SaveMemoryActionData } from "@/lib/coach/types";
 import {
-  getAnthropicClient,
-  ANTHROPIC_SONNET,
-} from "@/lib/anthropic-client";
-import { callAnthropicWithTool } from "@/lib/anthropic-helper";
-import { COACH_SYSTEM_PROMPT } from "@/lib/ai-prompts/coach";
-import {
-  CoachResponseSchema,
-  type CoachRequest,
-  type CoachResponse,
-} from "@/lib/coach/types";
+  getCoachMemories,
+  saveCoachMemory,
+  formatMemoriesForPrompt,
+} from "@/lib/coach/memory";
 
-const DAILY_LIMIT = 30;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+// ── SSE helpers ──────────────────────────────────────────────────────────────
 
-const TOOL_SCHEMA = {
-  type: "object" as const,
-  properties: {
-    reply: {
-      type: "string",
-      maxLength: 2000,
-      description: "Your conversational reply. Always confirm actions you took.",
-    },
-    action: {
-      type: "string",
-      enum: [
-        "show_exercise_history",
-        "generate_workout",
-        "show_substitution",
-        "show_readiness",
-        "show_recovery",
-        "show_prescription",
-        "add_exercise",
-        "swap_exercise",
-        "add_sets",
-        "update_set",
-        "remove_exercise",
-        "create_and_add_exercise",
-        "start_timer",
-        "create_template",
-        "start_workout_from_template",
-        "navigate_to",
-        "none",
-      ],
-      description: "The action to take. Mutation actions modify the workout directly. Use navigate_to to route the user to a different screen in the app.",
-    },
-    data: {
-      type: "object",
-      description:
-        "Action payload. Shape depends on action type. For add_exercise: {exercise_name, muscle_group, sets?}. For add_sets: {exercise_name, sets: [{weight_kg, reps}]}. For swap_exercise: {current_exercise_name, new_exercise_name, new_muscle_group, reason}. For create_and_add_exercise: {exercise_name, muscle_group, equipment, category, sets?}. For start_timer: {seconds}. For update_set: {exercise_name, set_number, updates}. For remove_exercise: {exercise_name, reason}. For create_template: {template_name, primary_muscle_group, exercises: [{exercise_name, muscle_group, target_sets, target_reps, rest_seconds?, equipment?, category?}]}. For start_workout_from_template: {template_id, template_name}. For navigate_to: {screen} where screen is one of: dashboard, workout, nutrition, history, body, marketplace, pods, exercises, settings.",
-      additionalProperties: true,
-      nullable: true,
-    },
-  },
-  required: ["reply", "action"],
-};
+function sseEvent(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
 
 export async function POST(request: Request) {
   try {
-    const client = getAnthropicClient();
-    if (!client) {
+    const provider = getAnthropicProvider();
+    if (!provider) {
       return NextResponse.json({ error: "AI unavailable" }, { status: 503 });
     }
 
     const supabase = await createClient();
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
-
-    const allowed = await rateLimit(
-      `ai:coach:${user.id}`,
-      DAILY_LIMIT,
-      ONE_DAY_MS,
-    );
-    if (!allowed) {
-      return NextResponse.json({ limitReached: true }, { status: 429 });
-    }
 
     const body = (await request.json()) as CoachRequest;
     if (!body.message || typeof body.message !== "string") {
@@ -98,6 +51,11 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    // Fetch persistent memories for this user
+    const memories = await getCoachMemories(supabase, user.id);
+    const memoriesBlock = formatMemoriesForPrompt(memories);
+    const systemPrompt = buildCoachSystemPrompt(memoriesBlock || undefined);
 
     // Build conversation messages
     const messages = [
@@ -111,27 +69,83 @@ export async function POST(request: Request) {
       },
     ];
 
-    const result = await callAnthropicWithTool<CoachResponse>({
-      client,
-      model: ANTHROPIC_SONNET,
-      systemPrompt: COACH_SYSTEM_PROMPT,
+    // Stream structured object and convert to SSE format the client expects
+    const result = streamObject({
+      model: provider(HAIKU),
+      schema: CoachResponseSchema,
+      system: systemPrompt,
       messages,
-      toolName: "coach_response",
-      toolDescription:
-        "Respond to the user and optionally take an action on their workout. For mutation actions (add_exercise, add_sets, swap_exercise, etc.), include the required data payload.",
-      toolSchema: TOOL_SCHEMA,
-      zodSchema: CoachResponseSchema,
-      maxTokens: 2048,
+      maxOutputTokens: 2048,
     });
 
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error },
-        { status: result.status },
-      );
-    }
+    const encoder = new TextEncoder();
+    let prevReplyLen = 0;
 
-    return NextResponse.json(result.data);
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // Stream partial objects — emit reply deltas as they arrive
+          for await (const partial of result.partialObjectStream) {
+            const reply = partial.reply ?? "";
+            if (reply.length > prevReplyLen) {
+              const delta = reply.slice(prevReplyLen);
+              prevReplyLen = reply.length;
+              controller.enqueue(
+                encoder.encode(sseEvent("text", { delta })),
+              );
+            }
+          }
+
+          // Get the final validated object
+          const final = await result.object;
+          const action = final.action ?? "none";
+          // Parse the stringified action data back into an object
+          let data: Record<string, unknown> | null = null;
+          if (final.data_json) {
+            try {
+              data = JSON.parse(final.data_json);
+            } catch {
+              data = null;
+            }
+          }
+
+          // Handle save_memory server-side — persist to DB before emitting action
+          if (action === "save_memory" && data) {
+            const memData = data as unknown as SaveMemoryActionData;
+            if (memData.category && memData.content) {
+              await saveCoachMemory(
+                supabase,
+                user.id,
+                memData.category,
+                memData.content,
+              );
+            }
+          }
+
+          controller.enqueue(
+            encoder.encode(sseEvent("action", { action, data })),
+          );
+          controller.enqueue(encoder.encode(sseEvent("done", {})));
+        } catch (err) {
+          logger.error("Coach streaming error:", err);
+          controller.enqueue(
+            encoder.encode(
+              sseEvent("error", { error: "Stream failed" }),
+            ),
+          );
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error) {
     logger.error("Coach API error:", error);
     return NextResponse.json(

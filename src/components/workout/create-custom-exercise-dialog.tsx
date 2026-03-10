@@ -74,7 +74,7 @@ export function CreateCustomExerciseDialog({ open, onClose, onCreated }: Props) 
       const slug = name.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
       // Insert the custom exercise
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("exercises")
         .insert({
           name: name.trim(),

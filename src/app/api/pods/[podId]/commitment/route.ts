@@ -12,6 +12,8 @@ interface RouteContext {
   params: Promise<{ podId: string }>;
 }
 
+const VALID_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
 export async function POST(
   request: NextRequest,
   context: RouteContext
@@ -38,7 +40,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { workouts_per_week } = body;
+    const { workouts_per_week, planned_days } = body;
 
     if (!workouts_per_week || typeof workouts_per_week !== 'number') {
       return NextResponse.json({ error: 'workouts_per_week is required' }, { status: 400 });
@@ -48,21 +50,43 @@ export async function POST(
       return NextResponse.json({ error: 'Commitment must be between 1 and 7 workouts per week' }, { status: 400 });
     }
 
+    // Validate planned_days if provided
+    const days: string[] = Array.isArray(planned_days)
+      ? planned_days.filter((d: unknown) => typeof d === 'string' && VALID_DAYS.includes(d as string))
+      : [];
+
     // Get current week start
     const weekStart = getCurrentWeekStart();
     const weekStartDate = weekStart.toISOString().split('T')[0];
 
     // Upsert commitment for this week
-    const { error: upsertError } = await supabase
+    // Try with planned_days first; fall back without it if column doesn't exist yet
+    const upsertPayload: Record<string, unknown> = {
+      pod_id: podId,
+      user_id: user.id,
+      workouts_per_week: workouts_per_week,
+      week_start_date: weekStartDate,
+    };
+    if (days.length > 0) {
+      upsertPayload.planned_days = days;
+    }
+
+    let { error: upsertError } = await supabase
       .from('pod_commitments')
-      .upsert({
-        pod_id: podId,
-        user_id: user.id,
-        workouts_per_week,
-        week_start_date: weekStartDate
-      }, {
+      .upsert(upsertPayload as any, {
         onConflict: 'pod_id,user_id,week_start_date'
       });
+
+    // If planned_days column doesn't exist yet, retry without it
+    if (upsertError?.message?.includes('planned_days')) {
+      delete upsertPayload.planned_days;
+      const retry = await supabase
+        .from('pod_commitments')
+        .upsert(upsertPayload as any, {
+          onConflict: 'pod_id,user_id,week_start_date'
+        });
+      upsertError = retry.error;
+    }
 
     if (upsertError) {
       console.error('Commitment upsert error:', upsertError);
@@ -73,6 +97,7 @@ export async function POST(
       success: true,
       commitment: {
         workouts_per_week,
+        planned_days: days,
         week_start_date: weekStartDate
       }
     });

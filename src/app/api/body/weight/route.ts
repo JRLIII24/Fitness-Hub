@@ -136,7 +136,7 @@ export async function DELETE(req: NextRequest) {
     if (id) {
       query = query.eq("id", id);
     } else {
-      query = query.eq("logged_date", date);
+      query = query.eq("logged_date", date!);
     }
 
     const { error } = await query;

@@ -12,6 +12,7 @@ export type ExerciseRow = {
   equipment: string;
   category: string;
   instructions: string | null;
+  has_video: boolean;
 };
 
 export default async function ExercisesPage() {
@@ -23,11 +24,22 @@ export default async function ExercisesPage() {
 
   const { data } = await supabase
     .from("exercises")
-    .select("id, name, muscle_group, equipment, category, instructions")
+    .select(`
+      id, name, muscle_group, equipment, category, instructions,
+      exercise_instructional_videos(count)
+    `)
     .order("name", { ascending: true })
     .limit(500);
 
-  const exercises = (data ?? []) as ExerciseRow[];
+  const exercises = (data ?? []).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    muscle_group: row.muscle_group,
+    equipment: row.equipment,
+    category: row.category,
+    instructions: row.instructions,
+    has_video: (row.exercise_instructional_videos?.[0]?.count ?? 0) > 0,
+  })) as ExerciseRow[];
 
   const muscleGroups = [...new Set(exercises.map((e) => e.muscle_group))].sort();
   const equipmentTypes = [...new Set(exercises.map((e) => e.equipment))].sort();

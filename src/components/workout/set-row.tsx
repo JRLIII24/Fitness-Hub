@@ -1,13 +1,14 @@
 "use client";
 
 import { memo } from "react";
-import { Check, Flame, Ghost, Play, Trash2, Trophy } from "lucide-react";
+import { ArrowUp, Check, Equal, Flame, Ghost, Play, Trash2, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { WorkoutSet } from "@/types/workout";
+import type { OverloadSuggestion } from "@/lib/progressive-overload";
 import { cn } from "@/lib/utils";
 import { REST_PRESETS } from "@/lib/constants";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { KG_TO_LBS } from "@/lib/units";
 import { celebratePR, triggerHaptic } from "@/lib/celebrations";
 import {
@@ -31,6 +32,8 @@ interface SetRowProps {
   };
   /** Display-only suggested weight in kg (never written to store) */
   suggestedWeight?: number | null;
+  /** Smart overload suggestion with intent (increase vs maintain) */
+  smartSuggestion?: OverloadSuggestion;
   autoFocusWeight?: boolean;
   onUpdate: (updates: Partial<WorkoutSet>) => void;
   onComplete: () => void;
@@ -50,6 +53,7 @@ export const SetRow = memo(function SetRow({
   previousSet,
   ghostSet,
   suggestedWeight = null,
+  smartSuggestion,
   autoFocusWeight = false,
   onUpdate,
   onComplete,
@@ -272,7 +276,7 @@ export const SetRow = memo(function SetRow({
 
       {/* Ghost workout indicator */}
       {ghostSet && !set.completed && (ghostSet.weight != null || ghostSet.reps != null) && (
-        <div className="space-y-1 rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1.5 text-xs">
+        <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1.5 text-xs">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-cyan-400/70">
               <Ghost className="h-3.5 w-3.5 shrink-0" />
@@ -287,15 +291,6 @@ export const SetRow = memo(function SetRow({
               </span>
             )}
           </div>
-          {suggestedWeight != null && (
-            <div className="flex items-center gap-1.5">
-              <Flame className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-              <span className="font-medium text-amber-400/80">Suggested:</span>
-              <span className="font-bold tabular-nums text-amber-400">
-                {toDisplay(suggestedWeight)} {unitLabel}
-              </span>
-            </div>
-          )}
         </div>
       )}
 
@@ -312,12 +307,46 @@ export const SetRow = memo(function SetRow({
             autoFocus={autoFocusWeight}
             type="number"
             inputMode="decimal"
-            placeholder={suggestedWeight != null ? String(toDisplay(suggestedWeight)) : "0"}
+            placeholder={smartSuggestion ? String(toDisplay(smartSuggestion.weightKg)) : suggestedWeight != null ? String(toDisplay(suggestedWeight)) : "0"}
             value={weightValue}
             onChange={(e) => handleWeightChange(e.target.value)}
             className="h-10 w-full text-center text-[18px] font-semibold tabular-nums text-foreground"
             disabled={set.completed}
           />
+          {/* Progressive overload suggestion chip — only visible when weight is empty */}
+          <AnimatePresence>
+            {!set.completed && set.weight_kg === null && smartSuggestion && (
+              <motion.button
+                type="button"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                onClick={() => {
+                  onUpdate({ weight_kg: smartSuggestion.weightKg });
+                  triggerHaptic("light");
+                }}
+                className={cn(
+                  "mt-1 inline-flex w-full items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold tabular-nums transition-colors",
+                  smartSuggestion.intent === "increase"
+                    ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                    : "border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
+                )}
+                title={
+                  smartSuggestion.intent === "increase"
+                    ? "Progressive overload: tap to use suggested weight increase"
+                    : "Maintain weight: previous set was at high effort"
+                }
+              >
+                {smartSuggestion.intent === "increase" ? (
+                  <ArrowUp className="h-3 w-3" />
+                ) : (
+                  <Equal className="h-3 w-3" />
+                )}
+                {toDisplay(smartSuggestion.weightKg)} {unitLabel}
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="space-y-1">

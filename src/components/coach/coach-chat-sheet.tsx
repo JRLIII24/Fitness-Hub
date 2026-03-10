@@ -21,19 +21,25 @@ import {
 import { T, statusMessages, orbColors } from "@/lib/coach-tokens";
 import type { OrbState } from "@/lib/coach-tokens";
 import { useVoiceCommands } from "@/hooks/use-voice-commands";
-import { speakAsJarvis, stopSpeaking, onSpeakingStateChange } from "@/lib/voice/text-to-speech";
+import {
+  stopSpeaking,
+  onSpeakingStateChange,
+  createSentenceQueue,
+  extractSentences,
+} from "@/lib/voice/text-to-speech";
 import { useSupabase } from "@/hooks/use-supabase";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
 import { CoachFeedItem } from "./coach-feed-item";
 import { isMutationAction } from "@/lib/coach/types";
-import { executeCoachAction } from "@/lib/coach/action-executor";
+import { executeCoachAction, confirmAction } from "@/lib/coach/action-executor";
+import { detectSimpleIntent } from "@/lib/coach/client-intent";
 import type {
   CoachMessage,
   CoachContext,
   CoachRequest,
-  CoachResponse,
   CoachAction,
+  PendingAction,
 } from "@/lib/coach/types";
 
 // ── Shared sub-components ────────────────────────────────────────────────────
@@ -106,6 +112,7 @@ export function CoachChatSheet({
   const [hudState, setHudState] = useState<HudState>("idle");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [pills, setPills] = useState<string[]>([]);
+  const [confirmingMsgId, setConfirmingMsgId] = useState<string | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("coach-voice-enabled") !== "false";
@@ -216,7 +223,7 @@ export function CoachChatSheet({
     }
   }, [isListening]);
 
-  // ── Send message ──────────────────────────────────────────────────────
+  // ── Send message (streaming) ─────────────────────────────────────────
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -230,8 +237,43 @@ export function CoachChatSheet({
       };
 
       setMessages((prev) => [...prev, userMsg]);
+
+      // Client-side intent detection — skip API for greetings/thanks/affirmations
+      const cannedReply = detectSimpleIntent(text);
+      if (cannedReply !== null) {
+        if (cannedReply) {
+          // Non-empty canned response (greeting/thanks)
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: nextMsgId(),
+              role: "assistant",
+              content: cannedReply,
+              timestamp: Date.now(),
+            },
+          ]);
+        }
+        // Empty string = silent affirmation — no response needed
+        return;
+      }
+
       setIsSending(true);
       setHudState("thinking");
+
+      // Create a placeholder assistant message for streaming
+      const assistantMsgId = nextMsgId();
+      const assistantMsg: CoachMessage = {
+        id: assistantMsgId,
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+        isStreaming: true,
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      // Start sentence queue for TTS
+      const ttsQueue = voiceEnabled ? createSentenceQueue() : null;
+      let sentenceRemainder = "";
 
       try {
         const conversationHistory = messages.map((m) => ({
@@ -253,58 +295,195 @@ export function CoachChatSheet({
 
         if (!res.ok) throw new Error("Coach API error");
 
-        const response: CoachResponse = await res.json();
-        const action = (response.action ?? "none") as CoachAction;
+        // Parse SSE stream
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("No response body");
 
-        // Execute mutation actions
-        let actionResult: { success: boolean; message: string } | undefined;
-        if (isMutationAction(action)) {
-          setHudState("executing");
-          actionResult = await executeCoachAction(action, response.data ?? null, {
-            workout: workoutStore,
-            timer: timerStore,
-            router,
-            userId: userId ?? undefined,
-          });
+        const decoder = new TextDecoder();
+        let fullReply = "";
+        let streamAction: CoachAction = "none";
+        let streamData: Record<string, unknown> | undefined;
+        let sseBuffer = "";
 
-          // Show confirmation pill
-          if (actionResult?.success && actionResult.message) {
-            const pillText = actionResult.message;
-            setPills((prev) => [...prev, pillText]);
-            setTimeout(() => setPills((prev) => prev.filter((x) => x !== pillText)), 2800);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          sseBuffer += decoder.decode(value, { stream: true });
+
+          // Parse SSE events from buffer
+          const lines = sseBuffer.split("\n");
+          sseBuffer = lines.pop() ?? ""; // keep incomplete line
+
+          let currentEvent = "";
+          for (const line of lines) {
+            if (line.startsWith("event: ")) {
+              currentEvent = line.slice(7);
+            } else if (line.startsWith("data: ") && currentEvent) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                if (currentEvent === "text") {
+                  fullReply += data.delta;
+                  // Update the streaming message content
+                  setMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMsgId
+                        ? { ...m, content: fullReply }
+                        : m,
+                    ),
+                  );
+
+                  // Detect sentence boundaries for TTS
+                  if (ttsQueue) {
+                    sentenceRemainder += data.delta;
+                    const [sentences, remainder] =
+                      extractSentences(sentenceRemainder);
+                    sentenceRemainder = remainder;
+                    for (const sentence of sentences) {
+                      ttsQueue.push(sentence);
+                    }
+                  }
+                } else if (currentEvent === "action") {
+                  streamAction = (data.action ?? "none") as CoachAction;
+                  streamData = data.data ?? undefined;
+                } else if (currentEvent === "error") {
+                  throw new Error(data.error ?? "Stream error");
+                }
+              } catch (e) {
+                if (e instanceof Error && e.message !== "Stream error") {
+                  // JSON parse error — skip this event
+                }
+              }
+              currentEvent = "";
+            }
           }
         }
 
-        const assistantMsg: CoachMessage = {
-          id: nextMsgId(),
-          role: "assistant",
-          content: response.reply,
-          timestamp: Date.now(),
-          action,
-          data: response.data ?? undefined,
-          actionResult,
-        };
-
-        setMessages((prev) => [...prev, assistantMsg]);
-
-        if (voiceEnabled) {
-          speakAsJarvis(response.reply);
+        // Flush remaining text as a final sentence for TTS
+        if (ttsQueue && sentenceRemainder.trim()) {
+          ttsQueue.push(sentenceRemainder.trim());
+          ttsQueue.finish();
         }
+
+        // Execute mutation actions
+        let actionResult: { success: boolean; message: string } | undefined;
+        let pendingAction: PendingAction | undefined;
+        if (isMutationAction(streamAction)) {
+          setHudState("executing");
+          const result = await executeCoachAction(
+            streamAction,
+            streamData ?? null,
+            {
+              workout: workoutStore,
+              timer: timerStore,
+              router,
+              userId: userId ?? undefined,
+            },
+          );
+
+          if (result.pending) {
+            // Destructive action — needs user confirmation
+            pendingAction = result.pending;
+          } else {
+            actionResult = result;
+            if (result.success && result.message) {
+              const pillText = result.message;
+              setPills((prev) => [...prev, pillText]);
+              setTimeout(
+                () => setPills((prev) => prev.filter((x) => x !== pillText)),
+                2800,
+              );
+            }
+          }
+        }
+
+        // Finalize the assistant message (mark streaming done)
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId
+              ? {
+                  ...m,
+                  content: fullReply,
+                  action: streamAction,
+                  data: streamData,
+                  actionResult,
+                  pendingAction,
+                  isStreaming: false,
+                }
+              : m,
+          ),
+        );
       } catch {
-        const errorMsg: CoachMessage = {
-          id: nextMsgId(),
-          role: "assistant",
-          content: "Connection lost. Try again.",
-          timestamp: Date.now(),
-        };
-        setMessages((prev) => [...prev, errorMsg]);
+        // Update the placeholder or add error message
+        setMessages((prev) => {
+          const existing = prev.find((m) => m.id === assistantMsgId);
+          if (existing && !existing.content) {
+            // Replace empty placeholder with error
+            return prev.map((m) =>
+              m.id === assistantMsgId
+                ? { ...m, content: "Connection lost. Try again.", isStreaming: false }
+                : m,
+            );
+          }
+          // Had partial content — mark as done
+          return prev.map((m) =>
+            m.id === assistantMsgId ? { ...m, isStreaming: false } : m,
+          );
+        });
+        ttsQueue?.cancel();
       } finally {
         setIsSending(false);
         setHudState("idle");
       }
     },
-    [messages, context, isSending, workoutStore, timerStore, router, voiceEnabled]
+    [messages, context, isSending, workoutStore, timerStore, router, voiceEnabled, userId],
   );
+
+  // ── Confirm / Dismiss pending destructive actions ────────────────────
+
+  const handleConfirmAction = useCallback(
+    async (msgId: string, pending: PendingAction) => {
+      setConfirmingMsgId(msgId);
+      const result = await confirmAction(pending, {
+        workout: workoutStore,
+        timer: timerStore,
+        router,
+        userId: userId ?? undefined,
+      });
+
+      // Update message: replace pending with actionResult
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msgId
+            ? { ...m, pendingAction: undefined, actionResult: result }
+            : m,
+        ),
+      );
+
+      if (result.success && result.message) {
+        const pillText = result.message;
+        setPills((prev) => [...prev, pillText]);
+        setTimeout(
+          () => setPills((prev) => prev.filter((x) => x !== pillText)),
+          2800,
+        );
+      }
+
+      setConfirmingMsgId(null);
+    },
+    [workoutStore, timerStore, router, userId],
+  );
+
+  const handleDismissAction = useCallback((msgId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId
+          ? { ...m, pendingAction: undefined, dismissed: true }
+          : m,
+      ),
+    );
+  }, []);
 
   // ── Submit handler ────────────────────────────────────────────────────
 
@@ -343,11 +522,14 @@ export function CoachChatSheet({
           voiceEnabled={voiceEnabled}
           pills={pills}
           context={context}
+          confirmingMsgId={confirmingMsgId}
           onSubmit={handleSubmit}
           onClose={onClose}
           onMicTap={() => (isListening ? stopListening() : startListening())}
           onToggleVoice={toggleVoice}
           onQuickAction={handleQuickAction}
+          onConfirmAction={handleConfirmAction}
+          onDismissAction={handleDismissAction}
           scrollRef={scrollRef}
           inputRef={inputRef}
         />
@@ -675,11 +857,14 @@ function HudShell({
   voiceEnabled,
   pills,
   context,
+  confirmingMsgId,
   onSubmit,
   onClose,
   onMicTap,
   onToggleVoice,
   onQuickAction,
+  onConfirmAction,
+  onDismissAction,
   scrollRef,
   inputRef,
 }: {
@@ -692,11 +877,14 @@ function HudShell({
   voiceEnabled: boolean;
   pills: string[];
   context: CoachContext;
+  confirmingMsgId: string | null;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
   onMicTap: () => void;
   onToggleVoice: () => void;
   onQuickAction: (prompt: string) => void;
+  onConfirmAction: (msgId: string, pending: PendingAction) => void;
+  onDismissAction: (msgId: string) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
@@ -962,6 +1150,9 @@ function HudShell({
                   isLatest={i === messages.length - 1}
                   index={i}
                   totalCount={messages.length}
+                  onConfirmAction={onConfirmAction}
+                  onDismissAction={onDismissAction}
+                  isConfirming={confirmingMsgId === msg.id}
                 />
               ))}
 

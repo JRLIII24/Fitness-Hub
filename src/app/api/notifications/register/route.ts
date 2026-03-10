@@ -13,7 +13,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Malformed JSON' }, { status: 400 });
+  }
+
   const { token, platform } = body as { token?: string; platform?: string };
 
   if (!token || !platform || !['ios', 'android', 'web'].includes(platform)) {

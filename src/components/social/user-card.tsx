@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Zap, ArrowUpRight } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { PresenceDot } from "./presence-dot";
 import { SendPingDialog } from "./send-ping-dialog";
@@ -17,6 +17,7 @@ export interface UserCardUser {
   username: string | null;
   bio: string | null;
   fitness_goal: string | null;
+  avatar_url?: string | null;
   isFollowing?: boolean;
 }
 
@@ -73,6 +74,9 @@ export function UserCard({ user, onFollow, onUnfollow, onSendPing }: UserCardPro
             <div className="flex items-center gap-3 min-w-0">
               <div className="relative shrink-0">
                 <Avatar className="size-11">
+                  {user.avatar_url && (
+                    <AvatarImage src={user.avatar_url} alt={displayName} />
+                  )}
                   <AvatarFallback className="bg-primary/15 text-sm font-semibold text-primary">
                     {getInitials(user.display_name)}
                   </AvatarFallback>

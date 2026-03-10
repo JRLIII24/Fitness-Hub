@@ -1,3 +1,5 @@
+// ── Workout CSV ───────────────────────────────────────────────────────────────
+
 export interface CSVRow {
     Date: string;
     Exercise: string;
@@ -64,3 +66,109 @@ export const generateCSV = (data: CSVRow[], filename: string = 'workout-data.csv
         console.error('Browser does not support the download attribute.');
     }
 };
+
+// ── Nutrition CSV ─────────────────────────────────────────────────────────────
+
+export interface NutritionCSVRow {
+  Date: string;
+  Meal: string;
+  Food: string;
+  Calories: number | string;
+  Protein_g: number | string;
+  Carbs_g: number | string;
+  Fat_g: number | string;
+  Servings: number | string;
+}
+
+/**
+ * Generates and triggers a download of a CSV file from nutrition log data.
+ */
+export function generateNutritionCSV(
+  data: NutritionCSVRow[],
+  filename: string = "nutrition-history.csv"
+): void {
+  if (!data || data.length === 0) {
+    console.warn("No data provided to generateNutritionCSV.");
+    return;
+  }
+
+  const headers = ["Date", "Meal", "Food", "Calories", "Protein_g", "Carbs_g", "Fat_g", "Servings"];
+
+  const csvContent = [
+    headers.map(escapeCSVField).join(","),
+    ...data.map((row) =>
+      [
+        row.Date,
+        row.Meal,
+        row.Food,
+        row.Calories,
+        row.Protein_g,
+        row.Carbs_g,
+        row.Fat_g,
+        row.Servings,
+      ]
+        .map(escapeCSVField)
+        .join(",")
+    ),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+}
+
+// ── Body Metrics CSV ──────────────────────────────────────────────────────────
+
+export interface BodyMetricsCSVRow {
+  Date: string;
+  Weight_kg: number | string;
+  Weight_lbs: number | string;
+  Body_Fat_Pct: number | string;
+  Note: string;
+}
+
+/**
+ * Generates and triggers a download of a CSV file from body weight log data.
+ */
+export function generateBodyMetricsCSV(
+  data: BodyMetricsCSVRow[],
+  filename: string = "body-metrics.csv"
+): void {
+  if (!data || data.length === 0) {
+    console.warn("No data provided to generateBodyMetricsCSV.");
+    return;
+  }
+
+  const headers = ["Date", "Weight_kg", "Weight_lbs", "Body_Fat_Pct", "Note"];
+
+  const csvContent = [
+    headers.map(escapeCSVField).join(","),
+    ...data.map((row) =>
+      [row.Date, row.Weight_kg, row.Weight_lbs, row.Body_Fat_Pct, row.Note]
+        .map(escapeCSVField)
+        .join(",")
+    ),
+  ].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+}

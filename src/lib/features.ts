@@ -60,3 +60,21 @@ export const FORM_ANALYSIS_ENABLED =
 
 export const AI_ONBOARDING_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_AI_ONBOARDING === "true";
+
+export const WORKOUT_RECAP_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_WORKOUT_RECAP === "true";
+
+export const WEEKLY_REPORT_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_WEEKLY_REPORT === "true";
+
+export const PROGRAM_BUILDER_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_PROGRAM_BUILDER === "true";
+
+export const SOCIAL_FEED_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_SOCIAL_FEED === "true";
+
+export const MEAL_PLANNING_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_MEAL_PLANNING === "true";
+
+export const WEARABLE_INTEGRATIONS_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_WEARABLE_INTEGRATIONS === "true";

@@ -8,61 +8,63 @@ const handlers: Record<string, SyncHandler> = {
         const payload = raw as SaveWorkoutPayload;
         const supabase = createClient();
 
-        // Insert the workout session
-        const { error: sessionError } = await supabase
+        // 1. Insert the workout session
+        const { data: session, error: sessionError } = await supabase
             .from('workout_sessions')
             .upsert(
                 {
                     id: payload.sessionId,
                     user_id: payload.userId,
+                    template_id: payload.templateId,
                     name: payload.name,
                     started_at: payload.startedAt,
-                    ended_at: payload.endedAt,
-                    duration_seconds: payload.durationSeconds,
-                    total_volume_kg: payload.totalVolumeKg,
+                    status: 'in_progress',
+                    completed_at: null,
+                    duration_seconds: null,
+                    total_volume_kg: null,
                     notes: payload.notes,
-                    status: 'completed',
                 },
                 { onConflict: 'id' }
-            );
+            )
+            .select('id')
+            .single();
 
-        if (sessionError) throw sessionError;
+        if (sessionError || !session) throw sessionError ?? new Error('No session returned');
 
-        // Insert exercises and sets
-        for (const exercise of payload.exercises) {
-            const { data: sessionExercise, error: exError } = await supabase
-                .from('session_exercises')
-                .upsert(
-                    {
-                        session_id: payload.sessionId,
-                        exercise_id: exercise.exerciseId,
-                        order_index: exercise.orderIndex,
-                    },
-                    { onConflict: 'session_id,exercise_id' }
-                )
-                .select('id')
-                .single();
+        // 2. Insert workout_sets
+        const setRows = payload.setRows.map((s) => ({
+            session_id: session.id,
+            exercise_id: s.exerciseId,
+            set_number: s.setNumber,
+            set_type: s.setType as "warmup" | "working" | "dropset" | "failure",
+            weight_kg: s.weightKg,
+            reps: s.reps,
+            rir: s.rir,
+            rest_seconds: s.restSeconds,
+            completed_at: s.completedAt,
+            sort_order: s.sortOrder,
+        }));
 
-            if (exError) throw exError;
+        const { error: setsError } = await supabase
+            .from('workout_sets')
+            .upsert(setRows, { onConflict: 'session_id,sort_order' });
 
-            // Insert sets
-            const setRows = exercise.sets.map((s) => ({
-                session_exercise_id: sessionExercise.id,
-                set_number: s.setNumber,
-                set_type: s.setType,
-                weight_kg: s.weightKg,
-                reps: s.reps,
-                rir: s.rir,
-                rest_seconds: s.restSeconds,
-                completed: s.completed,
-            }));
+        if (setsError) throw setsError;
 
-            const { error: setsError } = await supabase
-                .from('exercise_sets')
-                .upsert(setRows, { onConflict: 'session_exercise_id,set_number' });
+        // 3. Mark session completed
+        const { error: completeError } = await supabase
+            .from('workout_sessions')
+            .update({
+                status: 'completed',
+                completed_at: payload.endedAt,
+                duration_seconds: payload.durationSeconds,
+                total_volume_kg: payload.totalVolumeKg,
+                notes: payload.notes,
+            })
+            .eq('id', session.id)
+            .eq('user_id', payload.userId);
 
-            if (setsError) throw setsError;
-        }
+        if (completeError) throw completeError;
     },
 
     LOG_BODY_WEIGHT: async (raw) => {
@@ -88,7 +90,7 @@ const handlers: Record<string, SyncHandler> = {
         const { error } = await supabase.from('food_log').insert({
             user_id: payload.userId,
             food_item_id: payload.foodItemId,
-            meal_type: payload.mealType,
+            meal_type: payload.mealType as "breakfast" | "lunch" | "dinner" | "snack",
             servings: payload.servings,
             calories_consumed: payload.caloriesConsumed,
             protein_g: payload.proteinG,

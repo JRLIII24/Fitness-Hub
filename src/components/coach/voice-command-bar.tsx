@@ -8,7 +8,7 @@ import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { VOICE_LOGGING_ENABLED } from "@/lib/features";
-import { weightToDisplay } from "@/lib/units";
+import { weightToDisplay, lbsToKg } from "@/lib/units";
 import type { VoiceIntent } from "@/lib/coach/types";
 
 // ── Timer regex (avoid API call for simple commands) ─────────────────────────
@@ -152,7 +152,7 @@ export function VoiceCommandBar({ onOpenCoach }: VoiceCommandBarProps) {
             const weightKg =
               setData.weight !== null
                 ? setData.unit === "lbs"
-                  ? setData.weight / 2.20462
+                  ? lbsToKg(setData.weight)
                   : setData.weight
                 : null;
             updateSet(exerciseIdx, setIdx, {

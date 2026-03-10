@@ -60,7 +60,7 @@ export async function GET(
         user_id,
         joined_at,
         status,
-        profiles!inner(display_name, username)
+        profiles!inner(display_name, username, avatar_url)
       `)
       .eq('pod_id', podId)
       .eq('status', 'active')

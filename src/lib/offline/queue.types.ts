@@ -18,24 +18,23 @@ export interface SyncMutationPayload {
 export interface SaveWorkoutPayload {
     userId: string;
     sessionId: string;
+    templateId: string | null;
     name: string;
     startedAt: string;
     endedAt: string;
     durationSeconds: number;
     totalVolumeKg: number;
     notes: string;
-    exercises: Array<{
+    setRows: Array<{
         exerciseId: string;
-        orderIndex: number;
-        sets: Array<{
-            setNumber: number;
-            setType: string;
-            weightKg: number | null;
-            reps: number | null;
-            rir: number | null;
-            restSeconds: number;
-            completed: boolean;
-        }>;
+        setNumber: number;
+        setType: string;
+        weightKg: number | null;
+        reps: number | null;
+        rir: number | null;
+        restSeconds: number | null;
+        completedAt: string | null;
+        sortOrder: number;
     }>;
 }
 

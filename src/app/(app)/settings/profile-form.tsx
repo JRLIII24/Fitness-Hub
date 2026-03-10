@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { Loader2, Moon, Sun, Monitor, Globe } from "lucide-react";
+import { Loader2, Moon, Sun, Monitor, Globe, Camera } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { createClient } from "@/lib/supabase/client";
 import { useUnitPreference } from "@/hooks/use-unit-preference";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
@@ -25,6 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AccentColorPicker } from "@/components/ui/accent-color-picker";
 import { validateUsernameComplete } from "@/lib/username-validation";
+import { KG_TO_LBS, lbsToKg } from "@/lib/units";
 import type { Database } from "@/types/database";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -35,17 +37,43 @@ interface ProfileFormProps {
   userId: string;
 }
 
-const LBS_PER_KG = 2.205;
 const CM_PER_INCH = 2.54;
+const AVATAR_MAX_DIM = 512;
+const AVATAR_QUALITY = 0.8;
+const AVATAR_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+const AVATAR_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+function compressAvatar(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      // Center-crop to square, then resize to max dimension
+      const cropSize = Math.min(img.width, img.height);
+      const outSize = Math.min(cropSize, AVATAR_MAX_DIM);
+      const canvas = document.createElement("canvas");
+      canvas.width = outSize;
+      canvas.height = outSize;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(
+        img,
+        (img.width - cropSize) / 2, (img.height - cropSize) / 2, cropSize, cropSize,
+        0, 0, outSize, outSize
+      );
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Compression failed"))),
+        "image/jpeg",
+        AVATAR_QUALITY
+      );
+    };
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 function isSafariBrowser() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
   return /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|OPR/i.test(ua);
-}
-
-function lbsToKg(lbs: number): number {
-  return lbs / LBS_PER_KG;
 }
 
 function cmToFeetInches(cm: number | null): { feet: string; inches: string } {
@@ -70,7 +98,7 @@ function feetInchesToCm(feet: number, inches: number): number {
 
 function kgToDisplayWeight(kg: number | null, unitPreference: "metric" | "imperial"): string {
   if (kg === null || kg === undefined || Number.isNaN(kg)) return "";
-  const value = unitPreference === "imperial" ? kg * LBS_PER_KG : kg;
+  const value = unitPreference === "imperial" ? kg * KG_TO_LBS : kg;
   return String(Math.round(value * 10) / 10);
 }
 
@@ -118,6 +146,9 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
   const [fitnessGoal, setFitnessGoal] = useState<string>(
     profile?.fitness_goal ?? ""
   );
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingUnit, setIsUpdatingUnit] = useState(false);
   const previousUnitPreferenceRef = useRef(unitPreference);
@@ -126,6 +157,56 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
     setMounted(true);
     setIsSafari(isSafariBrowser());
   }, []);
+
+  const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!AVATAR_ALLOWED_TYPES.includes(file.type)) {
+      toast.error("Please select a JPEG, PNG, or WebP image");
+      return;
+    }
+    if (file.size > AVATAR_MAX_SIZE) {
+      toast.error("Image must be under 5 MB");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const supabase = createClient();
+      const compressed = await compressAvatar(file);
+      const path = `${userId}/avatar.jpg`;
+
+      // Upload (upsert to overwrite previous avatar)
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, compressed, { contentType: "image/jpeg", upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      // Append cache-buster so browser shows new image
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      // Save to profile
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq("id", userId);
+
+      if (updateError) throw updateError;
+
+      setAvatarUrl(publicUrl);
+      toast.success("Profile picture updated!");
+    } catch (err) {
+      console.error("Avatar upload error:", err);
+      toast.error("Failed to upload profile picture");
+    } finally {
+      setIsUploadingAvatar(false);
+      // Reset input so the same file can be re-selected
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }, [userId]);
 
   useEffect(() => {
     const previousPreference = previousUnitPreferenceRef.current;
@@ -328,6 +409,43 @@ export function ProfileForm({ profile, email, userId }: ProfileFormProps) {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Avatar upload */}
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                className="relative group"
+              >
+                <Avatar className="size-20">
+                  {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile picture" />}
+                  <AvatarFallback className="text-xl font-semibold bg-primary/15 text-primary">
+                    {(displayName || "?").slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {isUploadingAvatar ? (
+                    <Loader2 className="size-5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="size-5 text-white" />
+                  )}
+                </div>
+                {isUploadingAvatar && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                    <Loader2 className="size-5 text-white animate-spin" />
+                  </div>
+                )}
+              </button>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
+              <p className="text-xs text-muted-foreground">Tap to change photo</p>
+            </div>
+
             {/* Display Name */}
             <div className="space-y-1.5">
               <Label htmlFor="display-name">Display Name</Label>

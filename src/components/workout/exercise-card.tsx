@@ -12,9 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { SetRow } from "@/components/workout/set-row";
 import { ExerciseSparkline } from "@/components/workout/exercise-sparkline";
 import { FormTipsPanel } from "@/components/workout/form-tips-panel";
+import { RpeDeloadAlert } from "@/components/workout/rpe-deload-alert";
 import { weightToDisplay } from "@/lib/units";
 import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS } from "@/lib/constants";
 import type { WorkoutExercise, WorkoutSet } from "@/types/workout";
+import type { OverloadSuggestion } from "@/lib/progressive-overload";
 
 type MuscleGroup = string;
 
@@ -27,6 +29,8 @@ export interface ExerciseCardProps {
   previousSets: Array<{ reps: number | null; weight: number | null }> | undefined;
   /** Suggested weights per set index */
   suggestedWeights: Record<number, number> | undefined;
+  /** Smart overload suggestions with intent metadata per set index */
+  smartSuggestions: Record<number, OverloadSuggestion> | undefined;
   /** Trendline data for sparkline */
   trendline: { weights: number[]; slope: number } | undefined;
   /** Unit preference */
@@ -48,6 +52,7 @@ export function ExerciseCard({
   ghostSets,
   previousSets,
   suggestedWeights,
+  smartSuggestions,
   trendline,
   preference,
   onUpdateSet,
@@ -65,6 +70,25 @@ export function ExerciseCard({
     }
     return true;
   });
+
+  const [deloadDismissed, setDeloadDismissed] = useState(false);
+
+  // Detect consecutive high-effort sets (RIR ≤ 1) among the most recent completed sets
+  const completedSets = exerciseBlock.sets.filter((s) => s.completed && s.rir !== null);
+  let consecutiveGrinding = 0;
+  for (let i = completedSets.length - 1; i >= 0; i--) {
+    if (completedSets[i].rir !== null && completedSets[i].rir! <= 1) {
+      consecutiveGrinding++;
+    } else {
+      break;
+    }
+  }
+  const lastCompletedSet = completedSets[completedSets.length - 1];
+  const showDeloadAlert =
+    !deloadDismissed &&
+    consecutiveGrinding >= 2 &&
+    lastCompletedSet?.weight_kg != null &&
+    lastCompletedSet.weight_kg > 0;
 
   return (
     <Card className="overflow-hidden glass-surface-elevated shimmer-target transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-primary/30 hover:shadow-lg">
@@ -206,6 +230,7 @@ export function ExerciseCard({
               suggestedWeight={
                 suggestedWeights?.[setIndex] ?? null
               }
+              smartSuggestion={smartSuggestions?.[setIndex]}
               autoFocusWeight={setIndex === exerciseBlock.sets.length - 1 && !set.completed}
               onUpdate={(updates) => onUpdateSet(exerciseIndex, setIndex, updates)}
               onComplete={() => onCompleteSet(exerciseIndex, setIndex)}
@@ -220,6 +245,26 @@ export function ExerciseCard({
             />
           );
         })}
+        {/* Deload alert — shown when 2+ consecutive sets at RIR ≤ 1 */}
+        <AnimatePresence>
+          {showDeloadAlert && lastCompletedSet?.weight_kg != null && (
+            <RpeDeloadAlert
+              lastWeightKg={lastCompletedSet.weight_kg}
+              consecutiveCount={consecutiveGrinding}
+              preference={preference}
+              onApplyDeload={(newWeightKg) => {
+                // Pre-fill the next incomplete set's weight
+                const nextIncompleteIdx = exerciseBlock.sets.findIndex((s) => !s.completed);
+                if (nextIncompleteIdx !== -1) {
+                  onUpdateSet(exerciseIndex, nextIncompleteIdx, { weight_kg: newWeightKg });
+                }
+                setDeloadDismissed(true);
+              }}
+              onDismiss={() => setDeloadDismissed(true)}
+            />
+          )}
+        </AnimatePresence>
+
         <Button
           type="button"
           variant="outline"

@@ -31,7 +31,7 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(data as HistoryStatsResponse);
+    return NextResponse.json(data as unknown as HistoryStatsResponse);
   } catch (error) {
     logger.error("History stats error:", error);
     return NextResponse.json(

@@ -388,7 +388,7 @@ export function useOnboarding() {
 
       let updateError: unknown = null;
       for (let attempt = 0; attempt <= OPTIONAL_COLUMNS.length; attempt++) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("profiles")
           .upsert(profileData, { onConflict: "id" })
           .select("id")

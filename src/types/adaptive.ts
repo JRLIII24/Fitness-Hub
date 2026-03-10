@@ -98,7 +98,7 @@ export interface LauncherResponse {
     id: string;
     name: string;
     exercise_count: number;
-    last_used: string;
+    last_used_at: string;
   }>;
 }
 

@@ -72,14 +72,10 @@ export function SmartLauncherWidget() {
 
         const json = await res.json() as LauncherResponse;
 
-        // Update cache with fresh data
+        // Update with fresh data (silently replaces cached data if any)
         setData(json);
+        setLoading(false);
         await cachePrediction(user.id, json);
-
-        if (!cached) {
-          // Only stop loading if we didn't show cached data
-          setLoading(false);
-        }
       } catch (err) {
         logger.error("Launcher fetch error:", err);
         setError(err instanceof Error ? err.message : "Failed to load");

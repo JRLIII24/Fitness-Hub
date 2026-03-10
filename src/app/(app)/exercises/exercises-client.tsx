@@ -2,9 +2,11 @@
 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ChevronDown, ChevronUp, Dumbbell } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, Dumbbell, PlayCircle, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { ExerciseVideoPlayer } from "@/components/exercises/exercise-video-player";
 import type { ExerciseRow } from "./page";
 
 const MUSCLE_BADGE_COLORS: Record<string, string> = {
@@ -27,12 +29,17 @@ const EQUIPMENT_BADGE_COLORS: Record<string, string> = {
   band: "bg-fuchsia-500/20 text-fuchsia-400",
 };
 
-function ExerciseCard({ ex, muscleGroupLabels, equipmentLabels }: {
+function ExerciseCard({ ex, muscleGroupLabels, equipmentLabels, has_video }: {
   ex: ExerciseRow;
   muscleGroupLabels: Record<string, string>;
   equipmentLabels: Record<string, string>;
+  has_video: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [videoMounted, setVideoMounted] = useState(false);
+
+  const hasContent = ex.instructions || has_video;
+
   return (
     <motion.div
       layout
@@ -45,7 +52,12 @@ function ExerciseCard({ ex, muscleGroupLabels, equipmentLabels }: {
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{ex.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="truncate text-sm font-semibold">{ex.name}</p>
+            {has_video && (
+              <PlayCircle className="h-3.5 w-3.5 shrink-0 text-primary/60" />
+            )}
+          </div>
           <div className="mt-1 flex flex-wrap gap-1">
             <span
               className={cn(
@@ -68,13 +80,15 @@ function ExerciseCard({ ex, muscleGroupLabels, equipmentLabels }: {
             </span>
           </div>
         </div>
-        <span className="ml-2 shrink-0 text-muted-foreground">
-          {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </span>
+        {hasContent && (
+          <span className="ml-2 shrink-0 text-muted-foreground">
+            {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </span>
+        )}
       </button>
 
       <AnimatePresence initial={false}>
-        {open && ex.instructions && (
+        {open && hasContent && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
@@ -83,7 +97,34 @@ function ExerciseCard({ ex, muscleGroupLabels, equipmentLabels }: {
             className="overflow-hidden"
           >
             <div className="border-t border-border/40 px-4 pb-3 pt-2">
-              <p className="text-xs text-muted-foreground leading-relaxed">{ex.instructions}</p>
+              {has_video && ex.instructions ? (
+                <Tabs defaultValue="instructions">
+                  <TabsList className="mb-2 h-7">
+                    <TabsTrigger value="instructions" className="h-6 text-[11px]">
+                      <FileText className="mr-1 h-3 w-3" />
+                      Instructions
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="video"
+                      className="h-6 text-[11px]"
+                      onClick={() => setVideoMounted(true)}
+                    >
+                      <PlayCircle className="mr-1 h-3 w-3" />
+                      Video
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="instructions">
+                    <p className="text-xs text-muted-foreground leading-relaxed">{ex.instructions}</p>
+                  </TabsContent>
+                  <TabsContent value="video">
+                    {videoMounted && <ExerciseVideoPlayer exerciseId={ex.id} />}
+                  </TabsContent>
+                </Tabs>
+              ) : has_video ? (
+                <ExerciseVideoPlayer exerciseId={ex.id} />
+              ) : (
+                <p className="text-xs text-muted-foreground leading-relaxed">{ex.instructions}</p>
+              )}
             </div>
           </motion.div>
         )}
@@ -208,6 +249,7 @@ export function ExercisesClient({
               ex={ex}
               muscleGroupLabels={muscleGroupLabels}
               equipmentLabels={equipmentLabels}
+              has_video={ex.has_video}
             />
           ))}
         </div>

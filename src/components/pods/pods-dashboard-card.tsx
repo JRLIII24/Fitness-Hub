@@ -32,7 +32,6 @@ export function PodsDashboardCard() {
           throw new Error(errorData.details || errorData.error || "Failed to load pods");
         }
         const data = await res.json();
-        console.log("✅ Dashboard card pods loaded:", data.pods?.length || 0);
         setPods(data.pods || []);
       } catch (err) {
         console.error("Pods fetch error:", err);
@@ -149,7 +148,7 @@ export function PodsDashboardCard() {
 
         {/* Action */}
         <Button
-          onClick={() => router.push("/pods")}
+          onClick={() => router.push(hasMultiple ? "/pods" : `/pods/${primaryPod.id}`)}
           variant="outline"
           size="sm"
           className="motion-press w-full"

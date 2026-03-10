@@ -59,7 +59,7 @@ export function FoodLogForm({
       fiber_g: food.fiber_g ?? null,
       sugar_g: food.sugar_g ?? null,
       sodium_mg: food.sodium_mg ?? null,
-      source: food.source ?? "openfoodfacts",
+      source: (food.source ?? "openfoodfacts") as "openfoodfacts" | "usda" | "manual" | "ai-scan",
     };
 
     if (payload.barcode) {

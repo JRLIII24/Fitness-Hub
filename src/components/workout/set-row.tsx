@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { ArrowUp, Check, Equal, Flame, Ghost, Play, Trash2, Trophy } from "lucide-react";
+import { ArrowUp, Check, Equal, Flame, Ghost, Trash2, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { WorkoutSet } from "@/types/workout";
@@ -22,23 +22,29 @@ import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 
 interface SetRowProps {
   set: WorkoutSet;
+  exerciseIndex: number;
+  setIndex: number;
   previousSet?: {
     reps: number | null;
     weight: number | null;
   };
-  ghostSet?: {
-    reps: number | null;
-    weight: number | null;
-  };
+  /** Ghost weight in kg (null if no ghost) */
+  ghostWeight?: number | null;
+  /** Ghost reps (null if no ghost) */
+  ghostReps?: number | null;
   /** Display-only suggested weight in kg (never written to store) */
   suggestedWeight?: number | null;
   /** Smart overload suggestion with intent (increase vs maintain) */
   smartSuggestion?: OverloadSuggestion;
   autoFocusWeight?: boolean;
-  onUpdate: (updates: Partial<WorkoutSet>) => void;
-  onComplete: () => void;
-  onRemove: () => void;
-  onStartRest?: (seconds: number) => void;
+  onUpdate: (exerciseIndex: number, setIndex: number, updates: Partial<WorkoutSet>) => void;
+  onComplete: (exerciseIndex: number, setIndex: number) => void;
+  onRemove: (exerciseIndex: number, setIndex: number) => void;
+  onStartRest?: (exerciseId: string, exerciseName: string, seconds: number) => void;
+  /** Exercise ID for rest timer */
+  exerciseId?: string;
+  /** Exercise name for rest timer */
+  exerciseName?: string;
 }
 
 const setTypeColors: Record<string, string> = {
@@ -50,8 +56,11 @@ const setTypeColors: Record<string, string> = {
 
 export const SetRow = memo(function SetRow({
   set,
+  exerciseIndex,
+  setIndex,
   previousSet,
-  ghostSet,
+  ghostWeight = null,
+  ghostReps = null,
   suggestedWeight = null,
   smartSuggestion,
   autoFocusWeight = false,
@@ -59,6 +68,8 @@ export const SetRow = memo(function SetRow({
   onComplete,
   onRemove,
   onStartRest,
+  exerciseId,
+  exerciseName,
 }: SetRowProps) {
   const { preference, unitLabel } = useUnitPreferenceStore();
 
@@ -77,7 +88,7 @@ export const SetRow = memo(function SetRow({
   const rirValue = set.rir === null ? "" : String(set.rir);
 
   const handleComplete = () => {
-    onComplete();
+    onComplete(exerciseIndex, setIndex);
 
     // Enhanced haptic feedback
     triggerHaptic(beatPrevious ? "heavy" : "light");
@@ -88,44 +99,44 @@ export const SetRow = memo(function SetRow({
     }
 
     // Start rest timer if completing (not un-completing)
-    if (!set.completed && onStartRest) {
-      onStartRest(restSeconds);
+    if (!set.completed && onStartRest && exerciseId && exerciseName) {
+      onStartRest(exerciseId, exerciseName, restSeconds);
     }
   };
 
   const handleWeightChange = (value: string) => {
     if (value === "") {
-      onUpdate({ weight_kg: null });
+      onUpdate(exerciseIndex, setIndex, { weight_kg: null });
       return;
     }
 
     const parsed = Number(value);
     if (Number.isFinite(parsed)) {
-      onUpdate({ weight_kg: fromDisplay(parsed) });
+      onUpdate(exerciseIndex, setIndex, { weight_kg: fromDisplay(parsed) });
     }
   };
 
   const handleRepsChange = (value: string) => {
     if (value === "") {
-      onUpdate({ reps: null });
+      onUpdate(exerciseIndex, setIndex, { reps: null });
       return;
     }
 
     const parsed = Number.parseInt(value, 10);
     if (Number.isFinite(parsed)) {
-      onUpdate({ reps: parsed });
+      onUpdate(exerciseIndex, setIndex, { reps: parsed });
     }
   };
 
   const handleRirChange = (value: string) => {
     if (value === "") {
-      onUpdate({ rir: null });
+      onUpdate(exerciseIndex, setIndex, { rir: null });
       return;
     }
 
     const parsed = Number.parseInt(value, 10);
     if (Number.isFinite(parsed)) {
-      onUpdate({ rir: Math.max(0, Math.min(10, parsed)) });
+      onUpdate(exerciseIndex, setIndex, { rir: Math.max(0, Math.min(10, parsed)) });
     }
   };
 
@@ -153,26 +164,27 @@ export const SetRow = memo(function SetRow({
   const beatPrevious = Boolean(weightPR || repPRAtSameWeight);
 
   // Ghost workout comparison (from last time doing this template)
+  const hasGhost = ghostWeight != null || ghostReps != null;
   const ghostScore =
-    ghostSet?.weight != null && ghostSet.reps != null
-      ? ghostSet.weight * ghostSet.reps
+    ghostWeight != null && ghostReps != null
+      ? ghostWeight * ghostReps
       : null;
   const ghostWeightPR =
-    ghostSet?.weight != null && set.weight_kg != null && set.weight_kg > ghostSet.weight;
+    ghostWeight != null && set.weight_kg != null && set.weight_kg > ghostWeight;
   const ghostRepPRAtSameWeight =
-    ghostSet?.weight != null &&
-    ghostSet?.reps != null &&
+    ghostWeight != null &&
+    ghostReps != null &&
     set.weight_kg != null &&
     set.reps != null &&
-    set.weight_kg === ghostSet.weight &&
-    set.reps > ghostSet.reps;
+    set.weight_kg === ghostWeight &&
+    set.reps > ghostReps;
   const beatGhost = Boolean(ghostWeightPR || ghostRepPRAtSameWeight);
   const ghostPercentage =
     ghostScore != null && currentScore != null && ghostScore > 0
       ? Math.round((currentScore / ghostScore) * 100)
       : null;
-  const ghostWeightText = ghostSet?.weight != null ? `${toDisplay(ghostSet.weight)}` : "—";
-  const ghostRepsText = ghostSet?.reps != null ? `${ghostSet.reps}` : "—";
+  const ghostWeightText = ghostWeight != null ? `${toDisplay(ghostWeight)}` : "—";
+  const ghostRepsText = ghostReps != null ? `${ghostReps}` : "—";
   const previousWeightText = previousSet?.weight != null ? `${toDisplay(previousSet.weight)}` : "—";
   const previousRepsText = previousSet?.reps != null ? `${previousSet.reps}` : "—";
   const currentWeightText = set.weight_kg != null ? `${toDisplay(set.weight_kg)}` : "—";
@@ -185,15 +197,15 @@ export const SetRow = memo(function SetRow({
       } : {}}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "space-y-2.5 rounded-xl border border-border/60 px-3.5 py-3 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "space-y-1.5 rounded-xl border border-border/60 px-2.5 py-2 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
         set.completed
           ? "bg-primary/12 shadow-[0_0_18px_rgba(255,255,255,0.08)]"
           : "bg-secondary/40 hover:border-primary/40 hover:bg-secondary/60"
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-muted px-2 text-sm font-semibold text-foreground">
+      <div className="flex items-center justify-between gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-muted px-1.5 text-xs font-semibold text-foreground">
             {set.set_number}
           </span>
 
@@ -207,18 +219,20 @@ export const SetRow = memo(function SetRow({
               ];
               const currentIdx = types.indexOf(set.set_type);
               const nextType = types[(currentIdx + 1) % types.length];
-              onUpdate({ set_type: nextType });
+              onUpdate(exerciseIndex, setIndex, { set_type: nextType });
             }}
-            className={cn(
-              "rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors",
-              setTypeColors[set.set_type]
-            )}
+            className="flex min-h-[44px] items-center"
           >
-            {set.set_type === "working" ? "work" : set.set_type}
+            <span className={cn(
+              "rounded-md border px-1.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors",
+              setTypeColors[set.set_type]
+            )}>
+              {set.set_type === "working" ? "work" : set.set_type}
+            </span>
           </button>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0">
           <motion.div
             whileTap={{ scale: 0.9 }}
             animate={set.completed && (beatPrevious || beatGhost) ? { scale: [1, 1.15, 1] } : {}}
@@ -256,9 +270,9 @@ export const SetRow = memo(function SetRow({
                 transition={{ type: "spring", stiffness: 500, damping: 25 }}
               >
                 {set.completed && beatPrevious ? (
-                  <Trophy className="h-4 w-4" />
+                  <Trophy className="h-3.5 w-3.5" />
                 ) : (
-                  <Check className="h-4 w-4" />
+                  <Check className="h-3.5 w-3.5" />
                 )}
               </motion.div>
             </Button>
@@ -267,16 +281,16 @@ export const SetRow = memo(function SetRow({
             variant="ghost"
             size="icon"
             className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive"
-            onClick={onRemove}
+            onClick={() => onRemove(exerciseIndex, setIndex)}
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
 
       {/* Ghost workout indicator */}
-      {ghostSet && !set.completed && (ghostSet.weight != null || ghostSet.reps != null) && (
-        <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1.5 text-xs">
+      {hasGhost && !set.completed && (
+        <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1 text-[12px]">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-cyan-400/70">
               <Ghost className="h-3.5 w-3.5 shrink-0" />
@@ -294,11 +308,12 @@ export const SetRow = memo(function SetRow({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.15fr)]">
-        <div className="space-y-1">
+      {/* Row 1: Weight + Reps (primary inputs) */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-0.5">
           <label
             htmlFor={`weight-${set.id}`}
-            className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+            className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
           >
             Weight ({unitLabel})
           </label>
@@ -310,10 +325,10 @@ export const SetRow = memo(function SetRow({
             placeholder={smartSuggestion ? String(toDisplay(smartSuggestion.weightKg)) : suggestedWeight != null ? String(toDisplay(suggestedWeight)) : "0"}
             value={weightValue}
             onChange={(e) => handleWeightChange(e.target.value)}
-            className="h-10 w-full text-center text-[18px] font-semibold tabular-nums text-foreground"
+            className="h-10 w-full text-center text-[15px] font-semibold tabular-nums text-foreground"
             disabled={set.completed}
           />
-          {/* Progressive overload suggestion chip — only visible when weight is empty */}
+          {/* Progressive overload suggestion chip */}
           <AnimatePresence>
             {!set.completed && set.weight_kg === null && smartSuggestion && (
               <motion.button
@@ -323,36 +338,36 @@ export const SetRow = memo(function SetRow({
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15 }}
                 onClick={() => {
-                  onUpdate({ weight_kg: smartSuggestion.weightKg });
+                  onUpdate(exerciseIndex, setIndex, { weight_kg: smartSuggestion.weightKg });
                   triggerHaptic("light");
                 }}
                 className={cn(
-                  "mt-1 inline-flex w-full items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold tabular-nums transition-colors",
+                  "mt-0.5 inline-flex w-full items-center justify-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums transition-colors",
                   smartSuggestion.intent === "increase"
                     ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
                     : "border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
                 )}
-                title={
-                  smartSuggestion.intent === "increase"
-                    ? "Progressive overload: tap to use suggested weight increase"
-                    : "Maintain weight: previous set was at high effort"
-                }
               >
                 {smartSuggestion.intent === "increase" ? (
-                  <ArrowUp className="h-3 w-3" />
+                  <>
+                    <ArrowUp className="h-2.5 w-2.5" />
+                    {toDisplay(smartSuggestion.weightKg)} {unitLabel}
+                  </>
                 ) : (
-                  <Equal className="h-3 w-3" />
+                  <>
+                    <Equal className="h-2.5 w-2.5" />
+                    {toDisplay(smartSuggestion.weightKg)} {unitLabel}
+                  </>
                 )}
-                {toDisplay(smartSuggestion.weightKg)} {unitLabel}
               </motion.button>
             )}
           </AnimatePresence>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <label
             htmlFor={`reps-${set.id}`}
-            className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+            className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
           >
             Reps
           </label>
@@ -363,15 +378,18 @@ export const SetRow = memo(function SetRow({
             placeholder="0"
             value={repsValue}
             onChange={(e) => handleRepsChange(e.target.value)}
-            className="h-10 w-full text-center text-[18px] font-semibold tabular-nums text-foreground"
+            className="h-10 w-full text-center text-[15px] font-semibold tabular-nums text-foreground"
             disabled={set.completed}
           />
         </div>
+      </div>
 
-        <div className="space-y-1">
+      {/* Row 2: RIR + Rest (secondary, compact) */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-0.5">
           <label
             htmlFor={`rir-${set.id}`}
-            className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+            className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
           >
             RIR
           </label>
@@ -384,51 +402,39 @@ export const SetRow = memo(function SetRow({
             placeholder="—"
             value={rirValue}
             onChange={(e) => handleRirChange(e.target.value)}
-            className="h-10 w-full text-center text-[18px] font-semibold tabular-nums text-foreground"
+            className="h-8 w-full text-center text-sm tabular-nums text-foreground"
             disabled={set.completed}
           />
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <p
             id={`rest-label-${set.id}`}
-            className="text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+            className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
           >
             Rest
           </p>
-          <div className="flex items-center gap-1">
-            <Select
-              value={String(restSeconds)}
-              onValueChange={(value) => onUpdate({ rest_seconds: Number.parseInt(value, 10) })}
-            >
-              <SelectTrigger className="h-10 w-full" aria-labelledby={`rest-label-${set.id}`}>
-                <SelectValue placeholder="Rest" />
-              </SelectTrigger>
-              <SelectContent>
-                {REST_PRESETS.map((seconds) => (
-                  <SelectItem key={seconds} value={String(seconds)}>
-                    {seconds}s rest
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 shrink-0"
-              onClick={() => onStartRest?.(restSeconds)}
-              title="Start rest timer for this set"
-            >
-              <Play className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <Select
+            value={String(restSeconds)}
+            onValueChange={(value) => onUpdate(exerciseIndex, setIndex, { rest_seconds: Number.parseInt(value, 10) })}
+          >
+            <SelectTrigger className="h-8 w-full text-xs" aria-labelledby={`rest-label-${set.id}`}>
+              <SelectValue placeholder="Rest" />
+            </SelectTrigger>
+            <SelectContent>
+              {REST_PRESETS.map((seconds) => (
+                <SelectItem key={seconds} value={String(seconds)}>
+                  {seconds}s
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       {previousSet && (previousSet.weight != null || previousSet.reps != null) ? (
         <div className={cn(
-          "flex items-center justify-between rounded-md border px-2 py-1.5 text-[11px] transition-all duration-300",
+          "flex items-center justify-between rounded-md border px-2 py-1 text-[12px] transition-all duration-300",
           beatPrevious && set.completed
             ? "border-yellow-400/30 bg-gradient-to-r from-yellow-500/10 to-amber-500/10"
             : "border-border/50 bg-muted/30"

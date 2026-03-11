@@ -87,6 +87,7 @@ export default function FormCheckPage() {
     deleteVideo,
     retry,
     loadHistory,
+    loadFullReport,
     getSignedUrl,
     history,
     uploading,
@@ -212,6 +213,20 @@ export default function FormCheckPage() {
     loadHistory();
     setView("history");
   }, [loadHistory]);
+
+  const handleHistoryCardClick = useCallback(
+    async (item: (typeof history)[number]) => {
+      const fullReport = await loadFullReport(item.id);
+      if (!fullReport) return;
+
+      setReport(fullReport);
+      setCurrentVideoId(item.video_id);
+      setCurrentStoragePath(item.video_storage_path);
+      setVideoUrl(null); // reset so the useEffect fetches fresh signed URL
+      setView("report");
+    },
+    [loadFullReport],
+  );
 
   // ── Feature gate ──
 
@@ -680,9 +695,10 @@ export default function FormCheckPage() {
                   const exercise =
                     item.detected_exercise ?? item.selected_exercise ?? "Unknown";
                   return (
-                    <div
+                    <button
                       key={item.id}
-                      className="rounded-2xl border border-border/60 bg-card/30 p-4"
+                      onClick={() => handleHistoryCardClick(item)}
+                      className="w-full rounded-2xl border border-border/60 bg-card/30 p-4 text-left transition-colors hover:bg-card/50 active:scale-[0.98]"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -716,7 +732,7 @@ export default function FormCheckPage() {
                       <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-foreground/70">
                         {item.summary}
                       </p>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

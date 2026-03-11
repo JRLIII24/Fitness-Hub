@@ -329,12 +329,27 @@ export const useWorkoutStore = create<WorkoutState>()(
         };
         exercises[exerciseIndex] = { ...exercises[exerciseIndex], sets };
 
-        set({
-          activeWorkout: {
-            ...state.activeWorkout,
-            exercises,
-          },
-        });
+        const updatedWorkout = {
+          ...state.activeWorkout,
+          exercises,
+        };
+
+        set({ activeWorkout: updatedWorkout });
+
+        // Persist draft server-side so the workout can be restored if the app crashes.
+        // Fire-and-forget — failures are silent (best-effort only).
+        void fetch("/api/workout/draft", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            draft_data: {
+              workoutName: updatedWorkout.name,
+              startedAt: updatedWorkout.started_at,
+              templateId: updatedWorkout.template_id ?? null,
+              exercises: updatedWorkout.exercises,
+            },
+          }),
+        }).catch(() => {});
       },
     }),
     {

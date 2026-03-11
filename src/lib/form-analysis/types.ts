@@ -91,6 +91,11 @@ export interface FormHistoryItem {
   analyzed_at: string;
   video_uploaded_at: string;
   video_expires_at: string;
+  video_storage_path: string;
+  praise: string[];
+  recommendations: string[];
+  safety_notes: string[];
+  exercise_confidence: ExerciseConfidence | null;
 }
 
 /** Frame extracted client-side for analysis */

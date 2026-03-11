@@ -195,7 +195,7 @@ export function StepNutritionSummary({
             transition={{ delay: 0.2 }}
             className="text-2xl font-bold text-foreground"
           >
-            Your Personalized Plan
+            Your Apex Plan
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}

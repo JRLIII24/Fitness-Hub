@@ -76,6 +76,7 @@ export type Database = {
       }
       active_workout_sessions: {
         Row: {
+          draft_data: Json | null
           exercise_count: number
           run_session_id: string | null
           session_name: string
@@ -84,6 +85,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          draft_data?: Json | null
           exercise_count?: number
           run_session_id?: string | null
           session_name: string
@@ -92,6 +94,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          draft_data?: Json | null
           exercise_count?: number
           run_session_id?: string | null
           session_name?: string
@@ -2457,6 +2460,7 @@ export type Database = {
           is_shared: boolean
           name: string
           primary_muscle_group: string | null
+          program_id: string | null
           review_count: number
           save_count: number
           training_block: string | null
@@ -2476,6 +2480,7 @@ export type Database = {
           is_shared?: boolean
           name: string
           primary_muscle_group?: string | null
+          program_id?: string | null
           review_count?: number
           save_count?: number
           training_block?: string | null
@@ -2495,6 +2500,7 @@ export type Database = {
           is_shared?: boolean
           name?: string
           primary_muscle_group?: string | null
+          program_id?: string | null
           review_count?: number
           save_count?: number
           training_block?: string | null

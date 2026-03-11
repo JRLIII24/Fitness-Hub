@@ -55,6 +55,8 @@ interface UseFormCheckReturn {
   ) => Promise<AnalyzeResult | null>;
   /** Load history of completed analyses */
   loadHistory: () => Promise<void>;
+  /** Load full report with issues for a history item */
+  loadFullReport: (reportId: string) => Promise<AnalyzeResult | null>;
   /** Get a short-lived signed URL for video playback */
   getSignedUrl: (storagePath: string) => Promise<string | null>;
   history: FormHistoryItem[];
@@ -260,7 +262,11 @@ export function useFormCheck(userId: string | null): UseFormCheckReturn {
           overall_score,
           summary,
           analyzed_at,
-          form_videos!inner(uploaded_at, expires_at)
+          praise,
+          recommendations,
+          safety_notes,
+          exercise_confidence,
+          form_videos!inner(uploaded_at, expires_at, storage_path)
         `,
         )
         .eq("user_id", userId)
@@ -279,6 +285,11 @@ export function useFormCheck(userId: string | null): UseFormCheckReturn {
         analyzed_at: r.analyzed_at,
         video_uploaded_at: r.form_videos.uploaded_at,
         video_expires_at: r.form_videos.expires_at,
+        video_storage_path: r.form_videos.storage_path,
+        praise: r.praise ?? [],
+        recommendations: r.recommendations ?? [],
+        safety_notes: r.safety_notes ?? [],
+        exercise_confidence: r.exercise_confidence,
       }));
 
       setHistory(items);
@@ -288,6 +299,55 @@ export function useFormCheck(userId: string | null): UseFormCheckReturn {
       setLoadingHistory(false);
     }
   }, [userId, supabase]);
+
+  // ── Load full report (with issues) for a history item ──
+  const loadFullReport = useCallback(
+    async (reportId: string): Promise<AnalyzeResult | null> => {
+      try {
+        // Fetch the report from history (already loaded) for base fields
+        const historyItem = history.find((h) => h.id === reportId);
+
+        // Fetch issues for this report
+        const { data: issues, error: issuesErr } = await supabase
+          .from("form_analysis_issues")
+          .select("body_part, issue_type, severity, timestamp_seconds, description, correction, cue, confidence, sort_order")
+          .eq("report_id", reportId)
+          .order("sort_order", { ascending: true });
+
+        if (issuesErr) throw issuesErr;
+
+        if (!historyItem) {
+          setError("Report not found");
+          return null;
+        }
+
+        return {
+          reportId: historyItem.id,
+          overallScore: historyItem.overall_score,
+          summary: historyItem.summary,
+          detectedExercise: historyItem.detected_exercise,
+          exerciseConfidence: historyItem.exercise_confidence ?? "low",
+          issues: (issues ?? []).map((i: any) => ({
+            body_part: i.body_part,
+            issue_type: i.issue_type,
+            severity: i.severity,
+            timestamp_seconds: i.timestamp_seconds,
+            description: i.description,
+            correction: i.correction,
+            cue: i.cue,
+            confidence: i.confidence,
+          })),
+          praise: historyItem.praise,
+          recommendations: historyItem.recommendations,
+          safetyNotes: historyItem.safety_notes,
+        };
+      } catch {
+        setError("Failed to load report details");
+        return null;
+      }
+    },
+    [supabase, history],
+  );
 
   // ── Signed URL ──
   const getSignedUrl = useCallback(
@@ -308,6 +368,7 @@ export function useFormCheck(userId: string | null): UseFormCheckReturn {
     deleteVideo,
     retry,
     loadHistory,
+    loadFullReport,
     getSignedUrl,
     history,
     uploading,

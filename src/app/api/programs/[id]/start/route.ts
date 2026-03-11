@@ -2,8 +2,12 @@
  * Start Program API
  * POST /api/programs/:id/start
  *
- * Creates workout templates for each day in the program, links them
- * via template_id in program_data, and sets status to "active".
+ * Sets the program to "active" and creates a template for Day 1 of Week 1 only.
+ * Subsequent templates are created on-demand as each day is completed
+ * (see POST /api/programs/advance).
+ *
+ * This prevents flooding the user's template list — only one program
+ * template exists at any given time.
  */
 
 import { NextResponse } from "next/server";
@@ -44,35 +48,35 @@ export async function POST(
       return NextResponse.json({ error: "Program has no week data" }, { status: 400 });
     }
 
-    // Create templates for each day in each week
-    let templatesCreated = 0;
-    const updatedWeeks = [...programData.weeks];
+    // Create a template for Week 1, Day 1 only
+    const firstWeek = programData.weeks[0];
+    const firstDay = firstWeek?.days?.[0];
 
-    for (let wi = 0; wi < updatedWeeks.length; wi++) {
-      const week = updatedWeeks[wi];
-      const updatedDays = [...week.days];
-
-      for (let di = 0; di < updatedDays.length; di++) {
-        const day = updatedDays[di];
-        const templateId = await createTemplateFromProgramDay(
-          supabase,
-          user.id,
-          programData.name,
-          week.week_number,
-          day,
-        );
-
-        if (templateId) {
-          // Attach template_id to the day data
-          updatedDays[di] = { ...day, template_id: templateId } as ProgramDayData & { template_id: string };
-          templatesCreated++;
-        }
-      }
-
-      updatedWeeks[wi] = { ...week, days: updatedDays };
+    if (!firstDay) {
+      return NextResponse.json({ error: "Program has no day data" }, { status: 400 });
     }
 
-    // Update program with template IDs and set active
+    const templateId = await createTemplateFromProgramDay(
+      supabase,
+      user.id,
+      programData.name,
+      firstWeek.week_number,
+      firstDay,
+      id,
+    );
+
+    // Embed the template_id into program_data so the active card and advance
+    // endpoint can reference it without an extra query.
+    const updatedWeeks = programData.weeks.map((week, wi) => ({
+      ...week,
+      days: week.days.map((day, di) => {
+        if (wi === 0 && di === 0 && templateId) {
+          return { ...day, template_id: templateId } as ProgramDayData & { template_id: string };
+        }
+        return day;
+      }),
+    }));
+
     const { error: updateErr } = await supabase
       .from("training_programs")
       .update({
@@ -92,7 +96,7 @@ export async function POST(
 
     return NextResponse.json({
       started: true,
-      templates_created: templatesCreated,
+      template_id: templateId,
     });
   } catch (error) {
     logger.error("Program start error:", error);

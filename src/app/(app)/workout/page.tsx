@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronDown, Clock3, NotebookPen, Plus, Save, Dumbbell, Zap, Loader2 } from "lucide-react";
+import { Clock3, NotebookPen, Plus, Save, Dumbbell, Zap, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
 import {
   trackSessionIntentSet,
 } from "@/lib/retention-events";
@@ -16,14 +15,12 @@ import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
 import type { ActiveWorkout, Exercise, WorkoutSet } from "@/types/workout";
 import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS, MUSCLE_GROUPS } from "@/lib/constants";
+import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -31,6 +28,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ExerciseSwapSheet } from "@/components/workout/exercise-swap-sheet";
 import { useExerciseTrendlines } from "@/hooks/use-exercise-trendlines";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
@@ -40,16 +52,14 @@ import {
   isMissingTableError,
   slugify,
   normalizeEquipment,
-  resolveExerciseMediaUrl,
   makeCustomExercise,
 } from "@/lib/workout/exercise-resolver";
-import { calcSuggestedWeight } from "@/lib/progressive-overload";
 import { RestTimerPill } from "@/components/workout/rest-timer-pill";
 import { SaveTemplateDialog } from "@/components/workout/save-template-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { SendTemplateDialog } from "@/components/social/send-template-dialog";
 import { useSharedItems, type TemplateSnapshot } from "@/hooks/use-shared-items";
-import { ExerciseSelectionCard } from "@/components/workout/exercise-selection-card";
+import { ExerciseLibrarySheet } from "@/components/workout/exercise-library-sheet";
 import { WorkoutCompleteCelebration } from "@/components/workout/workout-complete-celebration";
 import { LevelUpCelebration } from "@/components/dashboard/level-up-celebration";
 
@@ -67,22 +77,33 @@ import { TemplateManagerPanel } from "@/components/workout/template-manager-pane
 import { QuickStartPanel } from "@/components/workout/quick-start-panel";
 import { AI_COACH_ENABLED } from "@/lib/features";
 import { VoiceCommandBar } from "@/components/coach/voice-command-bar";
+import { ActiveProgramCard } from "@/components/workout/active-program-card";
+import { RestoreWorkoutBanner, type WorkoutDraft } from "@/components/workout/restore-workout-banner";
 
 type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 
 const TEMPLATE_LIKES_KEY = "workout_template_likes_v1";
 
-/** Returns true when viewport width <= 639 px (Tailwind `sm` breakpoint). */
-function useIsSmallScreen(): boolean {
-  const [isSmall, setIsSmall] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    setIsSmall(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsSmall(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isSmall;
+// Thin sortable wrapper — keeps ExerciseCard pure and memoised
+function SortableExerciseCard({
+  exerciseId,
+  ...props
+}: { exerciseId: string } & React.ComponentProps<typeof ExerciseCard>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: exerciseId });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <ExerciseCard {...props} dragHandleProps={{ ...attributes, ...listeners }} />
+    </div>
+  );
 }
 
 export default function WorkoutPage() {
@@ -93,6 +114,8 @@ export default function WorkoutPage() {
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [dbFeaturesAvailable, setDbFeaturesAvailable] = useState(true);
+  const [workoutDraft, setWorkoutDraft] = useState<WorkoutDraft | null>(null);
+  const [programRefreshKey, setProgramRefreshKey] = useState(0);
 
   const [presetId, setPresetId] = useState<WorkoutPresetId>("upper-body-strength");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("none");
@@ -110,31 +133,13 @@ export default function WorkoutPage() {
     exercises: TemplateSnapshot["exercises"];
   } | null>(null);
 
-  const isSmallScreen = useIsSmallScreen();
-
-  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<MuscleGroup>("chest");
-  const [liftPickerOpen, setLiftPickerOpen] = useState(false);
-  const [liftSearch, setLiftSearch] = useState("");
-  const [selectedExerciseId, setSelectedExerciseId] = useState("");
-
-  const [customName, setCustomName] = useState("");
-  const [customMuscleGroup, setCustomMuscleGroup] = useState<MuscleGroup>("full_body");
-  const [customEquipment, setCustomEquipment] = useState("bodyweight");
-  const [customExercises, setCustomExercises] = useState<Exercise[]>([]);
-
-  // API exercise search state
-  const [apiExercises, setApiExercises] = useState<Exercise[]>([]);
-  const [loadingExercises, setLoadingExercises] = useState(false);
-  const searchRequestSeq = useRef(0);
+  const [exerciseLibraryOpen, setExerciseLibraryOpen] = useState(false);
 
   const [previousByExerciseId, setPreviousByExerciseId] = useState<
     Record<string, Array<{ reps: number | null; weight: number | null }>>
   >({});
   const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
-  const [exerciseLastPerformance, setExerciseLastPerformance] = useState<
-    Record<string, { reps: number | null; weight: number | null; performedAt: string | null }>
-  >({});
 
   // DEV: Uncomment to verify WorkoutPage render frequency.
   // Should NOT increment every second -- only on user interactions.
@@ -150,6 +155,7 @@ export default function WorkoutPage() {
     finishWorkout,
     addExercise,
     removeExercise,
+    reorderExercise,
     swapExercise,
     addSet,
     updateSet,
@@ -168,6 +174,7 @@ export default function WorkoutPage() {
       finishWorkout: s.finishWorkout,
       addExercise: s.addExercise,
       removeExercise: s.removeExercise,
+      reorderExercise: s.reorderExercise,
       swapExercise: s.swapExercise,
       addSet: s.addSet,
       updateSet: s.updateSet,
@@ -198,33 +205,18 @@ export default function WorkoutPage() {
     [preference]
   );
 
-  const allExercises = useMemo(
-    () => [...customExercises, ...apiExercises],
-    [customExercises, apiExercises]
+  // Stable exercise ID list — only changes when exercises are added/removed
+  const _exerciseIdList = activeWorkout?.exercises.map((e) => e.exercise.id) ?? [];
+  const activeExerciseIds = useMemo(
+    () => _exerciseIdList,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(_exerciseIdList)]
   );
 
   const selectedExerciseIds = useMemo(
     () =>
-      new Set(activeWorkout?.exercises.map((workoutExercise) => workoutExercise.exercise.id) ?? []),
-    [activeWorkout]
-  );
-
-  const filteredByMuscleGroup = useMemo(
-    () => allExercises.filter((exercise) => exercise.muscle_group === selectedMuscleGroup),
-    [allExercises, selectedMuscleGroup]
-  );
-
-  const filteredExercises = useMemo(() => {
-    const q = liftSearch.trim().toLowerCase();
-    return filteredByMuscleGroup
-      .filter((exercise) => (q.length === 0 ? true : exercise.name.toLowerCase().includes(q)))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [liftSearch, filteredByMuscleGroup]);
-
-
-  const selectedExercise = useMemo(
-    () => allExercises.find((exercise) => exercise.id === selectedExerciseId) ?? null,
-    [allExercises, selectedExerciseId]
+      new Set(activeExerciseIds),
+    [activeExerciseIds]
   );
 
   const plannerStats = useMemo(() => {
@@ -309,13 +301,8 @@ export default function WorkoutPage() {
     toDisplayVolume,
     unitLabel,
     setDbFeaturesAvailable,
+    onProgramAdvanced: () => setProgramRefreshKey((k) => k + 1),
   });
-
-  // Stable list of active exercise IDs for sparklines
-  const activeExerciseIds = useMemo(
-    () => activeWorkout?.exercises.map((e) => e.exercise.id) ?? [],
-    [activeWorkout]
-  );
 
   // Sparkline trendlines -- only fetches when workout is active
   const exerciseTrendlines = useExerciseTrendlines(activeExerciseIds, userId, isWorkoutActive);
@@ -326,6 +313,7 @@ export default function WorkoutPage() {
       .from("workout_templates")
       .select("id,name,primary_muscle_group")
       .eq("user_id", currentUserId)
+      .is("program_id", null)
       .order("updated_at", { ascending: false });
 
     if (error) {
@@ -368,6 +356,17 @@ export default function WorkoutPage() {
       if (!active || !user) return;
       setUserId(user.id);
       await loadTemplates(user.id);
+
+      // Check for an abandoned workout draft (only when no active workout in store)
+      if (!useWorkoutStore.getState().isWorkoutActive) {
+        try {
+          const res = await fetch("/api/workout/draft");
+          const json = await res.json() as { draft: WorkoutDraft | null };
+          if (active && json.draft) setWorkoutDraft(json.draft);
+        } catch {
+          // ignore — draft fetch is best-effort
+        }
+      }
     }
 
     init();
@@ -395,49 +394,6 @@ export default function WorkoutPage() {
     }
   }, [likedTemplateIds]);
 
-  // Fetch exercises from API with debounced search
-  useEffect(() => {
-    const controller = new AbortController();
-    const seq = ++searchRequestSeq.current;
-
-    const timeoutId = setTimeout(async () => {
-      setLoadingExercises(true);
-
-      try {
-        const params = new URLSearchParams();
-        const query = liftSearch.trim();
-
-        if (query.length > 0) {
-          params.set("query", query);
-        }
-        params.set("muscle_groups", selectedMuscleGroup);
-
-        const response = await fetch(`/api/exercises/search?${params}`, {
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("Failed to fetch exercises");
-
-        const data = await response.json();
-
-        if (seq !== searchRequestSeq.current) return;
-        setApiExercises(data.exercises ?? []);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        console.error("Error fetching exercises:", error);
-        toast.error("Failed to load exercises from database");
-      } finally {
-        if (seq === searchRequestSeq.current) {
-          setLoadingExercises(false);
-        }
-      }
-    }, 300);
-
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort("Search cancelled");
-    };
-  }, [liftSearch, selectedMuscleGroup]);
-
   useEffect(() => {
     if (selectedTemplateId === "none") return;
     const template = templates.find((item) => item.id === selectedTemplateId);
@@ -446,18 +402,47 @@ export default function WorkoutPage() {
     }
   }, [selectedTemplateId, templates]);
 
+  // Derive a stable key from exercise IDs so we only refetch when exercises change,
+  // NOT on every set update (weight/reps/completed changes).
+  const exerciseIdKey = useMemo(
+    () => activeExerciseIds.join(","),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(activeExerciseIds)]
+  );
+
+
   useEffect(() => {
     async function loadPreviousPerformance() {
-      if (!userId || !activeWorkout) {
+      if (!userId || !exerciseIdKey) {
         setPreviousByExerciseId({});
         return;
       }
 
-      const exerciseIds = activeWorkout.exercises.map(e => e.exercise.id);
+      const exerciseIds = exerciseIdKey.split(",").filter(Boolean);
       if (exerciseIds.length === 0) {
         setPreviousByExerciseId({});
         return;
       }
+
+
+
+      // First, find the most recent completed session per exercise (max 1 per exercise)
+      // This avoids scanning the entire workout_sets history
+      const { data: recentSessions, error: sessErr } = await supabase
+        .from("workout_sessions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(10);
+
+      if (sessErr || !recentSessions || recentSessions.length === 0) {
+        setPreviousByExerciseId({});
+
+        return;
+      }
+
+      const sessionIds = recentSessions.map(s => s.id);
 
       const { data: completedSets, error } = await supabase
         .from("workout_sets")
@@ -467,11 +452,13 @@ export default function WorkoutPage() {
         .eq("workout_sessions.user_id", userId)
         .eq("workout_sessions.status", "completed")
         .not("completed_at", "is", null)
-        .in("exercise_id", exerciseIds);
+        .in("exercise_id", exerciseIds)
+        .in("session_id", sessionIds);
 
       if (error) {
         console.error("Error loading previous performance:", error);
         setPreviousByExerciseId({});
+
         return;
       }
 
@@ -541,72 +528,78 @@ export default function WorkoutPage() {
     }
 
     void loadPreviousPerformance();
-  }, [activeWorkout, supabase, userId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exerciseIdKey, supabase, userId]);
 
-  useEffect(() => {
-    async function loadPickerPerformance() {
-      if (!userId || filteredExercises.length === 0) {
-        setExerciseLastPerformance({});
-        return;
-      }
-
-      const ids = filteredExercises.slice(0, 120).map((exercise) => exercise.id);
-      if (ids.length === 0) return;
-
-      const { data, error } = await supabase
-        .from("user_exercise_last_performance")
-        .select("exercise_id,best_set,last_performed_at")
-        .eq("user_id", userId)
-        .in("exercise_id", ids);
-
-      if (error) return;
-
-      const map: Record<string, { reps: number | null; weight: number | null; performedAt: string | null }> = {};
-      for (const row of data ?? []) {
-        const best = row.best_set as { reps?: number | null; weight_kg?: number | null };
-        map[row.exercise_id] = {
-          reps: best?.reps ?? null,
-          weight: best?.weight_kg ?? null,
-          performedAt: row.last_performed_at ?? null,
-        };
-      }
-      setExerciseLastPerformance(map);
-    }
-
-    void loadPickerPerformance();
-  }, [filteredExercises, supabase, userId]);
-
-  function getPrimaryBenefit(exercise: Exercise) {
-    const group = MUSCLE_GROUP_LABELS[exercise.muscle_group as MuscleGroup] ?? exercise.muscle_group;
-    if (exercise.category === "compound") return `Build maximal ${group.toLowerCase()} strength with full-body coordination.`;
-    if (exercise.category === "cardio") return `Increase conditioning capacity and repeat-effort endurance.`;
-    if (exercise.category === "stretch") return `Improve mobility quality and position control for safer loading.`;
-    return `Target ${group.toLowerCase()} with precision for hypertrophy and weak-point development.`;
-  }
-
-  function getCoachingCues(exercise: Exercise) {
-    if (exercise.form_tips?.length) return exercise.form_tips;
-    if (exercise.instructions) {
-      return exercise.instructions
-        .split(/\n+|\. /)
-        .map((part) => part.trim())
-        .filter(Boolean)
-        .slice(0, 2);
-    }
-    return [];
-  }
-
-  // Auto-start workout when coming from launcher or adaptive
+  // Auto-start workout when coming from launcher, adaptive, or active program card
   useEffect(() => {
     if (hasAutoStarted || isWorkoutActive || loadingTemplates) return;
 
     const fromLauncher = searchParams.get('from_launcher');
     const fromAdaptive = searchParams.get('from_adaptive');
-    if (!fromLauncher && !fromAdaptive) return;
+    const fromProgram = searchParams.get('from_program');
+    if (!fromLauncher && !fromAdaptive && !fromProgram) return;
 
     const templateId = searchParams.get('template_id');
     async function autoStart() {
       setHasAutoStarted(true);
+
+      // from_program: template is a program-generated template (filtered from templates[]),
+      // so skip templates.find() and load exercises directly from DB.
+      if (fromProgram && templateId && userId) {
+        const workoutName = searchParams.get('name') ?? 'Program Workout';
+        setSelectedTemplateId(templateId);
+        setWorkoutName(workoutName);
+        startWorkout(workoutName, userId, templateId);
+
+        try {
+          const { data: templateExercises, error } = await supabase
+            .from("template_exercises")
+            .select(
+              "sort_order,target_sets,target_reps,target_weight_kg,rest_seconds,exercise_id,exercises(id,name,slug,muscle_group,equipment,category,instructions,form_tips,image_url)"
+            )
+            .eq("template_id", templateId)
+            .order("sort_order", { ascending: true });
+
+          if (error) throw error;
+
+          for (const row of templateExercises ?? []) {
+            const exercise = row.exercises as unknown as Exercise | null;
+            if (!exercise) continue;
+
+            addExercise(exercise);
+
+            const exerciseIndex = useWorkoutStore.getState().activeWorkout?.exercises.length;
+            if (!exerciseIndex) continue;
+
+            const index = exerciseIndex - 1;
+            const setsToCreate = Math.max(1, row.target_sets ?? 1);
+            const parsedReps = row.target_reps ? Number.parseInt(row.target_reps, 10) : null;
+
+            updateSet(index, 0, {
+              reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+              weight_kg: row.target_weight_kg ?? null,
+              rest_seconds: row.rest_seconds ?? 90,
+            });
+
+            for (let i = 1; i < setsToCreate; i += 1) {
+              addSet(index);
+              updateSet(index, i, {
+                reps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+                weight_kg: row.target_weight_kg ?? null,
+                rest_seconds: row.rest_seconds ?? 90,
+              });
+            }
+          }
+
+          await applyAutofillFromHistory();
+          toast.success(`Started ${workoutName}`);
+        } catch (err) {
+          console.error('Program template load error:', err);
+          toast.error('Failed to load program workout');
+        }
+        return;
+      }
 
       if (templateId && templates.length > 0) {
         const template = templates.find(t => t.id === templateId);
@@ -685,13 +678,9 @@ export default function WorkoutPage() {
           const exerciseData = launcherEx.exercise;
           if (!exerciseData) continue;
 
-          const exercise = allExercises.find(ex => ex.name === exerciseData.name);
-          if (!exercise) {
-            console.warn(`Exercise not found: ${exerciseData.name}`);
-            continue;
-          }
+          if (!exerciseData?.name) continue;
 
-          addExercise(exercise);
+          addExercise(exerciseData as Exercise);
 
           const exerciseIndex = useWorkoutStore.getState().activeWorkout?.exercises.length;
           if (!exerciseIndex) continue;
@@ -727,7 +716,48 @@ export default function WorkoutPage() {
     }
 
     autoStart();
-  }, [searchParams, templates, loadingTemplates, isWorkoutActive, hasAutoStarted, startWorkout, addExercise, updateSet, addSet, allExercises, supabase]);
+  }, [searchParams, templates, loadingTemplates, isWorkoutActive, hasAutoStarted, startWorkout, addExercise, updateSet, addSet, supabase, userId]);
+
+  async function handleRestoreDraft(draft: WorkoutDraft) {
+    setWorkoutDraft(null);
+    if (!draft.data || !userId) return;
+
+    const { workoutName: name, startedAt, templateId, exercises } = draft.data;
+    startWorkout(name, userId, templateId ?? undefined);
+
+    for (const ex of exercises) {
+      addExercise(ex.exercise);
+      const exIndex = useWorkoutStore.getState().activeWorkout?.exercises.length;
+      if (!exIndex) continue;
+      const idx = exIndex - 1;
+
+      for (let si = 0; si < ex.sets.length; si++) {
+        if (si > 0) addSet(idx);
+        updateSet(idx, si, {
+          reps: ex.sets[si].reps,
+          weight_kg: ex.sets[si].weight_kg,
+          rest_seconds: ex.sets[si].rest_seconds,
+          rir: ex.sets[si].rir,
+          set_type: ex.sets[si].set_type,
+        });
+        if (ex.sets[si].completed) {
+          completeSet(idx, si);
+        }
+      }
+    }
+
+    // Restore the original start time
+    useWorkoutStore.setState((s) =>
+      s.activeWorkout ? { activeWorkout: { ...s.activeWorkout, started_at: startedAt } } : {}
+    );
+
+    toast.success(`Restored "${name}"`);
+  }
+
+  async function handleDiscardDraft() {
+    setWorkoutDraft(null);
+    await fetch("/api/workout/draft", { method: "DELETE" }).catch(() => {});
+  }
 
   function handlePresetChange(value: WorkoutPresetId) {
     setPresetId(value);
@@ -1059,21 +1089,9 @@ export default function WorkoutPage() {
       sets.sort((a, b) => a.setNumber - b.setNumber);
     }
 
-    const { preference: pref } = useUnitPreferenceStore.getState();
-
-    snapshot.exercises.forEach((exBlock, exIdx) => {
-      const prevSets = byEx[exBlock.exercise.id];
-      if (!prevSets) return;
-      exBlock.sets.forEach((set, setIdx) => {
-        if (set.completed) return;
-        const prev = prevSets[setIdx];
-        if (!prev) return;
-        const updates: Partial<WorkoutSet> = {};
-        if (prev.reps != null) updates.reps = prev.reps;
-        if (prev.weight != null) updates.weight_kg = calcSuggestedWeight(prev.weight, pref);
-        if (Object.keys(updates).length > 0) updateSet(exIdx, setIdx, updates);
-      });
-    });
+    // Weight and reps are NOT auto-filled here — the smart suggestion chip
+    // in SetRow shows the progressive overload suggestion as a tappable ghost.
+    // The user decides whether to accept it, preventing override of coach prescriptions.
   }
 
   async function handleStartWorkout() {
@@ -1176,7 +1194,7 @@ export default function WorkoutPage() {
         return;
       }
 
-      if (presetId !== "custom") {
+      if (setupTab === "quick" && presetId !== "custom") {
         const preset = POPULAR_WORKOUTS.find((item) => item.id === presetId);
         const liftNames = preset?.lifts.map((l) => l.name) ?? [];
 
@@ -1246,48 +1264,10 @@ export default function WorkoutPage() {
     }
   }
 
-  async function handleAddSelectedExercise() {
-    if (!selectedExercise) {
-      toast.error("Choose a lift first.");
-      return;
-    }
-
+  async function handleCreateCustomExercise(name: string, muscleGroup: string, equipment: string): Promise<void> {
     try {
-      await addExerciseToWorkout(selectedExercise);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not add exercise.";
-      toast.error(message);
-    }
-  }
-
-  async function handleCreateCustomExercise() {
-    const name = customName.trim();
-    if (name.length < 3) {
-      toast.error("Custom lift name must be at least 3 characters.");
-      return;
-    }
-
-    const duplicate = allExercises.find(
-      (exercise) =>
-        exercise.muscle_group === customMuscleGroup &&
-        exercise.name.toLowerCase() === name.toLowerCase()
-    );
-
-    try {
-      if (duplicate) {
-        await addExerciseToWorkout(duplicate);
-        setCustomName("");
-        toast.message("That lift already exists, added it to your workout.");
-        return;
-      }
-
-      const customExercise = makeCustomExercise(name, customMuscleGroup, customEquipment);
-      setCustomExercises((current) => [customExercise, ...current]);
+      const customExercise = makeCustomExercise(name, muscleGroup as MuscleGroup, equipment);
       await addExerciseToWorkout(customExercise);
-
-      setSelectedMuscleGroup(customMuscleGroup);
-      setSelectedExerciseId(customExercise.id);
-      setCustomName("");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create custom lift.";
       toast.error(message);
@@ -1369,6 +1349,36 @@ export default function WorkoutPage() {
     await loadTemplates(userId);
   }
 
+  // WakeLock: keep screen on while workout is active
+  useEffect(() => {
+    if (!isWorkoutActive) return;
+    let lock: WakeLockSentinel | null = null;
+    const acquire = async () => {
+      try {
+        lock = await (navigator as Navigator & { wakeLock?: { request: (type: string) => Promise<WakeLockSentinel> } }).wakeLock?.request("screen") ?? null;
+      } catch { /* not supported on this device/browser */ }
+    };
+    acquire();
+    return () => { lock?.release().catch(() => {}); };
+  }, [isWorkoutActive]);
+
+  // DnD sensors — TouchSensor with 200 ms delay to avoid scroll conflicts
+  const dndSensors = useSensors(
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !activeWorkout) return;
+    // IDs are `${exerciseId}-${index}` — extract index from suffix
+    const fromIndex = Number((active.id as string).split("-").pop());
+    const toIndex = Number((over.id as string).split("-").pop());
+    if (Number.isFinite(fromIndex) && Number.isFinite(toIndex) && fromIndex !== toIndex) {
+      reorderExercise(fromIndex, toIndex);
+    }
+  }, [activeWorkout, reorderExercise]);
+
   // Rest timer handler for ExerciseCard
   const handleStartRest = useCallback(
     (exerciseId: string, exerciseName: string, seconds: number) => {
@@ -1379,67 +1389,6 @@ export default function WorkoutPage() {
       startTimer(exerciseId, exerciseName, seconds);
     },
     [getActiveTimers, stopTimer, startTimer]
-  );
-
-  // Shared inner content for the lift picker
-  const liftPickerExerciseList = (
-    <>
-      <Input
-        value={liftSearch}
-        onChange={(event) => setLiftSearch(event.target.value)}
-        placeholder="Type to search lifts"
-        className="mb-2"
-        autoFocus
-      />
-      <ScrollArea className="h-96">
-        <div className="space-y-2 pr-2">
-          {loadingExercises ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">
-              Loading exercises...
-            </p>
-          ) : filteredExercises.length === 0 ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">
-              No lifts found for this filter.
-            </p>
-          ) : (
-            filteredExercises.map((exercise) => {
-              const mediaUrl = resolveExerciseMediaUrl(
-                ("gif_url" in exercise && exercise.gif_url)
-                  ? exercise.gif_url
-                  : exercise.image_url,
-                ("source" in exercise
-                  ? (exercise as { source?: string | null }).source
-                  : null) ?? null
-              );
-              return (
-                <ExerciseSelectionCard
-                  key={exercise.id}
-                  exercise={exercise}
-                  mediaUrl={mediaUrl}
-                  posterUrl={resolveExerciseMediaUrl(
-                    exercise.image_url,
-                    ("source" in exercise
-                      ? (exercise as { source?: string | null }).source
-                      : null) ?? null
-                  )}
-                  selected={selectedExerciseId === exercise.id}
-                  primaryBenefit={getPrimaryBenefit(exercise)}
-                  coachingCues={getCoachingCues(exercise)}
-                  previousPerformance={exerciseLastPerformance[exercise.id] ?? null}
-                  onSelect={() => {
-                    setSelectedExerciseId(exercise.id);
-                  }}
-                  onQuickAdd={async () => {
-                    setSelectedExerciseId(exercise.id);
-                    await addExerciseToWorkout(exercise);
-                  }}
-                />
-              );
-            })
-          )}
-        </div>
-      </ScrollArea>
-    </>
   );
 
   return (
@@ -1453,9 +1402,15 @@ export default function WorkoutPage() {
             <p className="text-lg font-bold font-display tracking-tight">Workout</p>
           </div>
           {isWorkoutActive && activeWorkout ? (
-            <div className="glass-chip inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-primary">
-              <Zap className="h-3.5 w-3.5" />
-              {plannerStats.completedSets}/{plannerStats.totalSets} sets
+            <div className="flex items-center gap-2">
+              <div className="glass-chip inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                <Clock3 className="h-3 w-3" />
+                <ElapsedTime startedAt={activeWorkout.started_at} className="tabular-nums" />
+              </div>
+              <div className="glass-chip inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-primary">
+                <Zap className="h-3.5 w-3.5" />
+                {plannerStats.completedSets}/{plannerStats.totalSets}
+              </div>
             </div>
           ) : null}
         </div>
@@ -1489,6 +1444,16 @@ export default function WorkoutPage() {
                   but templates/history sync will be limited until migrations are applied.
                 </p>
               ) : null}
+
+              {workoutDraft && !isWorkoutActive && (
+                <RestoreWorkoutBanner
+                  draft={workoutDraft}
+                  onRestore={handleRestoreDraft}
+                  onDiscard={handleDiscardDraft}
+                />
+              )}
+
+              <ActiveProgramCard refreshKey={programRefreshKey} />
 
               <div className="glass-inner rounded-xl p-1">
                 <div className="grid grid-cols-2 gap-1">
@@ -1534,7 +1499,11 @@ export default function WorkoutPage() {
                     setWorkoutName(name);
                     setPendingCategories([]);
                   }}
-                  onSelectStartFresh={() => setSelectedTemplateId("none")}
+                  onSelectStartFresh={() => {
+                    setSelectedTemplateId("none");
+                    setWorkoutName("My Workout");
+                    setPendingCategories([]);
+                  }}
                   onSendTemplate={handleSendTemplate}
                   onEditTemplate={handleEditTemplate}
                   onCopyTemplate={handleCopyTemplate}
@@ -1638,7 +1607,7 @@ export default function WorkoutPage() {
         ) : null}
 
         {isWorkoutActive && activeWorkout ? (
-          <>
+          <div className="mx-auto max-w-2xl space-y-3">
             <WorkoutHeader
               workoutName={activeWorkout.name}
               startedAt={activeWorkout.started_at}
@@ -1650,291 +1619,144 @@ export default function WorkoutPage() {
               unitLabel={unitLabel}
             />
 
-            <div className="grid gap-6 lg:grid-cols-[21.25rem_minmax(0,1fr)]">
-              <Card className="h-fit glass-surface shadow-sm transition-all duration-300 lg:sticky lg:top-20">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <Input
-                      value={activeWorkout.name}
-                      onChange={(e) => updateWorkoutName(e.target.value)}
-                      className="h-9 flex-1 border-transparent bg-transparent px-0 text-[22px] font-semibold leading-tight tracking-tight focus:border-border focus:bg-background"
-                      placeholder="Workout name"
-                    />
-                    <span className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground">
-                      <Clock3 className="size-4" />
-                      <ElapsedTime startedAt={activeWorkout.started_at} />
-                    </span>
-                  </div>
-                  {activeWorkout.template_id ? (
-                    <p className="text-xs text-muted-foreground">Template session</p>
-                  ) : null}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label>Muscle groups</Label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {MUSCLE_GROUPS.filter((g) => g !== "full_body").map((group) => {
-                          const isSelected = selectedMuscleGroup === group;
-                          return (
-                            <button
-                              key={group}
-                              type="button"
-                              onClick={() => {
-                                setSelectedMuscleGroup(group);
-                                setSelectedExerciseId("");
-                              }}
-                              className={cn(
-                                "rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all",
-                                isSelected
-                                  ? "border-primary/40 bg-primary/15 text-primary"
-                                  : "border-border/60 bg-card/40 text-muted-foreground"
-                              )}
-                            >
-                              {MUSCLE_GROUP_LABELS[group]}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Available lifts</Label>
-                      {isSmallScreen ? (
-                        <Sheet open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            className="w-full justify-between"
-                            onClick={() => setLiftPickerOpen(true)}
-                          >
-                            <span className="truncate">
-                              {selectedExercise ? selectedExercise.name : "Search and choose a lift"}
-                            </span>
-                            <ChevronDown className="ml-2 size-4 shrink-0 opacity-70" />
-                          </Button>
-                          <SheetContent side="bottom" className="h-[72dvh] flex flex-col">
-                            <SheetHeader>
-                              <SheetTitle>Choose a lift</SheetTitle>
-                            </SheetHeader>
-                            <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-0">
-                              {liftPickerExerciseList}
-                            </div>
-                          </SheetContent>
-                        </Sheet>
-                      ) : (
-                        <Popover open={liftPickerOpen} onOpenChange={setLiftPickerOpen}>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" role="combobox" className="w-full justify-between">
-                              <span className="truncate">
-                                {selectedExercise ? selectedExercise.name : "Search and choose a lift"}
-                              </span>
-                              <ChevronDown className="ml-2 size-4 shrink-0 opacity-70" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[min(28rem,calc(100vw-2rem))] p-2" align="start">
-                            {liftPickerExerciseList}
-                          </PopoverContent>
-                        </Popover>
-                      )}
-                    </div>
-                  </div>
-
-                  {selectedExercise ? (
-                    <div className="glass-inner rounded-xl p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">{selectedExercise.name}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {MUSCLE_GROUP_LABELS[selectedExercise.muscle_group as MuscleGroup] ?? selectedExercise.muscle_group}
-                            {selectedExercise.equipment
-                              ? ` \u00b7 ${EQUIPMENT_LABELS[selectedExercise.equipment] ?? selectedExercise.equipment}`
-                              : ""}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        className="mt-3 w-full"
-                        onClick={handleAddSelectedExercise}
-                      >
-                        <Plus className="mr-2 size-4" />
-                        Add Selected Lift
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      className="w-full"
-                      onClick={handleAddSelectedExercise}
-                      disabled
-                    >
-                      <Plus className="mr-2 size-4" />
-                      Add Selected Lift
-                    </Button>
-                  )}
-
-                  <Card className="border-dashed">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Create custom lift</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="custom-lift-name">Lift name</Label>
-                        <Input
-                          id="custom-lift-name"
-                          value={customName}
-                          onChange={(event) => setCustomName(event.target.value)}
-                          placeholder="Ex: Cable Y Raise"
-                        />
-                      </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label>Muscle group</Label>
-                          <Select
-                            value={customMuscleGroup}
-                            onValueChange={(value) => setCustomMuscleGroup(value as MuscleGroup)}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select muscle group" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {MUSCLE_GROUPS.map((group) => (
-                                <SelectItem key={group} value={group}>
-                                  {MUSCLE_GROUP_LABELS[group]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Equipment</Label>
-                          <Select value={customEquipment} onValueChange={setCustomEquipment}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select equipment" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(EQUIPMENT_LABELS).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>
-                                  {label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="w-full"
-                        onClick={handleCreateCustomExercise}
-                      >
-                        Create and Add Custom Lift
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-4">
-                <Card className="glass-surface">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-[20px] font-bold font-display tracking-tight">Exercises</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {activeWorkout.exercises.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-10 text-center">
-                        <p className="text-[20px] font-semibold tracking-tight text-foreground">
-                          Build the session that builds you.
-                        </p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Choose your first exercise to enter training mode.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {ghostWorkoutData ? (
-                          <div className="glass-inner rounded-lg px-3 py-2 text-xs text-muted-foreground">
-                            Ghost workout active. You are training against your last matching session.
-                          </div>
-                        ) : null}
-                        {activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
-                          <ExerciseCard
-                            key={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
-                            exerciseBlock={exerciseBlock}
-                            exerciseIndex={exerciseIndex}
-                            ghostSets={ghostWorkoutData?.exercises[exerciseBlock.exercise.id]}
-                            previousSets={previousByExerciseId[exerciseBlock.exercise.id]}
-                            suggestedWeights={suggestedWeightsByKey[exerciseBlock.exercise.id]}
-                            smartSuggestions={smartSuggestions[exerciseBlock.exercise.id]}
-                            trendline={exerciseTrendlines[exerciseBlock.exercise.id]}
-                            preference={preference}
-                            onUpdateSet={updateSet}
-                            onCompleteSet={completeSet}
-                            onRemoveSet={removeSet}
-                            onAddSet={addSet}
-                            onRemoveExercise={removeExercise}
-                            onSwapExercise={setSwapSheetIndex}
-                            onSetExerciseNote={setExerciseNote}
-                            onStartRest={handleStartRest}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="glass-surface shadow-sm lg:sticky lg:top-20">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Session Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {/* Workout Notes */}
-                    <div className="space-y-1.5 pb-3 border-b border-[rgba(255,255,255,0.06)]">
-                      <Label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <NotebookPen className="h-3 w-3" />
-                        Workout notes
-                      </Label>
-                      <Textarea
-                        placeholder="How did the session feel? Any PRs or observations..."
-                        value={activeWorkout.notes}
-                        onChange={(e) => setWorkoutNote(e.target.value)}
-                        className="min-h-[72px] resize-none text-sm"
-                        rows={3}
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="transition-all duration-200 hover:scale-[1.01]"
-                        onClick={handleOpenSaveTemplate}
-                      >
-                        <Save className="mr-2 size-4" />
-                        Save Template
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        className="transition-all duration-200 hover:scale-[1.01]"
-                        onClick={handleCancelWorkout}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        className="transition-all duration-200 hover:scale-[1.01]"
-                        onClick={handleFinishWorkout}
-                      >
-                        Finish Workout
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+            {/* Workout name inline edit */}
+            <div className="flex items-center gap-2 px-1">
+              <Input
+                value={activeWorkout.name}
+                onChange={(e) => updateWorkoutName(e.target.value)}
+                className="h-8 flex-1 border-transparent bg-transparent px-0 text-lg font-semibold leading-tight tracking-tight focus:border-border focus:bg-background"
+                placeholder="Workout name"
+              />
             </div>
-          </>
+
+            {/* Exercise cards */}
+            {activeWorkout.exercises.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setExerciseLibraryOpen(true)}
+                className="w-full rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-10 text-center transition-colors hover:border-primary/50 hover:bg-primary/10"
+              >
+                <Plus className="mx-auto h-6 w-6 text-primary" />
+                <p className="mt-1.5 text-sm font-semibold text-primary">Add Your First Exercise</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Browse the exercise library or create a custom exercise
+                </p>
+              </button>
+            ) : (
+              <div className="space-y-3">
+                {ghostWorkoutData ? (
+                  <div className="glass-inner rounded-lg px-3 py-1.5 text-[11px] text-muted-foreground">
+                    Ghost workout active — training against your last session.
+                  </div>
+                ) : null}
+                <DndContext
+                  sensors={dndSensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={activeWorkout.exercises.map((e, i) => `${e.exercise.id}-${i}`)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
+                      <SortableExerciseCard
+                        key={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
+                        exerciseId={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
+                        exerciseBlock={exerciseBlock}
+                        exerciseIndex={exerciseIndex}
+                        ghostSets={ghostWorkoutData?.exercises[exerciseBlock.exercise.id]}
+                        previousSets={previousByExerciseId[exerciseBlock.exercise.id]}
+                        suggestedWeights={suggestedWeightsByKey[exerciseBlock.exercise.id]}
+                        smartSuggestions={smartSuggestions[exerciseBlock.exercise.id]}
+                        trendline={exerciseTrendlines[exerciseBlock.exercise.id]}
+                        preference={preference}
+                        onUpdateSet={updateSet}
+                        onCompleteSet={completeSet}
+                        onRemoveSet={removeSet}
+                        onAddSet={addSet}
+                        onRemoveExercise={removeExercise}
+                        onSwapExercise={setSwapSheetIndex}
+                        onSetExerciseNote={setExerciseNote}
+                        onStartRest={handleStartRest}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+
+                {/* Add Exercise button */}
+                <button
+                  type="button"
+                  onClick={() => setExerciseLibraryOpen(true)}
+                  className="w-full rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-7 text-center transition-colors hover:border-primary/50 hover:bg-primary/10"
+                >
+                  <Plus className="mx-auto h-5 w-5 text-primary" />
+                  <p className="mt-1 text-sm font-semibold text-primary">Add Exercise</p>
+                </button>
+              </div>
+            )}
+
+            {/* Session Actions */}
+            <Card className="glass-surface shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Session Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2.5">
+                <div className="space-y-1.5 pb-2.5 border-b border-[rgba(255,255,255,0.06)]">
+                  <Label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <NotebookPen className="h-3 w-3" />
+                    Workout notes
+                  </Label>
+                  <Textarea
+                    placeholder="How did the session feel? Any PRs or observations..."
+                    value={activeWorkout.notes}
+                    onChange={(e) => setWorkoutNote(e.target.value)}
+                    className="min-h-[56px] resize-none text-sm"
+                    rows={2}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="transition-all duration-200 hover:scale-[1.01]"
+                    onClick={handleOpenSaveTemplate}
+                  >
+                    <Save className="mr-1.5 size-3.5" />
+                    Save
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="transition-all duration-200 hover:scale-[1.01]"
+                    onClick={handleCancelWorkout}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="transition-all duration-200 hover:scale-[1.01]"
+                    onClick={handleFinishWorkout}
+                  >
+                    Finish
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Exercise Library Sheet */}
+            <ExerciseLibrarySheet
+              open={exerciseLibraryOpen}
+              onClose={() => setExerciseLibraryOpen(false)}
+              selectedExerciseIds={selectedExerciseIds}
+              onAddExercise={async (exercise) => {
+                await addExerciseToWorkout(exercise);
+              }}
+              onCreateCustomExercise={handleCreateCustomExercise}
+            />
+          </div>
         ) : null}
 
         <SaveTemplateDialog
@@ -1995,6 +1817,18 @@ export default function WorkoutPage() {
           onSave={handleSaveSessionRpe}
           saving={savingSessionRpe}
         />
+
+        {/* Floating Finish FAB — visible once at least 1 set is completed */}
+        {isWorkoutActive && activeWorkout && plannerStats.completedSets > 0 && (
+          <button
+            type="button"
+            onClick={handleFinishWorkout}
+            className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-4 z-50 flex h-12 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-lg transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
+          >
+            <Zap className="size-4" />
+            Finish
+          </button>
+        )}
 
         {/* Floating Rest Timer Pill */}
         <RestTimerPill />

@@ -1,16 +1,18 @@
 /**
- * Program Auto-Advance API
- * POST /api/programs/advance
+ * Program Skip API
+ * POST /api/programs/skip
  *
- * Called after a workout completes. Uses the template's program_id FK
- * (set at creation time) to locate the active program directly — no
- * full JSONB scan needed.
+ * Advances the active program one day WITHOUT requiring a completed workout.
+ * Creates a template for the SKIPPED day (so the user can still do it later),
+ * then moves current_day forward.
  *
- * After advancing current_day/current_week, creates a template for the
- * NEW current day so the ActiveProgramCard immediately shows the next
- * session. This is the "lazy, one-at-a-time" template creation strategy.
+ * If skipping the last day of the last week → marks program as completed.
  *
- * Body: { template_id: string }
+ * Body: { program_id: string }
+ *
+ * Response:
+ *   { skipped: true, current_week, current_day, day_name, template_id }
+ *   { skipped: false, reason: string }
  */
 
 import { NextResponse } from "next/server";
@@ -45,49 +47,56 @@ export async function POST(request: Request) {
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
-    const { template_id } = await request.json();
-    if (!template_id) {
-      return NextResponse.json({ advanced: false });
+    const { program_id } = await request.json() as { program_id: string };
+    if (!program_id) {
+      return NextResponse.json({ skipped: false, reason: "Missing program_id" }, { status: 400 });
     }
-
-    // Use the program_id FK on the template to find the program directly.
-    const { data: templateRow } = await supabase
-      .from("workout_templates")
-      .select("program_id")
-      .eq("id", template_id)
-      .eq("user_id", user.id)
-      .single();
-
-    if (!templateRow?.program_id) {
-      // Not a program template — nothing to advance
-      return NextResponse.json({ advanced: false });
-    }
-
-    const programId = templateRow.program_id;
 
     const { data: program } = await supabase
       .from("training_programs")
       .select("id, current_week, current_day, program_data")
-      .eq("id", programId)
+      .eq("id", program_id)
       .eq("user_id", user.id)
       .eq("status", "active")
       .single();
 
     if (!program) {
-      return NextResponse.json({ advanced: false });
+      return NextResponse.json({ skipped: false, reason: "Active program not found" }, { status: 404 });
     }
 
     const programData = program.program_data as ProgramData;
-    if (!programData?.weeks?.length) {
-      return NextResponse.json({ advanced: false });
-    }
-
     const currentWeek = program.current_week ?? 1;
     const currentDay = program.current_day ?? 1;
     const totalWeeks = programData.weeks.length;
 
     const currentWeekData = programData.weeks.find((w) => w.week_number === currentWeek);
     const daysInCurrentWeek = currentWeekData?.days?.length ?? 0;
+    const currentDayData = currentWeekData?.days?.find((d) => d.day_number === currentDay);
+
+    // Create template for the current (skipped) day if it doesn't have one yet
+    let updatedWeeks = programData.weeks;
+    if (currentDayData && !currentDayData.template_id) {
+      const skippedTemplateId = await createTemplateFromProgramDay(
+        supabase,
+        user.id,
+        programData.name,
+        currentWeek,
+        currentDayData as ProgramDayData,
+        program_id,
+      );
+
+      if (skippedTemplateId) {
+        updatedWeeks = programData.weeks.map((week) => ({
+          ...week,
+          days: week.days.map((day) => {
+            if (week.week_number === currentWeek && day.day_number === currentDay) {
+              return { ...day, template_id: skippedTemplateId };
+            }
+            return day;
+          }),
+        }));
+      }
+    }
 
     // Compute next position
     let nextWeek = currentWeek;
@@ -98,7 +107,7 @@ export async function POST(request: Request) {
       nextDay = 1;
     }
 
-    // Program complete
+    // Skipping the last day of the last week → program complete
     if (nextWeek > totalWeeks) {
       await supabase
         .from("training_programs")
@@ -107,33 +116,32 @@ export async function POST(request: Request) {
           completed_at: new Date().toISOString(),
           current_week: totalWeeks,
           current_day: daysInCurrentWeek,
+          program_data: { ...programData, weeks: updatedWeeks },
         })
-        .eq("id", programId)
+        .eq("id", program_id)
         .eq("user_id", user.id);
 
-      return NextResponse.json({ advanced: true, completed: true });
+      return NextResponse.json({ skipped: true, completed: true });
     }
 
-    // Create a template for the next day on-demand
+    // Create template for the NEXT day (the new current day)
     const nextWeekData = programData.weeks.find((w) => w.week_number === nextWeek);
     const nextDayData = nextWeekData?.days?.find((d) => d.day_number === nextDay);
 
     let nextTemplateId: string | null = null;
-    let updatedWeeks = programData.weeks;
 
-    if (nextDayData) {
+    if (nextDayData && !nextDayData.template_id) {
       nextTemplateId = await createTemplateFromProgramDay(
         supabase,
         user.id,
         programData.name,
         nextWeek,
         nextDayData as ProgramDayData,
-        programId,
+        program_id,
       );
 
       if (nextTemplateId) {
-        // Store the new template_id in program_data for the next day
-        updatedWeeks = programData.weeks.map((week) => ({
+        updatedWeeks = updatedWeeks.map((week) => ({
           ...week,
           days: week.days.map((day) => {
             if (week.week_number === nextWeek && day.day_number === nextDay) {
@@ -144,10 +152,9 @@ export async function POST(request: Request) {
         }));
       }
     } else {
-      logger.error(`Advance: no day data found for W${nextWeek}D${nextDay} in program ${programId}`);
+      nextTemplateId = nextDayData?.template_id ?? null;
     }
 
-    // Advance the program position and persist the updated program_data
     const { error: updateErr } = await supabase
       .from("training_programs")
       .update({
@@ -155,22 +162,23 @@ export async function POST(request: Request) {
         current_day: nextDay,
         program_data: { ...programData, weeks: updatedWeeks },
       })
-      .eq("id", programId)
+      .eq("id", program_id)
       .eq("user_id", user.id);
 
     if (updateErr) {
-      logger.error("Failed to advance program:", updateErr);
-      return NextResponse.json({ advanced: false });
+      logger.error("Skip: failed to update program", updateErr);
+      return NextResponse.json({ skipped: false, reason: "Failed to update program" }, { status: 500 });
     }
 
     return NextResponse.json({
-      advanced: true,
+      skipped: true,
       current_week: nextWeek,
       current_day: nextDay,
-      next_template_id: nextTemplateId,
+      day_name: nextDayData?.name ?? `Day ${nextDay}`,
+      template_id: nextTemplateId,
     });
   } catch (err) {
-    logger.error("Program advance error:", err);
-    return NextResponse.json({ advanced: false });
+    logger.error("Skip error:", err);
+    return NextResponse.json({ skipped: false, reason: "Server error" }, { status: 500 });
   }
 }

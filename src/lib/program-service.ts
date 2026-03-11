@@ -167,6 +167,7 @@ export async function createTemplateFromProgramDay(
   programName: string,
   weekNumber: number,
   day: ProgramDayData,
+  programId?: string,
 ): Promise<string | null> {
   const resolvedExercises: Array<{ id: string; index: number }> = [];
 
@@ -193,6 +194,7 @@ export async function createTemplateFromProgramDay(
       description: `Week ${weekNumber}, Day ${day.day_number} of ${programName}`,
       primary_muscle_group: day.exercises[0]?.muscle_group || null,
       is_public: false,
+      ...(programId ? { program_id: programId } : {}),
     })
     .select("id")
     .single();

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot } from "lucide-react";
+import { Send, Zap } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -207,7 +207,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
     if (hasSentInitial.current) return;
     hasSentInitial.current = true;
 
-    const initialMessage = `Hi! I'm setting up my fitness profile. Here are my stats — can you help me set my nutrition goals?`;
+    const initialMessage = `Hey Apex! I'm setting up my fitness profile — here are my stats. Can you help me dial in my nutrition?`;
 
     const userMsg: ChatMessage = {
       role: "user",
@@ -253,7 +253,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
             transition={{ delay: 0.1 }}
             className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-primary/30 bg-primary/10"
           >
-            <Bot className="h-7 w-7 text-primary" />
+            <Zap className="h-7 w-7 text-primary" />
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -261,7 +261,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
             transition={{ delay: 0.2 }}
             className="text-2xl font-bold text-foreground"
           >
-            Your AI Coach
+            Meet Apex
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -269,7 +269,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
             transition={{ delay: 0.3 }}
             className="text-sm text-muted-foreground"
           >
-            Let&apos;s build your personalized nutrition plan
+            Your personal fitness &amp; nutrition coach
           </motion.p>
         </div>
 
@@ -311,7 +311,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
                   />
                 </div>
                 <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60">
-                  Thinking
+                  Apex is thinking
                 </span>
               </motion.div>
             )}
@@ -333,7 +333,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                placeholder="Tell the coach about your goals..."
+                placeholder="Talk to Apex..."
                 disabled={isSending}
                 className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none disabled:opacity-50"
               />
@@ -354,7 +354,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
           transition={{ delay: 0.6 }}
           className="text-center text-[11px] text-muted-foreground/50"
         >
-          The coach will calculate your personalized nutrition targets
+          Apex will build your personalized nutrition targets
         </motion.p>
       </div>
     </motion.div>

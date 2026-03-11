@@ -49,8 +49,9 @@ export interface WorkoutHeaderProps {
 /**
  * Active session hero banner with glows, stats badges, and progress bar.
  * Timer is isolated via memo (ElapsedTime) so ticks don't propagate.
+ * Memo prevents re-renders from parent when only unrelated state changes.
  */
-export function WorkoutHeader({
+export const WorkoutHeader = memo(function WorkoutHeader({
   workoutName,
   startedAt,
   totalVolumeDisplay,
@@ -112,4 +113,4 @@ export function WorkoutHeader({
       </div>
     </section>
   );
-}
+});

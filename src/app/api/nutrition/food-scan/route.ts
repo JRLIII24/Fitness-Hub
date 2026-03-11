@@ -105,9 +105,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json(object);
   } catch (error) {
-    logger.error("Food scan API error:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to analyze food";
+    logger.error("Food scan API error:", message, error);
     return NextResponse.json(
-      { error: "Failed to analyze food" },
+      { error: message },
       { status: 500 },
     );
   }

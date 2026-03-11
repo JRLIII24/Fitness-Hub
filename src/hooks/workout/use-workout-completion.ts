@@ -39,6 +39,7 @@ interface UseWorkoutCompletionArgs {
   toDisplayVolume: (kgVolume: number) => number;
   unitLabel: "kg" | "lbs";
   setDbFeaturesAvailable: (v: boolean) => void;
+  onProgramAdvanced?: () => void;
 }
 
 export function useWorkoutCompletion({
@@ -52,6 +53,7 @@ export function useWorkoutCompletion({
   toDisplayVolume,
   unitLabel,
   setDbFeaturesAvailable,
+  onProgramAdvanced,
 }: UseWorkoutCompletionArgs) {
   const [celebrationStats, setCelebrationStats] = useState<WorkoutStats | null>(null);
   const [celebrationWorkoutName, setCelebrationWorkoutName] = useState<string | null>(null);
@@ -350,13 +352,28 @@ export function useWorkoutCompletion({
       return;
     }
 
-    // Auto-advance training program if this workout is linked to one (non-blocking)
+    // Auto-advance training program if this workout is linked to one.
+    // Awaited so the next day's template exists before the card re-mounts.
+    let programCompleted = false;
     if (workout.template_id) {
-      fetch("/api/programs/advance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template_id: workout.template_id }),
-      }).catch(() => {});
+      try {
+        const advRes = await fetch("/api/programs/advance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ template_id: workout.template_id }),
+        });
+        const advData = await advRes.json() as { advanced?: boolean; completed?: boolean };
+        if (advData.completed) {
+          programCompleted = true;
+        } else if (advData.advanced) {
+          toast.success("Next session ready in your program.");
+        }
+        if (advData.advanced || advData.completed) {
+          onProgramAdvanced?.();
+        }
+      } catch {
+        // non-critical — advance failures don't block the celebration
+      }
     }
 
     const setsCompleted = workout.exercises.flatMap((exercise) => exercise.sets).filter(
@@ -454,6 +471,10 @@ export function useWorkoutCompletion({
     });
     setShowCelebration(true);
     setPendingSessionId(session.id);
+
+    if (programCompleted) {
+      toast.success("Program complete! All weeks finished.", { duration: 5000 });
+    }
 
     // Fire async AI recap (non-blocking)
     if (WORKOUT_RECAP_ENABLED) {

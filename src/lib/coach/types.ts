@@ -281,6 +281,18 @@ export interface CoachContext {
     top_issues: string[];
     analyzed_at: string;
   } | null;
+  /** Last 1-3 AI-generated Coach's Notes from recent workouts (episodic memory) */
+  recent_session_notes?: Array<{
+    summary: string;
+    key_observations: Record<string, unknown> | null;
+    created_at: string;
+  }> | null;
+  /** Acute:Chronic Workload Ratio (7-day avg / 28-day avg) */
+  acwr?: number | null;
+  /** ACWR status label */
+  acwr_status?: "danger" | "high" | "elevated" | "optimal" | "underloaded" | null;
+  /** Current fatigue level label from the fatigue engine */
+  fatigue_label?: string | null;
 }
 
 export interface CoachRequest {

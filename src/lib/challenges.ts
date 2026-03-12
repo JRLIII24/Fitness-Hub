@@ -1,10 +1,9 @@
 /**
- * Pod Challenges & Template Marketplace – Server-side Service Layer
+ * Pod Challenges – Server-side Service Layer
  *
  * Responsibilities:
  *  - CRUD for pod_challenges
  *  - Leaderboard aggregation via RPC
- *  - Template marketplace: browse, save, unsave
  */
 
 import { createClient } from '@/lib/supabase/server';
@@ -13,7 +12,6 @@ import type {
   CreateChallengeInput,
   ChallengeLeaderboard,
   LeaderboardEntry,
-  PublicTemplate,
 } from '@/types/pods';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,176 +142,3 @@ export async function deletePodChallenge(challengeId: string): Promise<void> {
   if (error) throw new Error(`Failed to delete challenge: ${error.message}`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Template Marketplace
-// ─────────────────────────────────────────────────────────────────────────────
-
-export type MarketplaceSortKey = 'save_count' | 'trending' | 'newest';
-
-export interface MarketplaceFilters {
-  search?:       string;
-  muscle_groups?: string[];
-  sort?:         MarketplaceSortKey;
-  page?:         number;
-  page_size?:    number;
-}
-
-/**
- * Browse public templates from the community marketplace.
- *
- * Sorting strategies:
- *   save_count – highest saves first
- *   trending   – weighted score: (saves × 2) + recency decay via updated_at
- *   newest     – most recently published first
- *
- * Muscle group filtering joins through template_exercises → exercises.
- * Fuzzy search is performed via ilike on name and description.
- */
-export async function getPublicTemplates(
-  filters: MarketplaceFilters = {},
-): Promise<{ templates: PublicTemplate[]; total: number }> {
-  const {
-    search,
-    muscle_groups,
-    sort        = 'save_count',
-    page        = 1,
-    page_size   = 20,
-  } = filters;
-
-  const supabase   = await createClient();
-  const offset     = (page - 1) * page_size;
-
-  // Base query: public templates with creator profile and exercise summary
-  let query = supabase
-    .from('workout_templates')
-    .select(
-      `
-      id, user_id, name, description, color, estimated_duration_min,
-      is_public, save_count, created_at, updated_at,
-      creator:profiles!user_id ( display_name, avatar_url ),
-      template_exercises (
-        id, exercise_id, sort_order, target_sets, target_reps,
-        target_weight_kg, rest_seconds, notes,
-        exercises ( id, name, muscle_group, equipment, category )
-      )
-      `,
-      { count: 'exact' },
-    )
-    .eq('is_public', true);
-
-  // Fuzzy search on name and description
-  if (search && search.trim().length > 0) {
-    const term = `%${search.trim()}%`;
-    query = query.or(`name.ilike.${term},description.ilike.${term}`);
-  }
-
-  // Muscle group filter: only return templates that contain at least one
-  // exercise matching any of the given muscle groups.
-  // This is handled post-fetch since Supabase JS doesn't natively support
-  // deep nested WHERE in select. A dedicated RPC is preferable at scale.
-  // For now we filter in application code (page_size is small enough).
-
-  // Sorting
-  switch (sort) {
-    case 'newest':
-      query = query.order('created_at', { ascending: false });
-      break;
-    case 'trending':
-      // Approximate trending: order by save_count then recency
-      // True trending score (decay function) should live in a DB view.
-      query = query
-        .order('save_count', { ascending: false })
-        .order('updated_at',  { ascending: false });
-      break;
-    case 'save_count':
-    default:
-      query = query.order('save_count', { ascending: false });
-      break;
-  }
-
-  query = query.range(offset, offset + page_size - 1);
-
-  const { data, error, count } = await query;
-  if (error) throw new Error(`Marketplace query failed: ${error.message}`);
-
-  let templates = (data ?? []) as unknown as PublicTemplate[];
-
-  // Application-level muscle group filter (see note above)
-  if (muscle_groups && muscle_groups.length > 0) {
-    const groups = new Set(muscle_groups.map(g => g.toLowerCase()));
-    templates = templates.filter(t =>
-      (t.template_exercises ?? []).some(te =>
-        te.exercises && groups.has(te.exercises.muscle_group.toLowerCase()),
-      ),
-    );
-  }
-
-  return { templates, total: count ?? 0 };
-}
-
-/**
- * Save (import) a public template to the current user's saved list.
- * Idempotent: re-saving the same template is a no-op.
- */
-export async function saveTemplate(templateId: string): Promise<void> {
-  const supabase = await createClient();
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  if (authErr || !user) throw new Error('Not authenticated');
-
-  const { error } = await supabase
-    .from('template_saves')
-    .upsert(
-      { template_id: templateId, user_id: user.id },
-      { onConflict: 'template_id,user_id', ignoreDuplicates: true },
-    );
-
-  if (error) throw new Error(`Failed to save template: ${error.message}`);
-}
-
-/**
- * Unsave a previously saved template.
- * Idempotent: unsaving an already-unsaved template is a no-op.
- */
-export async function unsaveTemplate(templateId: string): Promise<void> {
-  const supabase = await createClient();
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  if (authErr || !user) throw new Error('Not authenticated');
-
-  const { error } = await supabase
-    .from('template_saves')
-    .delete()
-    .eq('template_id', templateId)
-    .eq('user_id',     user.id);
-
-  if (error) throw new Error(`Failed to unsave template: ${error.message}`);
-}
-
-/**
- * Return the set of template IDs the current user has saved.
- * Useful for decorating marketplace listings with a "saved" indicator.
- */
-export async function getUserSavedTemplateIds(): Promise<Set<string>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('template_saves')
-    .select('template_id');
-
-  if (error) throw new Error(`Failed to load saved templates: ${error.message}`);
-  return new Set((data ?? []).map(r => r.template_id));
-}
-
-/**
- * Publish or unpublish a template (owner only, enforced by RLS).
- */
-export async function setTemplateVisibility(
-  templateId: string,
-  isPublic: boolean,
-): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('workout_templates')
-    .update({ is_public: isPublic, updated_at: new Date().toISOString() })
-    .eq('id', templateId);
-
-  if (error) throw new Error(`Failed to update template visibility: ${error.message}`);
-}

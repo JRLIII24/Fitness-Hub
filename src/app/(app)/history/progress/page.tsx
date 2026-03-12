@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { weightToDisplay, kgToLbs } from "@/lib/units";
+import { estimateE1RM } from "@/lib/e1rm";
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS } from "@/lib/constants";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -256,7 +257,7 @@ export default function ProgressPage() {
   const [sets, setSets] = useState<RawSet[]>([]);
   const [sessions, setSessions] = useState<RawSession[]>([]);
   const [selectedExerciseId, setSelectedExerciseId] = useState("");
-  const [strengthMetric, setStrengthMetric] = useState<"score" | "weight">("score");
+  const [strengthMetric, setStrengthMetric] = useState<"e1rm" | "weight">("e1rm");
 
   const [tab, setTab] = useState("strength");
   const [strengthView, setStrengthView] = useState<"all" | "single">("all");
@@ -355,7 +356,7 @@ export default function ProgressPage() {
       {
         name: string;
         muscleGroup: string;
-        sessions: Map<string, { rawDate: string; topScore: number; topWeight: number }>;
+        sessions: Map<string, { rawDate: string; topE1rm: number; topWeight: number }>;
       }
     >();
 
@@ -363,7 +364,8 @@ export default function ProgressPage() {
       if (!s.exercises?.name || s.weight_kg == null) continue;
       const weight = convertWeight(s.weight_kg);
       const reps = s.reps ?? 0;
-      const score = weight * reps;
+      // Use e1RM for strength comparison; fall back to raw weight for high-rep sets
+      const e1rm = estimateE1RM(weight, reps) ?? weight;
 
       let exercise = byExercise.get(s.exercise_id);
       if (!exercise) {
@@ -376,10 +378,10 @@ export default function ProgressPage() {
       }
 
       const existing = exercise.sessions.get(s.session_id);
-      if (!existing || score > existing.topScore) {
+      if (!existing || e1rm > existing.topE1rm) {
         exercise.sessions.set(s.session_id, {
           rawDate: s.workout_sessions.started_at,
-          topScore: score,
+          topE1rm: e1rm,
           topWeight: weight,
         });
       }
@@ -391,7 +393,7 @@ export default function ProgressPage() {
           .sort((a, b) => a.rawDate.localeCompare(b.rawDate))
           .map((dp) => ({
             date: format(new Date(dp.rawDate), "MMM d"),
-            value: strengthMetric === "score" ? Math.round(dp.topScore) : dp.topWeight,
+            value: strengthMetric === "e1rm" ? Math.round(dp.topE1rm) : dp.topWeight,
           }));
 
         const first = points[0]?.value ?? 0;
@@ -419,9 +421,9 @@ export default function ProgressPage() {
       string,
       {
         rawDate: string;
-        topSetScore: number | null;
-        topSetWeight: number;
-        topSetReps: number;
+        topE1rm: number | null;
+        topE1rmWeight: number;
+        topE1rmReps: number;
         topWeight: number;
         topWeightReps: number;
       }
@@ -432,25 +434,25 @@ export default function ProgressPage() {
       const rawDate = s.workout_sessions.started_at;
       const weight = convertWeight(s.weight_kg);
       const reps = s.reps ?? 0;
-      const score = weight * reps;
-      const hasValid = s.reps != null && s.reps > 0;
+      const e1rm = estimateE1RM(weight, reps);
+      const hasValid = e1rm != null;
 
       const ex = bySession.get(s.session_id);
       if (!ex) {
         bySession.set(s.session_id, {
           rawDate,
-          topSetScore: hasValid ? score : null,
-          topSetWeight: weight,
-          topSetReps: reps,
+          topE1rm: e1rm,
+          topE1rmWeight: weight,
+          topE1rmReps: reps,
           topWeight: weight,
           topWeightReps: reps,
         });
         continue;
       }
-      if (hasValid && (ex.topSetScore == null || score > ex.topSetScore)) {
-        ex.topSetScore = score;
-        ex.topSetWeight = weight;
-        ex.topSetReps = reps;
+      if (hasValid && (ex.topE1rm == null || e1rm > ex.topE1rm)) {
+        ex.topE1rm = e1rm;
+        ex.topE1rmWeight = weight;
+        ex.topE1rmReps = reps;
       }
       if (weight > ex.topWeight) {
         ex.topWeight = weight;
@@ -460,17 +462,17 @@ export default function ProgressPage() {
 
     return [...bySession.values()]
       .sort((a, b) => a.rawDate.localeCompare(b.rawDate))
-      .filter((v) => (strengthMetric === "weight" ? true : v.topSetScore != null))
+      .filter((v) => (strengthMetric === "weight" ? true : v.topE1rm != null))
       .map((v) => ({
         date: format(new Date(v.rawDate), "MMM d"),
-        topSetScore: v.topSetScore != null ? Math.round(v.topSetScore * 10) / 10 : 0,
-        topSetWeight: v.topSetWeight,
-        topSetReps: v.topSetReps,
+        topSetScore: v.topE1rm != null ? Math.round(v.topE1rm * 10) / 10 : 0,
+        topSetWeight: v.topE1rmWeight,
+        topSetReps: v.topE1rmReps,
         topWeight: v.topWeight,
         topWeightReps: v.topWeightReps,
         displayValue:
-          strengthMetric === "score"
-            ? v.topSetScore != null ? Math.round(v.topSetScore * 10) / 10 : 0
+          strengthMetric === "e1rm"
+            ? v.topE1rm != null ? Math.round(v.topE1rm * 10) / 10 : 0
             : v.topWeight,
         rawDate: v.rawDate,
       }));
@@ -481,16 +483,16 @@ export default function ProgressPage() {
   const bestStats = useMemo(() => {
     if (strengthData.length === 0) return null;
     let bestWeight = { value: 0, reps: 0, date: "" };
-    let bestScore = { value: 0, weight: 0, reps: 0, date: "" };
+    let bestE1rm = { value: 0, weight: 0, reps: 0, date: "" };
     for (const d of strengthData) {
       if (d.topWeight > bestWeight.value) {
         bestWeight = { value: d.topWeight, reps: d.topWeightReps, date: d.date };
       }
-      if (d.topSetScore > bestScore.value) {
-        bestScore = { value: d.topSetScore, weight: d.topSetWeight, reps: d.topSetReps, date: d.date };
+      if (d.topSetScore > bestE1rm.value) {
+        bestE1rm = { value: d.topSetScore, weight: d.topSetWeight, reps: d.topSetReps, date: d.date };
       }
     }
-    return { bestWeight, bestScore };
+    return { bestWeight, bestE1rm };
   }, [strengthData]);
 
   // ── Volume by category ────────────────────────────────────────────────────
@@ -669,9 +671,9 @@ export default function ProgressPage() {
                         </div>
                         <div className="mb-4">
                           <PillToggle
-                            opts={["Top Set Score", "Top Weight"]}
-                            active={strengthMetric === "score" ? "Top Set Score" : "Top Weight"}
-                            onChange={(v) => setStrengthMetric(v === "Top Set Score" ? "score" : "weight")}
+                            opts={["Est. 1RM", "Top Weight"]}
+                            active={strengthMetric === "e1rm" ? "Est. 1RM" : "Top Weight"}
+                            onChange={(v) => setStrengthMetric(v === "Est. 1RM" ? "e1rm" : "weight")}
                           />
                         </div>
 
@@ -745,7 +747,7 @@ export default function ProgressPage() {
                                   {exerciseOptions.find((e) => e.id === selectedExerciseId)?.name ?? "Exercise"}
                                 </p>
                                 <span className="rounded-full border border-border/50 bg-card/40 px-2.5 py-0.5 text-[10px] font-bold tabular-nums text-muted-foreground">
-                                  {strengthMetric === "score" ? "Top Set Score" : `Max Weight (${unitLabel})`}
+                                  {strengthMetric === "e1rm" ? `Est. 1RM (${unitLabel})` : `Max Weight (${unitLabel})`}
                                 </span>
                               </div>
                               <div className="h-[240px] sm:h-[300px]">
@@ -766,12 +768,12 @@ export default function ProgressPage() {
                                   </p>
                                 </div>
                                 <div className="rounded-xl border border-border/50 bg-card/40 p-4">
-                                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Best Score</p>
+                                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Best Est. 1RM</p>
                                   <p className="tabular-nums text-[22px] font-black leading-none text-primary">
-                                    {Math.round(bestStats.bestScore.value).toLocaleString()} pts
+                                    {Math.round(bestStats.bestE1rm.value)} {unitLabel}
                                   </p>
                                   <p className="mt-1 text-[10px] text-muted-foreground">
-                                    {bestStats.bestScore.date} · {bestStats.bestScore.reps} reps
+                                    {bestStats.bestE1rm.date} · {bestStats.bestE1rm.weight} {unitLabel} x {bestStats.bestE1rm.reps}
                                   </p>
                                 </div>
                               </div>

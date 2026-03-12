@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Clock3, NotebookPen, Plus, Save, Dumbbell, Zap, Loader2 } from "lucide-react";
+import { Clock3, NotebookPen, Plus, Save, Dumbbell, Zap, Loader2, ArrowUpDown, GripVertical, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -15,7 +15,7 @@ import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
 import type { ActiveWorkout, Exercise, WorkoutSet } from "@/types/workout";
 import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS, MUSCLE_GROUPS } from "@/lib/constants";
-import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
+import { getMuscleColor, MUSCLE_FILTERS } from "@/lib/muscle-colors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -79,6 +79,7 @@ import { AI_COACH_ENABLED } from "@/lib/features";
 import { VoiceCommandBar } from "@/components/coach/voice-command-bar";
 import { ActiveProgramCard } from "@/components/workout/active-program-card";
 import { RestoreWorkoutBanner, type WorkoutDraft } from "@/components/workout/restore-workout-banner";
+import { TrainSubNav } from "@/components/layout/train-sub-nav";
 
 type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 
@@ -102,6 +103,54 @@ function SortableExerciseCard({
   return (
     <div ref={setNodeRef} style={style}>
       <ExerciseCard {...props} dragHandleProps={{ ...attributes, ...listeners }} />
+    </div>
+  );
+}
+
+// Compact reorder item — shown in reorder mode
+function SortableReorderItem({
+  exerciseId,
+  name,
+  completedSets,
+  totalSets,
+}: {
+  exerciseId: string;
+  name: string;
+  completedSets: number;
+  totalSets: number;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: exerciseId });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex h-11 items-center gap-2 rounded-lg px-2 transition-colors",
+        isDragging ? "bg-primary/10 shadow-md" : "hover:bg-card/60"
+      )}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="flex h-11 w-8 shrink-0 cursor-grab items-center justify-center text-muted-foreground/60 active:cursor-grabbing"
+        aria-label="Drag to reorder"
+      >
+        <GripVertical className="size-4" />
+      </button>
+      <p className="min-w-0 flex-1 truncate text-sm font-medium">{name}</p>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {completedSets}/{totalSets}
+      </span>
     </div>
   );
 }
@@ -140,6 +189,7 @@ export default function WorkoutPage() {
   >({});
   const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
+  const [isReorderMode, setIsReorderMode] = useState(false);
 
   // DEV: Uncomment to verify WorkoutPage render frequency.
   // Should NOT increment every second -- only on user interactions.
@@ -1418,10 +1468,13 @@ export default function WorkoutPage() {
 
       <div className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-6 md:px-6 lg:px-10">
         {!isWorkoutActive ? (
-          <PageHeader
-            title="Workout"
-            subtitle="Save templates, reuse them in future sessions, and compare to previous performance."
-          />
+          <>
+            <TrainSubNav />
+            <PageHeader
+              title="Workout"
+              subtitle="Save templates, reuse them in future sessions, and compare to previous performance."
+            />
+          </>
         ) : null}
 
         {!isWorkoutActive ? (
@@ -1644,11 +1697,37 @@ export default function WorkoutPage() {
               </button>
             ) : (
               <div className="space-y-3">
-                {ghostWorkoutData ? (
+                {/* Reorder toggle */}
+                {activeWorkout.exercises.length > 1 && (
+                  <div className="flex justify-end px-1">
+                    <Button
+                      type="button"
+                      variant={isReorderMode ? "default" : "ghost"}
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={() => setIsReorderMode((prev) => !prev)}
+                    >
+                      {isReorderMode ? (
+                        <>
+                          <Check className="size-3.5" />
+                          Done
+                        </>
+                      ) : (
+                        <>
+                          <ArrowUpDown className="size-3.5" />
+                          Reorder
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {ghostWorkoutData && !isReorderMode ? (
                   <div className="glass-inner rounded-lg px-3 py-1.5 text-[11px] text-muted-foreground">
                     Ghost workout active — training against your last session.
                   </div>
                 ) : null}
+
                 <DndContext
                   sensors={dndSensors}
                   collisionDetection={closestCenter}
@@ -1658,40 +1737,56 @@ export default function WorkoutPage() {
                     items={activeWorkout.exercises.map((e, i) => `${e.exercise.id}-${i}`)}
                     strategy={verticalListSortingStrategy}
                   >
-                    {activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
-                      <SortableExerciseCard
-                        key={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
-                        exerciseId={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
-                        exerciseBlock={exerciseBlock}
-                        exerciseIndex={exerciseIndex}
-                        ghostSets={ghostWorkoutData?.exercises[exerciseBlock.exercise.id]}
-                        previousSets={previousByExerciseId[exerciseBlock.exercise.id]}
-                        suggestedWeights={suggestedWeightsByKey[exerciseBlock.exercise.id]}
-                        smartSuggestions={smartSuggestions[exerciseBlock.exercise.id]}
-                        trendline={exerciseTrendlines[exerciseBlock.exercise.id]}
-                        preference={preference}
-                        onUpdateSet={updateSet}
-                        onCompleteSet={completeSet}
-                        onRemoveSet={removeSet}
-                        onAddSet={addSet}
-                        onRemoveExercise={removeExercise}
-                        onSwapExercise={setSwapSheetIndex}
-                        onSetExerciseNote={setExerciseNote}
-                        onStartRest={handleStartRest}
-                      />
-                    ))}
+                    {isReorderMode ? (
+                      <Card className="glass-surface-elevated overflow-hidden divide-y divide-border/40">
+                        {activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
+                          <SortableReorderItem
+                            key={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
+                            exerciseId={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
+                            name={exerciseBlock.exercise.name}
+                            completedSets={exerciseBlock.sets.filter((s) => s.completed).length}
+                            totalSets={exerciseBlock.sets.length}
+                          />
+                        ))}
+                      </Card>
+                    ) : (
+                      activeWorkout.exercises.map((exerciseBlock, exerciseIndex) => (
+                        <SortableExerciseCard
+                          key={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
+                          exerciseId={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
+                          exerciseBlock={exerciseBlock}
+                          exerciseIndex={exerciseIndex}
+                          ghostSets={ghostWorkoutData?.exercises[exerciseBlock.exercise.id]}
+                          previousSets={previousByExerciseId[exerciseBlock.exercise.id]}
+                          suggestedWeights={suggestedWeightsByKey[exerciseBlock.exercise.id]}
+                          smartSuggestions={smartSuggestions[exerciseBlock.exercise.id]}
+                          trendline={exerciseTrendlines[exerciseBlock.exercise.id]}
+                          preference={preference}
+                          onUpdateSet={updateSet}
+                          onCompleteSet={completeSet}
+                          onRemoveSet={removeSet}
+                          onAddSet={addSet}
+                          onRemoveExercise={removeExercise}
+                          onSwapExercise={setSwapSheetIndex}
+                          onSetExerciseNote={setExerciseNote}
+                          onStartRest={handleStartRest}
+                        />
+                      ))
+                    )}
                   </SortableContext>
                 </DndContext>
 
                 {/* Add Exercise button */}
-                <button
-                  type="button"
-                  onClick={() => setExerciseLibraryOpen(true)}
-                  className="w-full rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-7 text-center transition-colors hover:border-primary/50 hover:bg-primary/10"
-                >
-                  <Plus className="mx-auto h-5 w-5 text-primary" />
-                  <p className="mt-1 text-sm font-semibold text-primary">Add Exercise</p>
-                </button>
+                {!isReorderMode && (
+                  <button
+                    type="button"
+                    onClick={() => setExerciseLibraryOpen(true)}
+                    className="w-full rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-7 text-center transition-colors hover:border-primary/50 hover:bg-primary/10"
+                  >
+                    <Plus className="mx-auto h-5 w-5 text-primary" />
+                    <p className="mt-1 text-sm font-semibold text-primary">Add Exercise</p>
+                  </button>
+                )}
               </div>
             )}
 

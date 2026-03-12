@@ -32,16 +32,13 @@ import { Card, CardContent } from "@/components/ui/card";
 
 type SocialTab = "feed" | "discover" | "following" | "pings" | "shared" | "pods" | "profile";
 
-const PRIMARY_TABS: Array<{ value: SocialTab; label: string }> = [
+const COMMUNITY_TABS: Array<{ value: SocialTab; label: string }> = [
   ...(SOCIAL_FEED_ENABLED ? [{ value: "feed" as SocialTab, label: "Feed" }] : []),
   { value: "discover", label: "Discover" },
   { value: "following", label: "Following" },
+  { value: "pods", label: "Pods" },
   { value: "pings", label: "Pings" },
   { value: "shared", label: "Shared" },
-];
-
-const SECONDARY_TABS: Array<{ value: SocialTab; label: string }> = [
-  { value: "pods", label: "Pods" },
   { value: "profile", label: "Profile" },
 ];
 
@@ -254,8 +251,8 @@ export default function SocialPage() {
         <div className="relative space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Social Performance</p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Train Together</h1>
+              <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Your Crew</p>
+              <h1 className="mt-1 text-3xl font-semibold tracking-tight">Community</h1>
               <p className="mt-2 max-w-xl text-sm text-muted-foreground">
                 Discover serious athletes, exchange pings and programming, and keep accountability tight.
               </p>
@@ -286,10 +283,13 @@ export default function SocialPage() {
             </Card>
           </div>
 
-          <div className="space-y-2">
-            <PillSelector value={activeTab} onChange={setActiveTab} options={PRIMARY_TABS} ariaLabel="Primary social tabs" />
-            <PillSelector value={activeTab} onChange={setActiveTab} options={SECONDARY_TABS} ariaLabel="Secondary social tabs" />
-          </div>
+          <PillSelector
+            value={activeTab}
+            onChange={setActiveTab}
+            options={COMMUNITY_TABS}
+            ariaLabel="Community tabs"
+            className="overflow-x-auto scrollbar-none [&>button]:flex-none [&>button]:px-3.5"
+          />
         </div>
       </section>
 

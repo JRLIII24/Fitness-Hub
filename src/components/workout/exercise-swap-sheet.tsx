@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Exercise } from "@/types/workout";
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, EQUIPMENT_LABELS } from "@/lib/constants";
-import { getMuscleColor } from "@/components/marketplace/muscle-colors";
+import { getMuscleColor } from "@/lib/muscle-colors";
 import { cn } from "@/lib/utils";
 
 type MuscleGroup = (typeof MUSCLE_GROUPS)[number];

@@ -550,6 +550,13 @@ export function useWorkoutCompletion({
 
       if (!response.ok) throw new Error("Could not save session effort");
 
+      // Fire-and-forget: generate AI session summary for coach episodic memory
+      // keepalive ensures the request completes even if the user closes the tab
+      fetch(`/api/workout/${pendingSessionId}/summarize`, {
+        method: "POST",
+        keepalive: true,
+      });
+
       toast.success("Session effort saved.");
       setSessionRpePromptOpen(false);
       setPendingSessionId(null);

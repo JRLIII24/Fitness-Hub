@@ -17,6 +17,9 @@ import {
   Timer,
   CircleCheck,
   Check,
+  Apple,
+  TrendingUp,
+  CalendarDays,
 } from "lucide-react";
 import { T, statusMessages, orbColors } from "@/lib/coach-tokens";
 import type { OrbState } from "@/lib/coach-tokens";
@@ -79,13 +82,25 @@ function nextMsgId(): string {
 
 type HudState = "idle" | "listening" | "thinking" | "executing";
 
-// ── Quick action presets ─────────────────────────────────────────────────────
+// ── Quick action presets (context-aware) ─────────────────────────────────────
 
-const QUICK_ACTIONS = [
-  { label: "Add Exercise", icon: Plus, prompt: "Add " },
-  { label: "Log Set", icon: Dumbbell, prompt: "I just did " },
-  { label: "Swap Move", icon: ArrowRightLeft, prompt: "Swap " },
-];
+function getQuickActions(hasActiveWorkout: boolean) {
+  if (hasActiveWorkout) {
+    return [
+      { label: "Log Set", icon: Dumbbell, prompt: "I just did " },
+      { label: "Add Exercise", icon: Plus, prompt: "Add " },
+      { label: "Swap Move", icon: ArrowRightLeft, prompt: "Swap " },
+      { label: "Rest Timer", icon: Timer, prompt: "Start a 90 second timer" },
+      { label: "How Am I Doing?", icon: Brain, prompt: "How is my workout looking?" },
+    ];
+  }
+  return [
+    { label: "Plan a Workout", icon: Dumbbell, prompt: "Build me a " },
+    { label: "Check Macros", icon: Apple, prompt: "How are my macros?" },
+    { label: "My Progress", icon: TrendingUp, prompt: "How is my training going?" },
+    { label: "Build Program", icon: CalendarDays, prompt: "Create a program for " },
+  ];
+}
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -1140,7 +1155,7 @@ function HudShell({
 
           {/* Message Feed or Empty State */}
           {messages.length === 0 ? (
-            <EmptyState hudState={hudState} onQuickAction={onQuickAction} />
+            <EmptyState hudState={hudState} onQuickAction={onQuickAction} hasActiveWorkout={!!context.active_workout} />
           ) : (
             <div className="flex flex-col gap-3">
               {messages.map((msg, i) => (
@@ -1300,9 +1315,11 @@ function HudShell({
 function EmptyState({
   hudState,
   onQuickAction,
+  hasActiveWorkout,
 }: {
   hudState: HudState;
   onQuickAction: (prompt: string) => void;
+  hasActiveWorkout: boolean;
 }) {
   return (
     <div
@@ -1392,7 +1409,7 @@ function EmptyState({
 
       {/* Quick action chips — glass styled */}
       <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8 }}>
-        {QUICK_ACTIONS.map((qa) => (
+        {getQuickActions(hasActiveWorkout).map((qa) => (
           <motion.button
             key={qa.label}
             whileTap={{ scale: 0.97 }}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
+import { getMuscleColor, MUSCLE_FILTERS } from "@/lib/muscle-colors";
 
 const CATEGORY_OPTIONS = MUSCLE_FILTERS.filter(f => f !== "All");
 
@@ -64,7 +64,7 @@ export function EditTemplateDialog({ open, template, onClose, onSave }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Edit Template</DialogTitle>
         </DialogHeader>

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import type { Exercise } from "@/types/workout";
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, EQUIPMENT_LABELS } from "@/lib/constants";
-import { getMuscleColor } from "@/components/marketplace/muscle-colors";
+import { getMuscleColor } from "@/lib/muscle-colors";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";

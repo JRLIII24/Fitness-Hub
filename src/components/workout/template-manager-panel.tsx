@@ -1,7 +1,7 @@
 "use client";
 
 import { Send, Pencil, Copy, Trash2, Heart, LayoutList } from "lucide-react";
-import { getMuscleColor } from "@/components/marketplace/muscle-colors";
+import { getMuscleColor } from "@/lib/muscle-colors";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import type { WorkoutTemplate } from "@/hooks/workout/use-template-actions";

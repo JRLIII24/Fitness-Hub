@@ -22,6 +22,7 @@ export async function GET(request: Request) {
       .from("training_programs")
       .select("id, name, description, goal, weeks, days_per_week, status, current_week, current_day, started_at, completed_at, created_at", { count: "exact" })
       .eq("user_id", user.id)
+      .neq("status", "abandoned")
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 

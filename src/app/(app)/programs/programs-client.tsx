@@ -7,9 +7,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ProgramCard } from "@/components/programs/program-card";
-import { MarketplaceProgramCard, ProgramCardSkeleton } from "@/components/marketplace/program-card";
-import { ProgramPreviewDialog } from "@/components/marketplace/program-preview-dialog";
-import type { PublicProgram } from "@/components/marketplace/program-types";
+import { MarketplaceProgramCard, ProgramCardSkeleton } from "@/components/programs/marketplace-program-card";
+import { ProgramPreviewDialog } from "@/components/programs/program-preview-dialog";
+import type { PublicProgram } from "@/components/programs/program-types";
+import { TrainSubNav } from "@/components/layout/train-sub-nav";
 
 interface Program {
   id: string;
@@ -50,6 +51,8 @@ export function ProgramsClient({ initialPrograms }: ProgramsClientProps) {
 
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 pb-24 pt-4">
+      <TrainSubNav />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

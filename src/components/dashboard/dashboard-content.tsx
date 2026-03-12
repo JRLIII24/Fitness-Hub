@@ -13,6 +13,7 @@ import {
   BarChart3,
   Play,
   TrendingUp,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -289,9 +290,20 @@ export function DashboardContent({
         <div className="pointer-events-none absolute left-1/2 -top-6 h-32 w-96 -translate-x-1/2 bg-[var(--phase-current-glow,oklch(0.98_0_0_/_0.10))] blur-2xl" />
 
         <div className="relative space-y-6">
+          {/* Settings gear — top-right of hero */}
+          <div className="absolute right-5 top-5 z-10 sm:right-7 sm:top-7">
+            <Link
+              href="/settings"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full glass-chip text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Settings"
+            >
+              <Settings className="size-[18px]" />
+            </Link>
+          </div>
+
           {/* Header row */}
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-3">
+            <div className="flex-1 space-y-3">
               {/* Date pill + Level badge */}
               <div className="flex flex-wrap items-center gap-2">
                 {/* Date pill with live dot */}

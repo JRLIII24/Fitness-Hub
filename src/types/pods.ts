@@ -117,66 +117,6 @@ export interface CreateChallengeInput {
   target_value?: number;
 }
 
-// ── Template Marketplace ───────────────────────────────────────────────────────
-
-export interface PublicTemplate {
-  id: string;
-  user_id: string;
-  name: string;
-  description: string | null;
-  color: string | null;
-  estimated_duration_min: number | null;
-  is_public: boolean;
-  save_count: number;
-  primary_muscle_group: string | null;
-  difficulty_level?: string; // 'warm_up' | 'grind' | 'beast_mode'
-  created_at: string;
-  updated_at: string;
-  /** Only present when querying with exercise join */
-  template_exercises?: Array<{
-    id: string;
-    exercise_id: string;
-    sort_order: number;
-    target_sets: number | null;
-    target_reps: string | null;
-    target_weight_kg: number | null;
-    rest_seconds: number;
-    notes: string | null;
-    exercises?: {
-      id: string;
-      name: string;
-      muscle_group: string;
-      equipment: string;
-      category: string;
-    };
-  }>;
-  /** Only present when joined with saves */
-  is_saved?: boolean;
-  creator?: {
-    display_name: string | null;
-    avatar_url: string | null;
-  };
-  /** Aggregate rating data joined from template_rating_stats */
-  avg_rating?: number | null;
-  review_count?: number;
-}
-
-/** A single review row returned from the API */
-export interface TemplateReview {
-  id: string;
-  template_id: string;
-  reviewer_id: string;
-  rating: number;       // 1–5
-  comment: string | null;
-  created_at: string;
-  reviewer?: {
-    display_name: string | null;
-    avatar_url: string | null;
-  };
-  /** True if this review belongs to the currently logged-in user */
-  is_own?: boolean;
-}
-
 // Form types
 
 export interface CreatePodInput {

@@ -13,6 +13,7 @@ export default async function ProgramsPage() {
     .from("training_programs")
     .select("id, name, description, goal, weeks, days_per_week, status, current_week, current_day, started_at, completed_at, created_at")
     .eq("user_id", user.id)
+    .neq("status", "abandoned")
     .order("created_at", { ascending: false })
     .limit(20);
 

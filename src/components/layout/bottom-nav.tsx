@@ -8,18 +8,12 @@ import {
   Dumbbell,
   Apple,
   Users,
-  ScanLine,
-  Settings,
-  Store,
-  Target,
-  Calendar,
 } from "lucide-react";
 import type { ElementType } from "react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkoutStore } from "@/stores/workout-store";
-import { MARKETPLACE_ENABLED } from "@/lib/features";
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -100,26 +94,24 @@ export function BottomNav() {
     { href: "/dashboard", label: "Home", icon: LayoutDashboard },
     {
       href: "/workout",
-      label: isWorkoutActive && !pathname.startsWith("/workout") ? "Resume" : "Workout",
+      label: isWorkoutActive && !pathname.startsWith("/workout") ? "Resume" : "Train",
       icon: Dumbbell,
       pulse: isWorkoutActive,
     },
-    { href: "/workout/form-check", label: "Form", icon: ScanLine },
     { href: "/nutrition", label: "Nutrition", icon: Apple },
-    { href: "/pods", label: "Pods", icon: Target },
-    { href: "/social", label: "Social", icon: Users, badge: unreadCount },
-    ...(MARKETPLACE_ENABLED ? [{ href: "/marketplace", label: "Templates", icon: Store }] : []),
-    { href: "/programs", label: "Programs", icon: Calendar },
-    { href: "/settings", label: "Settings", icon: Settings },
+    { href: "/social", label: "Community", icon: Users, badge: unreadCount },
   ];
 
   const isTabActive = (href: string) => {
     if (href === "/dashboard") return pathname.startsWith("/dashboard");
-    // If a more specific tab owns this path, don't mark the parent as active.
-    const superseded = tabs.some(
-      (t) => t.href !== href && t.href.startsWith(href + "/") && pathname.startsWith(t.href)
-    );
-    if (superseded) return false;
+    // "Train" tab owns workout, programs, and templates routes
+    if (href === "/workout") {
+      return (
+        pathname.startsWith("/workout") ||
+        pathname.startsWith("/programs") ||
+        pathname.startsWith("/templates")
+      );
+    }
     return pathname.startsWith(href);
   };
 

@@ -279,6 +279,48 @@ export type Database = {
           },
         ]
       }
+      session_summaries: {
+        Row: {
+          id: string
+          user_id: string
+          session_id: string
+          summary: string
+          key_observations: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_id: string
+          summary: string
+          key_observations?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_id?: string
+          summary?: string
+          key_observations?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_summaries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_summaries_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "workout_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversion_impressions: {
         Row: {
           acted_at: string | null

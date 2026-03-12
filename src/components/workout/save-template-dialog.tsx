@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { DIFFICULTY_LEVELS, type DifficultyLevel } from "@/lib/template-utils";
-import { MUSCLE_FILTERS, getMuscleColor } from "@/components/marketplace/muscle-colors";
+import { MUSCLE_FILTERS, getMuscleColor } from "@/lib/muscle-colors";
 
 const CATEGORY_OPTIONS = MUSCLE_FILTERS.filter((f) => f !== "All");
 

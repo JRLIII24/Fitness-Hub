@@ -36,6 +36,7 @@ export default async function MyTemplatesPage() {
       template_exercises(id)
     `)
     .eq("user_id", user.id)
+    .is("program_id", null)
     .order("updated_at", { ascending: false });
 
   type RawTemplate = {

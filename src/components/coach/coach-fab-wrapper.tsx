@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AI_COACH_ENABLED, FORM_ANALYSIS_ENABLED } from "@/lib/features";
+import { AI_COACH_ENABLED, FORM_ANALYSIS_ENABLED, READINESS_SCORE_ENABLED } from "@/lib/features";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { CoachFab } from "./coach-fab";
 import { T, orbColors, statusMessages } from "@/lib/coach-tokens";
@@ -11,6 +11,22 @@ import type { CoachContext } from "@/lib/coach/types";
 
 type MacroSummary = CoachContext["daily_macros"];
 type FormReport = CoachContext["latest_form_report"];
+
+type CoachProfileContext = {
+  fitness_goal: string | null;
+  experience_level: string | null;
+  current_streak: number;
+  level: number;
+  recent_prs: string[] | null;
+  recent_session_notes?: Array<{
+    summary: string;
+    key_observations: Record<string, unknown> | null;
+    created_at: string;
+  }> | null;
+  acwr?: number | null;
+  acwr_status?: "danger" | "high" | "elevated" | "optimal" | "underloaded" | null;
+  fatigue_label?: string | null;
+};
 
 /**
  * Thin client wrapper so the server-rendered app layout can mount CoachFab
@@ -27,31 +43,55 @@ export function CoachFabWrapper() {
   const activeWorkout = useWorkoutStore((s) => s.activeWorkout);
   const [dailyMacros, setDailyMacros] = useState<MacroSummary>(null);
   const [formReport, setFormReport] = useState<FormReport>(null);
+  const [profileCtx, setProfileCtx] = useState<CoachProfileContext | null>(null);
+  const [readinessScore, setReadinessScore] = useState<number | null>(null);
+  const [readinessLevel, setReadinessLevel] = useState<string | null>(null);
   const [orbState, setOrbState] = useState<OrbState>("idle");
   const [showTooltip, setShowTooltip] = useState(false);
 
-  // Fetch today's macro summary once on mount — only when feature is enabled
+  // Fetch today's macro summary once on mount
   useEffect(() => {
     if (!AI_COACH_ENABLED) return;
     fetch("/api/nutrition/today")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!data) return;
-        // Only set if we have at least one target configured
-        if (data.target_calories != null) {
-          setDailyMacros(data as MacroSummary);
-        }
+        if (data?.target_calories != null) setDailyMacros(data as MacroSummary);
       })
       .catch(() => undefined);
   }, []);
 
-  // Fetch latest form analysis report — only when form analysis is enabled
+  // Fetch latest form analysis report
   useEffect(() => {
     if (!AI_COACH_ENABLED || !FORM_ANALYSIS_ENABLED) return;
     fetch("/api/form-check/latest")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) setFormReport(data as FormReport);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Fetch profile context (streak, goal, experience, PRs)
+  useEffect(() => {
+    if (!AI_COACH_ENABLED) return;
+    fetch("/api/coach/context")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setProfileCtx(data as CoachProfileContext);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Fetch readiness score
+  useEffect(() => {
+    if (!AI_COACH_ENABLED || !READINESS_SCORE_ENABLED) return;
+    fetch("/api/readiness")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.readiness) {
+          setReadinessScore(data.readiness.score ?? null);
+          setReadinessLevel(data.readiness.level ?? null);
+        }
       })
       .catch(() => undefined);
   }, []);
@@ -82,15 +122,19 @@ export function CoachFabWrapper() {
           ),
         }
       : null,
-    readiness_score: null,
-    readiness_level: null,
+    readiness_score: readinessScore,
+    readiness_level: readinessLevel,
     recent_sessions_7d: 0,
-    current_streak: 0,
-    fitness_goal: null,
-    experience_level: null,
+    current_streak: profileCtx?.current_streak ?? 0,
+    fitness_goal: profileCtx?.fitness_goal ?? null,
+    experience_level: profileCtx?.experience_level ?? null,
     daily_macros: dailyMacros,
-    recent_prs: null,
+    recent_prs: profileCtx?.recent_prs ?? null,
     latest_form_report: formReport,
+    recent_session_notes: profileCtx?.recent_session_notes ?? null,
+    acwr: profileCtx?.acwr ?? null,
+    acwr_status: profileCtx?.acwr_status ?? null,
+    fatigue_label: profileCtx?.fatigue_label ?? null,
   };
 
   const orbColor = orbColors[orbState];

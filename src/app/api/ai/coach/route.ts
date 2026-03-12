@@ -17,7 +17,7 @@ import { streamObject } from "ai";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
-import { getAnthropicProvider, HAIKU } from "@/lib/ai-sdk";
+import { getAnthropicProvider, SONNET } from "@/lib/ai-sdk";
 import { buildCoachSystemPrompt } from "@/lib/ai-prompts/coach";
 import { CoachResponseSchema } from "@/lib/coach/types";
 import type { CoachRequest, SaveMemoryActionData } from "@/lib/coach/types";
@@ -71,11 +71,11 @@ export async function POST(request: Request) {
 
     // Stream structured object and convert to SSE format the client expects
     const result = streamObject({
-      model: provider(HAIKU),
+      model: provider(SONNET),
       schema: CoachResponseSchema,
       system: systemPrompt,
       messages,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
     });
 
     const encoder = new TextEncoder();
@@ -106,6 +106,17 @@ export async function POST(request: Request) {
               data = JSON.parse(final.data_json);
             } catch {
               data = null;
+            }
+          }
+
+          // ACWR safety guardrail — programmatically enforce deload regardless of LLM output
+          if (action === "show_prescription" && data) {
+            const acwrStatus = body.context?.acwr_status;
+            if (acwrStatus === "danger" || acwrStatus === "high") {
+              data.readiness_factor = "deload";
+              if (typeof data.progressive_overload_pct === "number" && data.progressive_overload_pct > 0) {
+                data.progressive_overload_pct = 0;
+              }
             }
           }
 

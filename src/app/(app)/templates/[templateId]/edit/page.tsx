@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, ChevronLeft, Trash2, Plus, Globe } from "lucide-react";
 import { AddExerciseToTemplateDialog } from "@/components/workout/add-exercise-to-template-dialog";
 import { Switch } from "@/components/ui/switch";
-import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
+import { getMuscleColor, MUSCLE_FILTERS } from "@/lib/muscle-colors";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { weightToDisplay } from "@/lib/units";
 

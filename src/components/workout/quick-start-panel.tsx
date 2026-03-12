@@ -1,6 +1,6 @@
 "use client";
 
-import { getMuscleColor, MUSCLE_FILTERS } from "@/components/marketplace/muscle-colors";
+import { getMuscleColor, MUSCLE_FILTERS } from "@/lib/muscle-colors";
 import { Label } from "@/components/ui/label";
 import { POPULAR_WORKOUTS, type WorkoutPresetId } from "@/lib/workout-presets";
 

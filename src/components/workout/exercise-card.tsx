@@ -92,7 +92,7 @@ export const ExerciseCard = memo(function ExerciseCard({
   const [deloadDismissed, setDeloadDismissed] = useState(false);
 
   // Collapsible state — starts expanded; auto-collapses when all sets are done
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const wasAutoCollapsed = useRef(false);
   const allSetsComplete = exerciseBlock.sets.length > 0 && exerciseBlock.sets.every((s) => s.completed);
 

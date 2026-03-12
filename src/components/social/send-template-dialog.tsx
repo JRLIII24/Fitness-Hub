@@ -83,7 +83,7 @@ export function SendTemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="sm:max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Send &ldquo;{template?.name}&rdquo;</DialogTitle>
         </DialogHeader>

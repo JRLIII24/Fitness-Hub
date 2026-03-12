@@ -8,12 +8,23 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EditTemplateDialog } from "@/components/workout/edit-template-dialog";
 import { SendTemplateDialog } from "@/components/social/send-template-dialog";
 import { useSharedItems, type TemplateSnapshot } from "@/hooks/use-shared-items";
 import { useTemplateFavorites } from "@/hooks/use-template-favorites";
-import { getMuscleColor } from "@/components/marketplace/muscle-colors";
+import { getMuscleColor } from "@/lib/muscle-colors";
 import { stripImportFingerprint } from "@/lib/template-utils";
+import { TrainSubNav } from "@/components/layout/train-sub-nav";
 
 interface WorkoutTemplate {
   id: string;
@@ -38,6 +49,7 @@ export default function TemplatesPage() {
   const [editingTemplate, setEditingTemplate] = useState<WorkoutTemplate | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [sendingTemplate, setSendingTemplate] = useState<{ id: string; name: string; description: string | null; exercises: TemplateSnapshot["exercises"] } | null>(null);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
 
@@ -103,6 +115,7 @@ export default function TemplatesPage() {
           .from("workout_templates")
           .select("*")
           .eq("user_id", user.id)
+          .is("program_id", null)
           .order("updated_at", { ascending: false });
 
         if (error) {
@@ -199,9 +212,8 @@ export default function TemplatesPage() {
     }
   }
 
-  async function handleDelete(templateId: string) {
-    if (!confirm("Delete this template? This action cannot be undone.")) return;
-
+  async function handleDeleteConfirmed(templateId: string) {
+    setDeleteConfirmId(null);
     setDeletingId(templateId);
     try {
       // Safety: preserve workout history even if DB FK was previously configured as CASCADE.
@@ -241,6 +253,7 @@ export default function TemplatesPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-3xl space-y-6 px-4 pt-6 pb-28">
+        <TrainSubNav />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Workout Templates</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -258,6 +271,8 @@ export default function TemplatesPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 pt-6 pb-28">
+      <TrainSubNav />
+
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Workout Templates</h1>
@@ -400,7 +415,7 @@ export default function TemplatesPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleDelete(template.id)}
+                            onClick={() => setDeleteConfirmId(template.id)}
                             disabled={deletingId === template.id}
                           >
                             {deletingId === template.id ? (
@@ -441,6 +456,26 @@ export default function TemplatesPage() {
           toast.success("Template sent!");
         }}
       />
+
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(o) => !o && setDeleteConfirmId(null)}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. Your workout history will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => deleteConfirmId && handleDeleteConfirmed(deleteConfirmId)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

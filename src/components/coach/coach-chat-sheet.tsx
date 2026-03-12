@@ -95,7 +95,7 @@ function getQuickActions(hasActiveWorkout: boolean) {
     ];
   }
   return [
-    { label: "Plan a Workout", icon: Dumbbell, prompt: "Build me a " },
+    { label: "Plan a Workout", icon: Dumbbell, prompt: "Plan a workout for me — show me my options" },
     { label: "Check Macros", icon: Apple, prompt: "How are my macros?" },
     { label: "My Progress", icon: TrendingUp, prompt: "How is my training going?" },
     { label: "Build Program", icon: CalendarDays, prompt: "Create a program for " },
@@ -519,6 +519,13 @@ export function CoachChatSheet({
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
 
+  const handleSelectOption = useCallback(
+    (text: string) => {
+      sendMessage(text);
+    },
+    [sendMessage]
+  );
+
   // ── Portal ────────────────────────────────────────────────────────────
 
   const portalTarget = typeof document !== "undefined" ? document.body : null;
@@ -545,6 +552,7 @@ export function CoachChatSheet({
           onQuickAction={handleQuickAction}
           onConfirmAction={handleConfirmAction}
           onDismissAction={handleDismissAction}
+          onSelectOption={handleSelectOption}
           scrollRef={scrollRef}
           inputRef={inputRef}
         />
@@ -880,6 +888,7 @@ function HudShell({
   onQuickAction,
   onConfirmAction,
   onDismissAction,
+  onSelectOption,
   scrollRef,
   inputRef,
 }: {
@@ -900,6 +909,7 @@ function HudShell({
   onQuickAction: (prompt: string) => void;
   onConfirmAction: (msgId: string, pending: PendingAction) => void;
   onDismissAction: (msgId: string) => void;
+  onSelectOption: (text: string) => void;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
@@ -1167,6 +1177,7 @@ function HudShell({
                   totalCount={messages.length}
                   onConfirmAction={onConfirmAction}
                   onDismissAction={onDismissAction}
+                  onSelectOption={onSelectOption}
                   isConfirming={confirmingMsgId === msg.id}
                 />
               ))}

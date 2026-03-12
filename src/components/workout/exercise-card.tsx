@@ -165,8 +165,8 @@ export const ExerciseCard = memo(function ExerciseCard({
                 </Badge>
               ) : null}
             </div>
-            <div className="flex items-center gap-1.5">
-              <p className="truncate">{exerciseBlock.exercise.name}</p>
+            <div className="flex items-start gap-1.5">
+              <p className="line-clamp-2 text-sm leading-tight">{exerciseBlock.exercise.name}</p>
               {trendline && (
                 <ExerciseSparkline
                   weights={trendline.weights}
@@ -176,7 +176,7 @@ export const ExerciseCard = memo(function ExerciseCard({
             </div>
           </div>
 
-          <div className="flex items-center shrink-0">
+          <div className="flex items-start shrink-0">
             <div className="text-right">
               <p className="text-base font-bold font-display tabular-nums leading-none text-primary">
                 {exerciseBlock.sets.filter((set) => set.completed).length}
@@ -185,36 +185,33 @@ export const ExerciseCard = memo(function ExerciseCard({
               <p className="text-[9px] uppercase tracking-[0.08em] text-muted-foreground">sets</p>
             </div>
             {/* Collapse toggle */}
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              className="h-11 w-11 p-0"
+              className="flex h-8 w-8 items-center justify-center"
               onClick={() => setIsCollapsed((prev) => !prev)}
               aria-label={isCollapsed ? "Expand exercise" : "Collapse exercise"}
             >
               {isCollapsed
-                ? <ChevronDown className="size-3.5 text-muted-foreground" />
-                : <ChevronUp className="size-3.5 text-muted-foreground" />
+                ? <ChevronDown className="size-4 text-muted-foreground" />
+                : <ChevronUp className="size-4 text-muted-foreground" />
               }
-            </Button>
-            <Button
+            </button>
+            <button
               type="button"
-              variant="ghost"
-              className="h-11 w-11 p-0"
+              className="flex h-8 w-8 items-center justify-center"
               onClick={() => onSwapExercise(exerciseIndex)}
               aria-label="Swap exercise"
             >
-              <ArrowLeftRight className="size-3.5 text-muted-foreground" />
-            </Button>
-            <Button
+              <ArrowLeftRight className="size-4 text-muted-foreground" />
+            </button>
+            <button
               type="button"
-              variant="ghost"
-              className="h-11 w-11 p-0"
+              className="flex h-8 w-8 items-center justify-center"
               onClick={() => onRemoveExercise(exerciseIndex)}
               aria-label="Remove exercise"
             >
-              <X className="size-3.5 text-destructive" />
-            </Button>
+              <X className="size-4 text-destructive" />
+            </button>
           </div>
         </CardTitle>
       </CardHeader>

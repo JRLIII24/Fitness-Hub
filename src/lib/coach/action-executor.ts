@@ -546,6 +546,7 @@ export async function executeCoachAction(
     // Display-only actions — no store mutation needed
     case "show_exercise_history":
     case "generate_workout":
+    case "present_workout_options":
     case "show_substitution":
     case "show_readiness":
     case "show_recovery":

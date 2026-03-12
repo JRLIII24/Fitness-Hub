@@ -21,6 +21,8 @@ import { ExerciseHistoryCard } from "./exercise-history-card";
 import { MealSuggestionCard } from "./meal-suggestion-card";
 import { MacroBreakdownCard } from "./macro-breakdown-card";
 import { ActionConfirmationCard } from "./action-confirmation-card";
+import { WorkoutOptionsCard } from "./workout-options-card";
+import type { PresentWorkoutOptionsActionData } from "@/lib/coach/types";
 
 // ── Typewriter hook ─────────────────────────────────────────────────────────
 
@@ -149,9 +151,10 @@ interface CoachFeedItemProps {
   onConfirmAction?: (msgId: string, pending: PendingAction) => void;
   onDismissAction?: (msgId: string) => void;
   isConfirming?: boolean;
+  onSelectOption?: (text: string) => void;
 }
 
-export function CoachFeedItem({ message, isLatest, index, totalCount, onConfirmAction, onDismissAction, isConfirming }: CoachFeedItemProps) {
+export function CoachFeedItem({ message, isLatest, index, totalCount, onConfirmAction, onDismissAction, isConfirming, onSelectOption }: CoachFeedItemProps) {
   const isUser = message.role === "user";
   const hasMutation = message.action ? isMutationAction(message.action) : false;
   // When streaming, text arrives progressively — skip typewriter and render directly.
@@ -335,6 +338,13 @@ export function CoachFeedItem({ message, isLatest, index, totalCount, onConfirmA
             }
           />
         </div>
+      )}
+
+      {message.action === "present_workout_options" && !!message.data?.options && isComplete && (
+        <WorkoutOptionsCard
+          data={message.data as unknown as PresentWorkoutOptionsActionData}
+          onSelectOption={onSelectOption ?? (() => {})}
+        />
       )}
 
       {/* Pending action confirmation */}

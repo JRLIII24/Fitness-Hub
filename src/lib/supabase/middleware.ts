@@ -36,6 +36,7 @@ export async function updateSession(request: NextRequest) {
   // Allow unauthenticated access to auth and password reset pages
   const isPublicPath =
     request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname === "/manifest.json" ||
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/signup") ||
     request.nextUrl.pathname.startsWith("/forgot-password") ||

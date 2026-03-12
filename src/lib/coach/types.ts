@@ -62,6 +62,7 @@ export type CoachAction =
   // Display-only actions
   | "show_exercise_history"
   | "generate_workout"
+  | "present_workout_options"
   | "show_substitution"
   | "show_readiness"
   | "show_recovery"
@@ -232,6 +233,29 @@ export interface SaveMemoryActionData {
   content: string;
 }
 
+// ── Workout Plan Mode Data Types ──
+
+export interface WorkoutOptionExercise {
+  name: string;
+  sets: number;
+  reps: string;
+  muscle_group: string;
+}
+
+export interface WorkoutOption {
+  id: "A" | "B" | "C";
+  label: string;
+  rationale: string;
+  exercises: WorkoutOptionExercise[];
+  estimated_duration_min: number;
+  intensity: "low" | "moderate" | "high" | "peak";
+  primary_muscle_group: string;
+}
+
+export interface PresentWorkoutOptionsActionData {
+  options: [WorkoutOption, WorkoutOption, WorkoutOption];
+}
+
 // ── Coach Context ──
 
 export interface CoachContext {
@@ -307,6 +331,7 @@ export interface CoachRequest {
 const ALL_COACH_ACTIONS = [
   "show_exercise_history",
   "generate_workout",
+  "present_workout_options",
   "show_substitution",
   "show_readiness",
   "show_recovery",

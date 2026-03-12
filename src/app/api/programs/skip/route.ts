@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { createTemplateFromProgramDay, type ProgramDayData } from "@/lib/program-service";
 import { logger } from "@/lib/logger";
+import type { Json } from "@/types/database";
 
 interface ProgramDay {
   day_number: number;
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
           completed_at: new Date().toISOString(),
           current_week: totalWeeks,
           current_day: daysInCurrentWeek,
-          program_data: { ...programData, weeks: updatedWeeks },
+          program_data: { ...programData, weeks: updatedWeeks } as unknown as Json,
         })
         .eq("id", program_id)
         .eq("user_id", user.id);
@@ -160,7 +161,7 @@ export async function POST(request: Request) {
       .update({
         current_week: nextWeek,
         current_day: nextDay,
-        program_data: { ...programData, weeks: updatedWeeks },
+        program_data: { ...programData, weeks: updatedWeeks } as unknown as Json,
       })
       .eq("id", program_id)
       .eq("user_id", user.id);

@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { createTemplateFromProgramDay, type ProgramDayData } from "@/lib/program-service";
 import { logger } from "@/lib/logger";
+import type { Json } from "@/types/database";
 import { type Program } from "@/lib/ai-prompts/program-builder";
 
 export async function POST(
@@ -84,7 +85,7 @@ export async function POST(
         started_at: new Date().toISOString(),
         current_week: 1,
         current_day: 1,
-        program_data: { ...programData, weeks: updatedWeeks },
+        program_data: { ...programData, weeks: updatedWeeks } as unknown as Json,
       })
       .eq("id", id)
       .eq("user_id", user.id);

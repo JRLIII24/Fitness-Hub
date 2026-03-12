@@ -114,7 +114,7 @@ export function UserCard({ user, onFollow, onUnfollow, onSendPing }: UserCardPro
               <Button
                 size="icon"
                 variant="ghost"
-                className="size-8"
+                className="size-11"
                 aria-label="Send ping"
                 onClick={() => setPingOpen(true)}
               >
@@ -126,7 +126,7 @@ export function UserCard({ user, onFollow, onUnfollow, onSendPing }: UserCardPro
                   variant={user.isFollowing ? "outline" : "default"}
                   disabled={followLoading}
                   onClick={handleFollowToggle}
-                  className="h-8"
+                  className="min-h-[44px]"
                 >
                   {user.isFollowing ? "Unfollow" : "Follow"}
                 </Button>
@@ -134,7 +134,7 @@ export function UserCard({ user, onFollow, onUnfollow, onSendPing }: UserCardPro
               <Button
                 size="icon"
                 variant="ghost"
-                className="size-8"
+                className="size-11"
                 title="View profile"
                 onClick={() => router.push(`/social/${user.id}`)}
               >

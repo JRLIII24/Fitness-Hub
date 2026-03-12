@@ -68,7 +68,7 @@ export function WeeklyReviewModal({
         variant="ghost"
         size="sm"
         onClick={() => setOpen(true)}
-        className="h-8 gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+        className="min-h-[44px] gap-1.5 rounded-lg px-2.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground"
       >
         <TrendingUp className="h-3 w-3" />
         Weekly Review

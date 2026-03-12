@@ -66,14 +66,14 @@ export const WorkoutHeader = memo(function WorkoutHeader({
       <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
       <div className="pointer-events-none absolute -left-16 bottom-0 h-44 w-44 rounded-full bg-accent/20 blur-3xl" />
       <div className="relative space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Active Session</p>
-            <h2 className="mt-1 text-[28px] font-black leading-tight tracking-tight sm:text-[32px]">
+            <h2 className="mt-1 truncate text-[28px] font-black leading-tight tracking-tight sm:text-[32px]">
               {workoutName}
             </h2>
           </div>
-          <div className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
+          <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
             <Clock3 className="size-4" />
             <ElapsedTime startedAt={startedAt} />
           </div>

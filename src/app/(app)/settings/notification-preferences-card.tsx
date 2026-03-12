@@ -116,7 +116,7 @@ export function NotificationPreferencesCard() {
             <p className="text-[12px] text-muted-foreground">
               Get a daily nudge when you haven&apos;t trained yet. Never break your streak.
             </p>
-            <Button onClick={handleEnable} size="sm" className="w-full">
+            <Button onClick={handleEnable} size="sm" className="w-full min-h-[44px]">
               Enable Notifications
             </Button>
           </div>
@@ -154,11 +154,11 @@ export function NotificationPreferencesCard() {
                 </select>
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleSchedule} size="sm" className="flex-1">
+                <Button onClick={handleSchedule} size="sm" className="flex-1 min-h-[44px]">
                   {isScheduled ? "Update Reminder" : "Set Reminder"}
                 </Button>
                 {isScheduled && (
-                  <Button onClick={handleCancel} size="sm" variant="outline">
+                  <Button onClick={handleCancel} size="sm" variant="outline" className="min-h-[44px]">
                     <BellOff className="h-3.5 w-3.5" />
                   </Button>
                 )}

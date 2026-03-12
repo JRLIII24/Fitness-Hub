@@ -84,7 +84,7 @@ function SheetContent({
           <h2 className="text-[15px] font-black text-foreground">Menu Picks For You</h2>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-opacity hover:opacity-80"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-muted/50 text-muted-foreground transition-opacity hover:opacity-80"
           >
             <X className="h-4 w-4" />
           </button>

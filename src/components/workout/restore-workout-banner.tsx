@@ -64,7 +64,7 @@ export function RestoreWorkoutBanner({ draft, onRestore, onDiscard }: RestoreWor
             <Button
               size="sm"
               onClick={() => onRestore(draft)}
-              className="h-8 rounded-lg px-4 text-xs font-semibold"
+              className="min-h-[44px] rounded-lg px-4 text-xs font-semibold"
             >
               Restore
             </Button>
@@ -72,7 +72,7 @@ export function RestoreWorkoutBanner({ draft, onRestore, onDiscard }: RestoreWor
               size="sm"
               variant="ghost"
               onClick={onDiscard}
-              className="h-8 rounded-lg px-3 text-xs text-muted-foreground"
+              className="min-h-[44px] rounded-lg px-3 text-xs text-muted-foreground"
             >
               Discard
             </Button>

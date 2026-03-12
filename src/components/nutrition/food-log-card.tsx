@@ -158,7 +158,7 @@ export function FoodLogCard({ entry, onDelete, onEdit }: Props) {
             <Button
               size="icon"
               variant="ghost"
-              className="h-9 w-9 shrink-0"
+              className="h-11 w-11 shrink-0"
               onClick={() => setEditDialogOpen(true)}
               aria-label="Edit entry"
             >
@@ -167,7 +167,7 @@ export function FoodLogCard({ entry, onDelete, onEdit }: Props) {
             <Button
               size="icon"
               variant="ghost"
-              className="size-8 shrink-0"
+              className="size-11 shrink-0"
               onClick={handleDelete}
               disabled={deleting}
               aria-label="Delete entry"

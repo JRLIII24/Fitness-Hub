@@ -84,7 +84,7 @@ export function TemplateManagerPanel({
                     variant="secondary"
                     onClick={() => onSendTemplate(template)}
                     disabled={templateActionBusyId === template.id}
-                    className="h-7 px-2 text-xs"
+                    className="min-h-[44px] px-3 text-xs"
                   >
                     <Send className="mr-1 h-3 w-3" />
                     Send
@@ -95,7 +95,7 @@ export function TemplateManagerPanel({
                     variant="secondary"
                     onClick={() => onEditTemplate(template)}
                     disabled={templateActionBusyId === template.id}
-                    className="h-7 px-2 text-xs"
+                    className="min-h-[44px] px-3 text-xs"
                   >
                     <Pencil className="mr-1 h-3 w-3" />
                     Edit
@@ -106,7 +106,7 @@ export function TemplateManagerPanel({
                     variant="secondary"
                     onClick={() => onCopyTemplate(template)}
                     disabled={templateActionBusyId === template.id}
-                    className="h-7 px-2 text-xs"
+                    className="min-h-[44px] px-3 text-xs"
                   >
                     <Copy className="mr-1 h-3 w-3" />
                     Copy
@@ -117,7 +117,7 @@ export function TemplateManagerPanel({
                     variant="destructive"
                     onClick={() => onDeleteTemplate(template)}
                     disabled={templateActionBusyId === template.id}
-                    className="h-7 px-2 text-xs"
+                    className="min-h-[44px] px-3 text-xs"
                   >
                     <Trash2 className="mr-1 h-3 w-3" />
                     Delete
@@ -127,7 +127,7 @@ export function TemplateManagerPanel({
                     size="sm"
                     variant={likedTemplateIds.has(template.id) ? "default" : "secondary"}
                     onClick={() => onToggleLike(template.id)}
-                    className="h-7 px-2 text-xs"
+                    className="min-h-[44px] px-3 text-xs"
                   >
                     <Heart className="mr-1 h-3 w-3" />
                     {likedTemplateIds.has(template.id) ? "Liked" : "Like"}

@@ -356,7 +356,7 @@ export default function SocialPage() {
             <Card className="border-border/60 bg-card/70">
               <CardContent className="py-10 text-center">
                 <p className="text-sm text-muted-foreground">You&apos;re not following anyone yet.</p>
-                <Button size="sm" variant="outline" className="mt-3" onClick={() => setActiveTab("discover")}>
+                <Button size="sm" variant="outline" className="mt-3 min-h-[44px]" onClick={() => setActiveTab("discover")}>
                   Discover Athletes
                 </Button>
               </CardContent>
@@ -403,12 +403,12 @@ export default function SocialPage() {
               {(sharedUnread > 0 || sharedItems.some((item) => !!item.read_at)) && (
                 <div className="flex justify-end gap-2">
                   {sharedUnread > 0 ? (
-                    <Button variant="ghost" size="sm" onClick={markSharedRead}>
+                    <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={markSharedRead}>
                       Mark all read
                     </Button>
                   ) : null}
                   {sharedItems.some((item) => !!item.read_at) ? (
-                    <Button variant="ghost" size="sm" onClick={clearReadShared}>
+                    <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={clearReadShared}>
                       Clear read
                     </Button>
                   ) : null}
@@ -437,7 +437,7 @@ export default function SocialPage() {
 
       <div className="fixed bottom-[calc(6rem+1rem+env(safe-area-inset-bottom,0px))] right-4 z-20 md:right-6">
         {(pingsUnread > 0 || sharedUnread > 0) && (
-          <Button size="sm" className="h-9 gap-1.5 rounded-full px-3 shadow-lg" onClick={() => setActiveTab("pings")}>
+          <Button size="sm" className="min-h-[44px] gap-1.5 rounded-full px-3 shadow-lg" onClick={() => setActiveTab("pings")}>
             <Bell className="size-4" />
             Inbox
             <Badge variant="secondary" className="h-5 rounded-full px-1.5 text-[10px]">

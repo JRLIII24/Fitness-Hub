@@ -109,7 +109,7 @@ export function PodInvitesSection({ onUpdate }: PodInvitesSectionProps) {
                   variant="default"
                   onClick={() => handleResponse(invite.id, "accept")}
                   disabled={responding === invite.id}
-                  className="h-8 px-3"
+                  className="min-h-[44px] px-3"
                 >
                   <Check className="h-4 w-4 mr-1" />
                   Accept
@@ -119,7 +119,7 @@ export function PodInvitesSection({ onUpdate }: PodInvitesSectionProps) {
                   variant="ghost"
                   onClick={() => handleResponse(invite.id, "decline")}
                   disabled={responding === invite.id}
-                  className="h-8 px-3"
+                  className="min-h-[44px] px-3"
                 >
                   <X className="h-4 w-4" />
                 </Button>

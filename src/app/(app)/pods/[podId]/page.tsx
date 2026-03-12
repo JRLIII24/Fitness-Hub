@@ -89,7 +89,7 @@ function ChallengesSection({ podId, currentUserId }: { podId: string; currentUse
         <Button
           size="sm"
           variant="outline"
-          className="h-7 px-2 text-xs"
+          className="min-h-[44px] px-3 text-xs"
           onClick={() => setCreateOpen(true)}
         >
           <Plus className="h-3 w-3 mr-1" />
@@ -273,7 +273,7 @@ export default function PodDetailPage({ params }: PageProps) {
   if (error || !pod) {
     return (
       <div className="mx-auto w-full max-w-lg px-4 pt-5 pb-28 md:max-w-2xl">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-4">
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-4 min-h-[44px]">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -290,17 +290,17 @@ export default function PodDetailPage({ params }: PageProps) {
     <div className="mx-auto w-full max-w-lg px-4 pt-5 pb-28 space-y-4 md:max-w-2xl">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+        <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
         <div className="flex items-center gap-2">
           {isCreator ? (
-            <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(true)} className="text-destructive">
+            <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => setDeleteConfirmOpen(true)}>
               <Trash2 className="h-4 w-4" />
             </Button>
           ) : (
-            <Button variant="ghost" size="sm" onClick={() => setLeaveConfirmOpen(true)}>
+            <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => setLeaveConfirmOpen(true)}>
               <LogOut className="h-4 w-4 mr-2" />
               Leave
             </Button>
@@ -323,18 +323,18 @@ export default function PodDetailPage({ params }: PageProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => setCommitmentOpen(true)} className="flex-1 min-w-[120px]">
+            <Button size="sm" onClick={() => setCommitmentOpen(true)} className="flex-1 min-w-[120px] min-h-[44px]">
               <Target className="h-4 w-4 mr-2" />
               {currentUserProgress && currentUserProgress.commitment > 0
                 ? `${currentUserProgress.commitment}x/week`
                 : "Set Goal"}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setMessageOpen(true)} className="flex-1 min-w-[120px]">
+            <Button size="sm" variant="outline" onClick={() => setMessageOpen(true)} className="flex-1 min-w-[120px] min-h-[44px]">
               <MessageSquare className="h-4 w-4 mr-2" />
               Encourage
             </Button>
             {isCreator && (
-              <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} className="shrink-0">
+              <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} className="shrink-0 min-h-[44px]">
                 <UserPlus className="h-4 w-4" />
               </Button>
             )}

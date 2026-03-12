@@ -138,7 +138,7 @@ function ProgramPreviewSheet({
           <button
             onClick={onClose}
             aria-label="Close program preview"
-            className="absolute right-4 top-3.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/35 text-white/80 backdrop-blur-sm transition-opacity hover:opacity-80"
+            className="absolute right-4 top-3.5 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-white/80 backdrop-blur-sm transition-opacity hover:opacity-80"
           >
             <X className="h-4 w-4" />
           </button>

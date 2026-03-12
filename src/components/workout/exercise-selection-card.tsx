@@ -133,7 +133,7 @@ export function ExerciseSelectionCard({
             e.stopPropagation();
             onQuickAdd();
           }}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -148,7 +148,7 @@ export function ExerciseSelectionCard({
             setExpanded((v) => !v);
           }}
           className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground transition-all hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted/40 text-muted-foreground transition-all hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
             expanded && "rotate-180"
           )}
         >
@@ -192,7 +192,7 @@ export function ExerciseSelectionCard({
             <Button
               type="button"
               size="sm"
-              className="h-8 w-full justify-between text-xs"
+              className="min-h-[44px] w-full justify-between text-xs"
               onClick={(e) => {
                 e.stopPropagation();
                 onQuickAdd();

@@ -21,6 +21,21 @@ export function BottomNav() {
   const [userId, setUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const isWorkoutActive = useWorkoutStore((state) => state.isWorkoutActive);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  // Hide nav when virtual keyboard is open (mobile)
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const threshold = 0.75; // keyboard likely open if viewport < 75% of window height
+    function onResize() {
+      setKeyboardOpen(vv!.height < window.innerHeight * threshold);
+    }
+
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -116,7 +131,12 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 glass-nav border-t border-[rgba(255,255,255,0.09)] shadow-[0_-8px_32px_rgba(0,0,0,0.60)]">
+    <nav
+      className={cn(
+        "fixed bottom-0 left-0 right-0 z-50 glass-nav border-t border-[rgba(255,255,255,0.09)] shadow-[0_-8px_32px_rgba(0,0,0,0.60)] transition-transform duration-200",
+        keyboardOpen && "translate-y-full"
+      )}
+    >
       <div className="mx-auto flex w-full max-w-7xl items-center justify-center px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <LayoutGroup id="bottom-nav">
           <div className="flex max-w-full items-center gap-1 overflow-x-auto scrollbar-none rounded-full border border-border/70 glass-inner p-1 sm:gap-1">

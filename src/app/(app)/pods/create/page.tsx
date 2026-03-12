@@ -51,7 +51,7 @@ export default function CreatePodPage() {
         variant="ghost"
         size="sm"
         onClick={() => router.back()}
-        className="mb-4"
+        className="mb-4 min-h-[44px]"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back

@@ -50,12 +50,12 @@ export function PingInbox({
           </div>
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={onMarkAllRead}>
+              <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={onMarkAllRead}>
                 Mark all read
               </Button>
             )}
             {readCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={onClearRead}>
+              <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={onClearRead}>
                 Clear read
               </Button>
             )}
@@ -103,7 +103,7 @@ export function PingInbox({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 shrink-0"
+                    className="h-11 w-11 shrink-0"
                     onClick={() => handleDelete(ping.id)}
                     disabled={deleting === ping.id}
                     aria-label="Delete ping"

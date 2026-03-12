@@ -191,7 +191,7 @@ export function MiniDashboardCard({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-8"
+                          className="size-11"
                           onClick={() => onToggleFavorite(tpl.id)}
                           aria-label={
                             tpl.isFavorited
@@ -206,7 +206,7 @@ export function MiniDashboardCard({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="size-8"
+                          className="size-11"
                           onClick={() => onCopyTemplate(tpl)}
                           aria-label="Copy template"
                         >
@@ -249,7 +249,7 @@ export function MiniDashboardCard({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8 shrink-0"
+                      className="size-11 shrink-0"
                       onClick={() => onCopyTemplate(tpl)}
                       aria-label="Copy template"
                     >

@@ -476,7 +476,7 @@ export default function EditWorkoutPage() {
               size="icon"
               variant="ghost"
               onClick={() => handleRemoveExercise(exerciseIndex)}
-              className="h-8 w-8 rounded-lg shrink-0"
+              className="h-11 w-11 rounded-lg shrink-0"
             >
               <Trash2 className="size-4 text-destructive" />
             </Button>
@@ -504,7 +504,7 @@ export default function EditWorkoutPage() {
                       size="icon"
                       variant="ghost"
                       onClick={() => handleRemoveSet(exerciseIndex, setIndex)}
-                      className="h-8 w-8 rounded-lg"
+                      className="h-11 w-11 rounded-lg"
                       title="Remove set"
                     >
                       <Trash2 className="size-3 text-destructive" />

@@ -305,7 +305,7 @@ export function DashboardContent({
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex-1 space-y-3">
               {/* Date pill + Level badge */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 pr-12 sm:pr-14">
                 {/* Date pill with live dot */}
                 <div className="inline-flex items-center gap-2 rounded-full glass-chip px-3 py-1">
                   <span

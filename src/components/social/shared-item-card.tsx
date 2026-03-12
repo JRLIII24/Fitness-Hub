@@ -228,7 +228,7 @@ export function SharedItemCard({
           <div className="grid grid-cols-2 gap-2 pt-1">
             <Button
               size="sm"
-              className="w-full gap-1.5"
+              className="w-full gap-1.5 min-h-[44px]"
               disabled={saving || clearing}
               onClick={handleSaveTemplate}
             >
@@ -242,7 +242,7 @@ export function SharedItemCard({
             <Button
               size="sm"
               variant="outline"
-              className="w-full"
+              className="w-full min-h-[44px]"
               disabled={saving || clearing}
               onClick={handleClearInbox}
             >
@@ -340,7 +340,7 @@ export function SharedItemCard({
         <Button
           size="sm"
           variant="outline"
-          className="w-full"
+          className="w-full min-h-[44px]"
           disabled={clearing}
           onClick={handleClearInbox}
         >

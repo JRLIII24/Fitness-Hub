@@ -111,7 +111,7 @@ export function StreakBadge({
                 size="sm"
                 variant="ghost"
                 onClick={onUseFreeze}
-                className="gap-1 text-xs text-primary hover:text-primary/80"
+                className="gap-1 text-xs text-primary hover:text-primary/80 min-h-[44px]"
                 title="Use streak freeze (1x/month)"
               >
                 <Snowflake className="h-3 w-3" />

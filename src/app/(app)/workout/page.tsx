@@ -1814,7 +1814,7 @@ export default function WorkoutPage() {
                     type="button"
                     variant="secondary"
                     size="sm"
-                    className="transition-all duration-200 hover:scale-[1.01]"
+                    className="min-h-[44px] transition-all duration-200 hover:scale-[1.01]"
                     onClick={handleOpenSaveTemplate}
                   >
                     <Save className="mr-1.5 size-3.5" />
@@ -1824,7 +1824,7 @@ export default function WorkoutPage() {
                     type="button"
                     variant="destructive"
                     size="sm"
-                    className="transition-all duration-200 hover:scale-[1.01]"
+                    className="min-h-[44px] transition-all duration-200 hover:scale-[1.01]"
                     onClick={handleCancelWorkout}
                   >
                     Cancel
@@ -1832,7 +1832,7 @@ export default function WorkoutPage() {
                   <Button
                     type="button"
                     size="sm"
-                    className="transition-all duration-200 hover:scale-[1.01]"
+                    className="min-h-[44px] transition-all duration-200 hover:scale-[1.01]"
                     onClick={handleFinishWorkout}
                   >
                     Finish

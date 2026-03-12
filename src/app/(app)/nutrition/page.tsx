@@ -191,7 +191,7 @@ function MealSection({
           </div>
         </div>
         <Link href={`/nutrition/scan?meal=${meal}`}>
-          <Button size="sm" variant="ghost" className="h-8 gap-1 text-xs">
+          <Button size="sm" variant="ghost" className="min-h-[44px] gap-1 text-xs">
             <Plus className="size-3.5" />
             Add
           </Button>
@@ -522,7 +522,7 @@ export default function NutritionPage() {
                 </Link>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="size-9">
+                    <Button variant="ghost" size="icon" className="size-11">
                       <MoreHorizontal className="size-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -562,7 +562,7 @@ export default function NutritionPage() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-8"
+              className="size-11"
               onClick={() => setSelectedDate((d) => subDays(d, 1))}
               aria-label="Previous day"
             >
@@ -573,7 +573,7 @@ export default function NutritionPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedDate(new Date())}
-                className="text-sm font-medium"
+                className="min-h-[44px] text-sm font-medium"
               >
                 {format(selectedDate, "MMM d, yyyy") === format(new Date(), "MMM d, yyyy")
                   ? "Today"
@@ -583,7 +583,7 @@ export default function NutritionPage() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-8"
+              className="size-11"
               onClick={() => setSelectedDate((d) => addDays(d, 1))}
               aria-label="Next day"
               disabled={format(selectedDate, "yyyy-MM-dd") >= format(new Date(), "yyyy-MM-dd")}
@@ -641,7 +641,7 @@ export default function NutritionPage() {
                       </p>
                     </div>
                     <Link href="/nutrition/goals">
-                      <Button size="sm" variant="outline" className="w-fit gap-1.5 text-xs">
+                      <Button size="sm" variant="outline" className="min-h-[44px] w-fit gap-1.5 text-xs">
                         <Apple className="size-3.5" />
                         Set Goals
                       </Button>
@@ -667,7 +667,7 @@ export default function NutritionPage() {
                       </p>
                     </div>
                     <Link href="/nutrition/scan">
-                      <Button size="sm" className="motion-press h-8 rounded-lg px-3 text-xs">
+                      <Button size="sm" className="motion-press min-h-[44px] rounded-lg px-3 text-xs">
                         Add Protein
                       </Button>
                     </Link>

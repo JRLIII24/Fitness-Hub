@@ -370,6 +370,7 @@ export default function TemplatesPage() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="min-h-[44px]"
                             onClick={() => toggleFavorite(template.id)}
                             title={favoriteIds.has(template.id) ? "Remove from favorites" : "Add to favorites"}
                             aria-label={favoriteIds.has(template.id) ? "Remove from favorites" : "Add to favorites"}
@@ -381,6 +382,7 @@ export default function TemplatesPage() {
                           <Button
                             size="sm"
                             variant="outline"
+                            className="min-h-[44px]"
                             onClick={() => handleSendOpen(template)}
                             title="Send to a friend"
                           >
@@ -389,6 +391,7 @@ export default function TemplatesPage() {
                           <Button
                             size="sm"
                             variant="default"
+                            className="min-h-[44px]"
                             onClick={() => router.push(`/workout?from_launcher=1&template_id=${template.id}`)}
                             title="Start workout with this template"
                           >
@@ -398,6 +401,7 @@ export default function TemplatesPage() {
                           <Button
                             size="sm"
                             variant="outline"
+                            className="min-h-[44px]"
                             onClick={() => router.push(`/templates/${template.id}/edit`)}
                             title="Edit exercises"
                           >
@@ -407,6 +411,7 @@ export default function TemplatesPage() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="min-h-[44px]"
                             onClick={() => handleEditOpen(template)}
                             title="Edit name & details"
                           >
@@ -415,6 +420,7 @@ export default function TemplatesPage() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="min-h-[44px]"
                             onClick={() => setDeleteConfirmId(template.id)}
                             disabled={deletingId === template.id}
                           >

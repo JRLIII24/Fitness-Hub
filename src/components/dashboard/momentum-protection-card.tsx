@@ -132,7 +132,7 @@ export function MomentumProtectionCard({
             <Button
               size="sm"
               variant="secondary"
-              className="h-8 rounded-lg px-3 text-xs"
+              className="min-h-[44px] rounded-lg px-3 text-xs"
               onClick={handleUseFreeze}
             >
               <Snowflake className="mr-1.5 h-3.5 w-3.5" />
@@ -142,7 +142,7 @@ export function MomentumProtectionCard({
             <Link href="/workout">
               <Button
                 size="sm"
-                className="motion-press h-8 rounded-lg px-3 text-xs"
+                className="motion-press min-h-[44px] rounded-lg px-3 text-xs"
                 onClick={() => {
                   void trackComebackPlanStarted(supabase, userId, {
                     channel: "start_workout",

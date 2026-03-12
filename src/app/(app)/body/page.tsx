@@ -763,7 +763,7 @@ export default function BodyMetricsPage() {
                         <Button
                           onClick={handleCancelEdit}
                           disabled={submitting}
-                          className="flex-1"
+                          className="flex-1 min-h-[44px]"
                           variant="outline"
                           size="sm"
                         >
@@ -773,7 +773,7 @@ export default function BodyMetricsPage() {
                       <Button
                         onClick={handleSave}
                         disabled={submitting || !formWeight}
-                        className="flex-1"
+                        className="flex-1 min-h-[44px]"
                         size="sm"
                       >
                         {submitting
@@ -981,7 +981,7 @@ export default function BodyMetricsPage() {
                             resetMeasForm();
                           }}
                           disabled={measSubmitting}
-                          className="flex-1"
+                          className="flex-1 min-h-[44px]"
                           variant="outline"
                           size="sm"
                         >
@@ -991,7 +991,7 @@ export default function BodyMetricsPage() {
                       <Button
                         onClick={handleMeasSave}
                         disabled={measSubmitting}
-                        className="flex-1"
+                        className="flex-1 min-h-[44px]"
                         size="sm"
                       >
                         {measSubmitting
@@ -1033,7 +1033,7 @@ export default function BodyMetricsPage() {
                     Track waist, chest, arms and more to see your body change over time.
                   </p>
                 </div>
-                <Button size="sm" variant="outline" onClick={toggleMeasForm}>
+                <Button size="sm" variant="outline" className="min-h-[44px]" onClick={toggleMeasForm}>
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
                   Start logging metrics
                 </Button>

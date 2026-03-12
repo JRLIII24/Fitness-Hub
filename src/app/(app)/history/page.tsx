@@ -269,7 +269,7 @@ export default function HistoryPage() {
           <div className="mb-4 flex items-center justify-between">
             <button
               onClick={() => setViewMonth(subMonths(viewMonth, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-border/40"
+              className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-border/40"
             >
               <ChevronLeft className="size-4 text-muted-foreground" />
             </button>
@@ -278,7 +278,7 @@ export default function HistoryPage() {
             </h3>
             <button
               onClick={() => setViewMonth(addMonths(viewMonth, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-border/40"
+              className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-border/40"
             >
               <ChevronRight className="size-4 text-muted-foreground" />
             </button>
@@ -429,7 +429,7 @@ export default function HistoryPage() {
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-9 shrink-0">
+                          <Button variant="ghost" size="icon" className="size-11 shrink-0">
                             <MoreHorizontal className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>

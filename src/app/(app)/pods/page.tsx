@@ -54,7 +54,7 @@ export default function PodsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Pods</h1>
           <p className="text-sm text-muted-foreground">Accountability groups for consistency</p>
         </div>
-        <Button onClick={() => router.push("/pods/create")} size="sm">
+        <Button onClick={() => router.push("/pods/create")} size="sm" className="min-h-[44px]">
           <Plus className="h-4 w-4 mr-1" />
           Create
         </Button>

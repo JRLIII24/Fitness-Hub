@@ -66,7 +66,7 @@ export function LevelUpCelebration({ newLevel, onClose }: LevelUpCelebrationProp
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-3 top-3 z-10 h-8 w-8 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+                className="absolute right-3 top-3 z-10 h-11 w-11 rounded-full text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
                 onClick={onClose}
                 aria-label="Close level-up celebration"
               >

@@ -253,14 +253,14 @@ export function GroceryListBoard() {
                           }}
                           className="h-8 flex-1 text-[13px]"
                         />
-                        <Button size="sm" className="h-8 gap-1" onClick={() => handleAddItem(catIdx)}>
+                        <Button size="sm" className="min-h-[44px] gap-1" onClick={() => handleAddItem(catIdx)}>
                           <Plus className="size-3" />
                           Add
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8"
+                          className="min-h-[44px]"
                           onClick={() => setAddingCategory(null)}
                         >
                           <X className="size-3" />

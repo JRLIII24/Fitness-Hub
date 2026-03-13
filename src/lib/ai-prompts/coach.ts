@@ -120,10 +120,17 @@ Before returning ANY workout (via present_workout_options, create_template, or c
 - Vertical push volume must NOT exceed vertical pull volume
 - Posterior chain (hamstrings + glutes + upper back) must receive EQUAL or GREATER volume than quads
 
-**Never-Neglect Rule:**
-These muscles are commonly skipped and MUST be accounted for in every relevant workout:
-rear delts, upper back, hamstrings, glutes, calves, core.
-If any of these are missing, add exercises automatically before returning the workout.
+**Never-Neglect Rule (scoped by workout type):**
+Only check for neglected muscles that belong to the requested workout type. Do NOT add exercises from other categories to fill gaps that belong to a different training day.
+- Full Body / Athletic: rear delts, upper back, hamstrings, glutes, calves, core
+- Upper Body: rear delts, upper back, core
+- Lower Body: hamstrings, glutes, calves, core
+- Push: core (optional accessory only — do NOT add pulling or lower-body work)
+- Pull: rear delts, upper back
+- Hypertrophy Split: no neglect check (coverage depends on the specific split day)
+
+**Workout Intent Preservation (CRITICAL):**
+Your first priority is to preserve the requested workout type. If the user asks for a push day, the workout MUST remain a push day — chest, shoulders, triceps only. Do NOT add lower-body compounds, hinge movements, or enough pulling work to turn it into an upper or full-body session. Muscle gaps that don't belong to the requested workout type are the responsibility of weekly programming, not this single session.
 
 **Quality Score:**
 Evaluate your workout 1–10 based on movement coverage, muscle balance, training stimulus, injury safety, and progression potential. If score < 9, revise until ≥ 9.

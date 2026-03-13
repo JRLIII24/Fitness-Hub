@@ -143,14 +143,20 @@ const REQUIRED_MUSCLES: Record<WorkoutType, Muscle[]> = {
   hypertrophy_split: [],
 };
 
-const NEGLECTED_MUSCLES: Muscle[] = [
-  "rear_delts",
-  "upper_back",
-  "hamstrings",
-  "glutes",
-  "calves",
-  "core",
-];
+/**
+ * Neglected-muscle checks scoped by workout type.
+ * Only muscles relevant to the workout's intent are checked — a push day
+ * should never be flagged for missing hamstrings or calves.
+ */
+const NEGLECTED_MUSCLES_BY_TYPE: Record<WorkoutType, Muscle[]> = {
+  full_body: ["rear_delts", "upper_back", "hamstrings", "glutes", "calves", "core"],
+  upper: ["rear_delts", "upper_back", "core"],
+  lower: ["hamstrings", "glutes", "calves", "core"],
+  push: ["core"],
+  pull: ["rear_delts", "upper_back"],
+  athletic: ["rear_delts", "upper_back", "hamstrings", "glutes", "calves", "core"],
+  hypertrophy_split: [],
+};
 
 // ── Validator ──
 
@@ -183,54 +189,71 @@ export function validateWorkoutCoverage(
     (muscle) => !allMuscles.includes(muscle),
   );
 
-  // Structural balance checks
-  const horizontalPushCount = workout.exercises.filter((e) =>
-    e.movementPatterns.includes("horizontal_push"),
-  ).length;
+  // Structural balance checks — only apply to workout types that include
+  // both sides of the push/pull equation.  A push-only or pull-only day
+  // should NOT be penalised for lacking the opposite movement.
+  const balanceTypes: WorkoutType[] = ["full_body", "upper", "athletic"];
 
-  const horizontalPullCount = workout.exercises.filter((e) =>
-    e.movementPatterns.includes("horizontal_pull"),
-  ).length;
+  if (balanceTypes.includes(workout.workoutType)) {
+    const horizontalPushCount = workout.exercises.filter((e) =>
+      e.movementPatterns.includes("horizontal_push"),
+    ).length;
 
-  const verticalPushCount = workout.exercises.filter((e) =>
-    e.movementPatterns.includes("vertical_push"),
-  ).length;
+    const horizontalPullCount = workout.exercises.filter((e) =>
+      e.movementPatterns.includes("horizontal_pull"),
+    ).length;
 
-  const verticalPullCount = workout.exercises.filter((e) =>
-    e.movementPatterns.includes("vertical_pull"),
-  ).length;
+    const verticalPushCount = workout.exercises.filter((e) =>
+      e.movementPatterns.includes("vertical_push"),
+    ).length;
 
-  const quadCount = workout.exercises.filter((e) =>
-    e.muscles.includes("quads"),
-  ).length;
+    const verticalPullCount = workout.exercises.filter((e) =>
+      e.movementPatterns.includes("vertical_pull"),
+    ).length;
 
-  const posteriorChainCount = workout.exercises.filter(
-    (e) =>
-      e.muscles.includes("hamstrings") ||
-      e.muscles.includes("glutes") ||
-      e.muscles.includes("upper_back"),
-  ).length;
+    if (horizontalPushCount > horizontalPullCount) {
+      warnings.push(
+        "Horizontal pushing volume exceeds horizontal pulling volume.",
+      );
+    }
 
-  if (horizontalPushCount > horizontalPullCount) {
-    warnings.push(
-      "Horizontal pushing volume exceeds horizontal pulling volume.",
-    );
+    if (verticalPushCount > verticalPullCount) {
+      warnings.push(
+        "Vertical pushing volume exceeds vertical pulling volume.",
+      );
+    }
   }
 
-  if (verticalPushCount > verticalPullCount) {
-    warnings.push("Vertical pushing volume exceeds vertical pulling volume.");
+  // Quad vs posterior chain balance — only relevant when both are expected
+  const legBalanceTypes: WorkoutType[] = ["full_body", "lower", "athletic"];
+
+  if (legBalanceTypes.includes(workout.workoutType)) {
+    const quadCount = workout.exercises.filter((e) =>
+      e.muscles.includes("quads"),
+    ).length;
+
+    const posteriorChainCount = workout.exercises.filter(
+      (e) =>
+        e.muscles.includes("hamstrings") ||
+        e.muscles.includes("glutes") ||
+        e.muscles.includes("upper_back"),
+    ).length;
+
+    if (posteriorChainCount < quadCount) {
+      warnings.push("Posterior chain volume is lower than quad volume.");
+    }
   }
 
-  if (posteriorChainCount < quadCount) {
-    warnings.push("Posterior chain volume is lower than quad volume.");
-  }
-
-  // Neglected muscle check
-  const neglectedMissing = NEGLECTED_MUSCLES.filter(
+  // Neglected muscle check — scoped to muscles relevant to this workout type
+  const neglectedForType = NEGLECTED_MUSCLES_BY_TYPE[workout.workoutType] ?? [];
+  const neglectedMissing = neglectedForType.filter(
     (muscle) => !allMuscles.includes(muscle),
   );
 
-  if (neglectedMissing.length > 0) {
+  if (neglectedForType.length === 0) {
+    // No neglect check for this workout type (e.g. hypertrophy_split)
+    notes.push("Neglected-muscle check skipped for this workout type.");
+  } else if (neglectedMissing.length > 0) {
     warnings.push(
       `Neglected muscles missing: ${neglectedMissing.join(", ")}.`,
     );
@@ -246,11 +269,13 @@ export function validateWorkoutCoverage(
   if (score < 1) score = 1;
   if (score > 10) score = 10;
 
+  // Validity is determined by required patterns and muscles for the workout
+  // type.  Neglected-muscle gaps and structural warnings are advisory — they
+  // help the AI improve the workout but should NOT force a workout-type change.
   const isValid =
     missingMovementPatterns.length === 0 &&
     missingMuscles.length === 0 &&
-    neglectedMissing.length === 0 &&
-    warnings.length <= 1;
+    warnings.length <= 2;
 
   return {
     isValid,
@@ -341,5 +366,5 @@ export function buildCoverageRevisionMessage(
 
   if (failures.length === 0) return null;
 
-  return `COVERAGE_AUDIT_FAILED: ${failures.join(". ")}. Revise all options to cover these gaps. Ensure every exercise includes movement_patterns and target_muscles arrays.`;
+  return `COVERAGE_AUDIT_FAILED: ${failures.join(". ")}. Revise all options to cover these gaps. Ensure every exercise includes movement_patterns and target_muscles arrays. IMPORTANT: preserve each option's workout type — do NOT add exercises from other categories (e.g. do not add legs to a push workout).`;
 }

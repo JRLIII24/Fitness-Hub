@@ -336,7 +336,6 @@ export async function executeCoachAction(
             description: d.description,
             primary_muscle_group: d.primary_muscle_group,
             estimated_duration_min: d.estimated_duration_min,
-            difficulty_level: d.difficulty_level,
             exercises: normalizedExercises,
           }),
         });

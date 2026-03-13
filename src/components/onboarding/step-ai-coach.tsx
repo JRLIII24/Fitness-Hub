@@ -31,6 +31,8 @@ interface StepAiCoachProps {
     gender: string;
     activity_level: string;
     unit_preference: "metric" | "imperial";
+    equipment: string[];
+    experience_level: string;
   };
   onPlanGenerated: (plan: OnboardingPlanData) => void;
 }
@@ -207,7 +209,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
     if (hasSentInitial.current) return;
     hasSentInitial.current = true;
 
-    const initialMessage = `Hey Apex! I'm setting up my fitness profile — here are my stats. Can you help me dial in my nutrition?`;
+    const initialMessage = `Hey Apex! I'm setting up my fitness profile — here are my stats. Help me build a plan that works for me.`;
 
     const userMsg: ChatMessage = {
       role: "user",
@@ -283,7 +285,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
           {/* Messages */}
           <div
             ref={feedRef}
-            className="h-[320px] overflow-y-auto p-4 space-y-3 scrollbar-thin"
+            className="h-[380px] overflow-y-auto p-4 space-y-3 scrollbar-thin"
           >
             <AnimatePresence>
               {messages.map((msg, i) => (
@@ -354,7 +356,7 @@ export function StepAiCoach({ userStats, onPlanGenerated }: StepAiCoachProps) {
           transition={{ delay: 0.6 }}
           className="text-center text-[11px] text-muted-foreground/50"
         >
-          Apex will build your personalized nutrition targets
+          Apex will get to know you and build your plan
         </motion.p>
       </div>
     </motion.div>

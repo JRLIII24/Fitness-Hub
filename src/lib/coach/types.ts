@@ -189,7 +189,6 @@ export interface CreateTemplateActionData {
   description?: string;
   primary_muscle_group: string;
   estimated_duration_min?: number;
-  difficulty_level?: string;
   exercises: CreateTemplateExerciseData[];
   /** When true, immediately start a workout from this template after saving it. */
   start_immediately?: boolean;

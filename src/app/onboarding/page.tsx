@@ -127,6 +127,8 @@ export default function OnboardingPage() {
     gender: data.gender ?? "prefer_not_to_say",
     activity_level: data.activityLevel ?? "moderately_active",
     unit_preference: data.unitPreference,
+    equipment: data.equipmentAvailable ?? [],
+    experience_level: data.experienceLevel ?? "beginner",
   };
 
   const handlePlanGenerated = (plan: NutritionPlan) => {

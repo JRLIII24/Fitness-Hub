@@ -2,11 +2,11 @@
  * AI Onboarding Coach API
  * POST /api/ai/onboarding-coach
  *
- * Guides new users through goal-setting and generates a personalized
- * nutrition plan (calories + macros) based on their body stats.
+ * Guides new users through goal-setting, discovers injuries/preferences,
+ * saves coach memories, and generates a personalized nutrition plan.
  *
- * Model: Haiku (fast, cheap — simple goal-setting conversation)
- * Rate limit: 10/day
+ * Model: Haiku (fast, cheap)
+ * Rate limit: 20/day
  */
 
 import { NextResponse } from "next/server";
@@ -19,8 +19,9 @@ import { generateObject } from "ai";
 import { getAnthropicProvider, HAIKU } from "@/lib/ai-sdk";
 import { ONBOARDING_SYSTEM_PROMPT } from "@/lib/ai-prompts/onboarding";
 import { kgToLbs } from "@/lib/units";
+import { saveCoachMemory } from "@/lib/coach/memory";
 
-const DAILY_LIMIT = 10;
+const DAILY_LIMIT = 20;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 const PlanDataSchema = z.object({
@@ -38,13 +39,17 @@ const PlanDataSchema = z.object({
   rationale: z.string(),
 });
 
+const MemoryItemSchema = z.object({
+  category: z.enum(["preference", "injury", "goal", "note"]),
+  content: z.string(),
+});
+
 const OnboardingCoachResponseSchema = z.object({
   reply: z.string(),
   action: z.enum(["ask_question", "generate_plan"]),
   plan_data: PlanDataSchema.optional().nullable(),
+  memories: z.array(MemoryItemSchema).optional().nullable(),
 });
-
-type OnboardingCoachResponse = z.infer<typeof OnboardingCoachResponseSchema>;
 
 interface OnboardingCoachRequest {
   message: string;
@@ -57,6 +62,8 @@ interface OnboardingCoachRequest {
     gender: string;
     activity_level: string;
     unit_preference: 'metric' | 'imperial';
+    equipment: string[];
+    experience_level: string;
   };
 }
 
@@ -104,7 +111,10 @@ export async function POST(request: Request) {
           const heightDisplay = isImperial
             ? `${Math.floor(s.height_cm / 30.48)}ft ${Math.round((s.height_cm / 2.54) % 12)}in`
             : `${s.height_cm} cm`;
-          return `\n\n---\nUser stats (display unit: ${s.unit_preference}): Height ${heightDisplay}, Current weight ${weightDisplay}, Goal weight ${goalDisplay}, Age ${s.age}, Gender: ${s.gender}, Activity: ${s.activity_level}.\nNOTE: The user's preferred unit is ${isImperial ? 'lbs/inches' : 'kg/cm'}. When the user states a target weight or change, interpret it in that unit unless they specify otherwise. All plan_data macros must be in grams.`;
+          const equipmentList = s.equipment?.length
+            ? s.equipment.join(", ")
+            : "not specified";
+          return `\n\n---\nUser stats (display unit: ${s.unit_preference}): Height ${heightDisplay}, Current weight ${weightDisplay}, Goal weight ${goalDisplay}, Age ${s.age}, Gender: ${s.gender}, Activity: ${s.activity_level}, Experience: ${s.experience_level ?? 'beginner'}, Equipment: ${equipmentList}.\nNOTE: The user's preferred unit is ${isImperial ? 'lbs/inches' : 'kg/cm'}. When the user states a target weight or change, interpret it in that unit unless they specify otherwise. All plan_data macros must be in grams.`;
         })()
       : "";
 
@@ -124,8 +134,17 @@ export async function POST(request: Request) {
       schema: OnboardingCoachResponseSchema,
       system: ONBOARDING_SYSTEM_PROMPT,
       messages,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 1536,
     });
+
+    // Save any extracted memories server-side
+    if (object.memories?.length) {
+      await Promise.all(
+        object.memories.map((mem) =>
+          saveCoachMemory(supabase, user.id, mem.category, mem.content, "coach")
+        )
+      );
+    }
 
     return NextResponse.json(object);
   } catch (error) {

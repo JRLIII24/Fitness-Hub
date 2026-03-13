@@ -28,7 +28,6 @@ interface CreateTemplateBody {
   description?: string;
   primary_muscle_group?: string;
   estimated_duration_min?: number;
-  difficulty_level?: string;
   exercises: ExerciseInput[];
 }
 
@@ -86,7 +85,6 @@ export async function POST(request: Request) {
         description: body.description || null,
         primary_muscle_group: body.primary_muscle_group || null,
         estimated_duration_min: body.estimated_duration_min || null,
-        difficulty_level: body.difficulty_level || null,
         is_public: false,
       })
       .select("id")

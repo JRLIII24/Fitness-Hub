@@ -1332,7 +1332,7 @@ export default function WorkoutPage() {
     setSaveTemplateDialogOpen(true);
   }
 
-  async function handleSaveTemplate(templateName: string, isPublic: boolean, difficulty: string = "grind", categories: string[] = []) {
+  async function handleSaveTemplate(templateName: string, isPublic: boolean, categories: string[] = []) {
     if (!activeWorkout || !userId) {
       toast.error("Start a workout first.");
       return;
@@ -1354,7 +1354,6 @@ export default function WorkoutPage() {
         name: templateName.trim(),
         description: `Saved from ${activeWorkout.name}`,
         is_public: isPublic,
-        difficulty_level: difficulty,
         primary_muscle_group: categories.length > 0 ? categories.join(",") : null,
       })
       .select("id")

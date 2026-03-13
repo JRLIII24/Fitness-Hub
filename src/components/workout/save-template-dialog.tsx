@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { DIFFICULTY_LEVELS, type DifficultyLevel } from "@/lib/template-utils";
 import { MUSCLE_FILTERS, getMuscleColor } from "@/lib/muscle-colors";
 
 const CATEGORY_OPTIONS = MUSCLE_FILTERS.filter((f) => f !== "All");
@@ -19,13 +18,12 @@ interface Props {
   defaultName?: string;
   defaultCategories?: string[];
   onClose: () => void;
-  onSave: (name: string, isPublic: boolean, difficulty: DifficultyLevel, categories: string[]) => Promise<void>;
+  onSave: (name: string, isPublic: boolean, categories: string[]) => Promise<void>;
 }
 
 export function SaveTemplateDialog({ open, defaultName = "", defaultCategories = [], onClose, onSave }: Props) {
   const [loading, setLoading] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
-  const [difficulty, setDifficulty] = useState<DifficultyLevel>("grind");
   const [categories, setCategories] = useState<string[]>(defaultCategories);
   const {
     register,
@@ -41,10 +39,9 @@ export function SaveTemplateDialog({ open, defaultName = "", defaultCategories =
   const onSubmit = async (data: SaveTemplateFormData) => {
     setLoading(true);
     try {
-      await onSave(data.name.trim(), isPublic, difficulty, categories);
+      await onSave(data.name.trim(), isPublic, categories);
       reset();
       setIsPublic(true);
-      setDifficulty("grind");
       setCategories([]);
       onClose();
     } catch (err) {
@@ -61,7 +58,6 @@ export function SaveTemplateDialog({ open, defaultName = "", defaultCategories =
     if (!open) {
       reset();
       setIsPublic(true);
-      setDifficulty("grind");
       setCategories([]);
       onClose();
     }
@@ -122,28 +118,6 @@ export function SaveTemplateDialog({ open, defaultName = "", defaultCategories =
                   </button>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Difficulty picker */}
-          <div className="space-y-2">
-            <Label>Difficulty Level</Label>
-            <div className="grid gap-2">
-              {DIFFICULTY_LEVELS.map((level) => (
-                <button
-                  key={level.value}
-                  type="button"
-                  onClick={() => setDifficulty(level.value)}
-                  className={`rounded-lg border-2 p-2.5 text-left transition-all ${
-                    difficulty === level.value
-                      ? "border-primary bg-primary/10"
-                      : "border-border/40 bg-card/20 hover:border-border/60"
-                  }`}
-                >
-                  <p className="font-semibold text-sm">{level.label}</p>
-                  <p className="text-xs text-muted-foreground">{level.description}</p>
-                </button>
-              ))}
             </div>
           </div>
 

@@ -2495,7 +2495,6 @@ export type Database = {
           color: string | null
           created_at: string
           description: string | null
-          difficulty_level: string | null
           estimated_duration_min: number | null
           id: string
           is_public: boolean
@@ -2515,7 +2514,6 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
-          difficulty_level?: string | null
           estimated_duration_min?: number | null
           id?: string
           is_public?: boolean
@@ -2535,7 +2533,6 @@ export type Database = {
           color?: string | null
           created_at?: string
           description?: string | null
-          difficulty_level?: string | null
           estimated_duration_min?: number | null
           id?: string
           is_public?: boolean

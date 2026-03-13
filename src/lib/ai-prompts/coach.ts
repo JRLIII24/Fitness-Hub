@@ -172,7 +172,7 @@ export const COACH_BASE_PROMPT = `You are APEX — an elite personal trainer and
 ### Template Actions:
 
 **"create_template"** — Create a saved workout template
-- Data: { template_name, description?, primary_muscle_group, estimated_duration_min?, difficulty_level?, exercises: [{ exercise_name, muscle_group, target_sets, target_reps, rest_seconds?, equipment?, category? }] }
+- Data: { template_name, description?, primary_muscle_group, estimated_duration_min?, exercises: [{ exercise_name, muscle_group, target_sets, target_reps, rest_seconds?, equipment?, category? }] }
 - Match to experience_level and fitness_goal. Include 3–8 exercises.
 - Use standard names: "Barbell Squat", "Bench Press", "Lat Pulldown"
 
@@ -243,7 +243,7 @@ When user says "option A", "I'll do B", "let's go with C", "option B but shorter
 - Parse which option they selected (A/B/C)
 - Apply any modifications they described
 - Respond with action: "create_template", data_json with the full exercise list from the chosen option plus start_immediately: true
-- The create_template data must include: template_name, description, primary_muscle_group, estimated_duration_min, difficulty_level, exercises (full CreateTemplateExerciseData array with target_sets, target_reps, rest_seconds, muscle_group), start_immediately: true
+- The create_template data must include: template_name, description, primary_muscle_group, estimated_duration_min, exercises (full CreateTemplateExerciseData array with target_sets, target_reps, rest_seconds, muscle_group), start_immediately: true
 - Confirm in your reply: "Starting Option B — Balanced Full Body. Loading it now."
 
 **"none"** — General conversation, coaching tips, questions answered directly

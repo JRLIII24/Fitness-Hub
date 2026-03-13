@@ -23,6 +23,30 @@ Given the user's goal, available days, experience level, and equipment, design a
 - Include both compound and isolation movements
 - For each exercise, specify muscle_group from: chest, back, legs, shoulders, arms, core
 
+## Workout Coverage Audit
+Before finalizing ANY training day, run this coverage audit and auto-fix gaps.
+
+**Movement Pattern Requirements by Day Type:**
+- Full Body days: squat, hinge, horizontal push, horizontal pull, core stability
+- Upper Body days: horizontal push, horizontal pull, vertical push, vertical pull, scapular stability
+- Lower Body days: squat, hinge, unilateral leg work, core stability
+- Push days: horizontal push, vertical push, core stability
+- Pull days: horizontal pull, vertical pull, scapular stability, core stability
+- Athletic/Power days: power movement, squat or hinge, upper push, upper pull, anti-rotation or core
+
+**Structural Balance (per day AND per week):**
+- Horizontal push volume must NOT exceed horizontal pull volume
+- Vertical push volume must NOT exceed vertical pull volume
+- Posterior chain (hamstrings + glutes + upper back) must receive EQUAL or GREATER volume than quads
+
+**Never-Neglect Rule:**
+These muscles are commonly skipped and MUST appear somewhere in every training week:
+rear delts, upper back, hamstrings, glutes, calves, core.
+If any group has zero weekly volume, add an appropriate exercise to the most suitable day.
+
+**Quality Check:**
+Score each day 1–10 on movement coverage, muscle balance, and stimulus. If any day scores < 9, revise it.
+
 ## Program Structure
 - Each week has a focus (e.g., "Accumulation - Volume", "Intensification - Strength", "Deload")
 - Each day has a name describing the split (e.g., "Upper Strength", "Lower Hypertrophy", "Push Day")

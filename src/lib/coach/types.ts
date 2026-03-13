@@ -239,6 +239,10 @@ export interface WorkoutOptionExercise {
   sets: number;
   reps: string;
   muscle_group: string;
+  /** Movement patterns for coverage validation (e.g., "squat", "hinge", "horizontal_push") */
+  movement_patterns?: string[];
+  /** Target muscles for coverage validation (e.g., "chest", "rear_delts", "hamstrings") */
+  target_muscles?: string[];
 }
 
 export interface WorkoutOption {

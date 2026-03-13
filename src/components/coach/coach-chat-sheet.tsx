@@ -35,10 +35,8 @@ import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
 import { CoachFeedItem } from "./coach-feed-item";
 import { isMutationAction } from "@/lib/coach/types";
-import type { PresentWorkoutOptionsActionData } from "@/lib/coach/types";
 import { executeCoachAction, confirmAction } from "@/lib/coach/action-executor";
 import { detectSimpleIntent } from "@/lib/coach/client-intent";
-import { buildCoverageRevisionMessage } from "@/lib/workout-coverage";
 import type {
   CoachMessage,
   CoachContext,
@@ -140,8 +138,6 @@ export function CoachChatSheet({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initialMessageSentRef = useRef(false);
-  const coverageRetryCountRef = useRef(0);
-  const MAX_COVERAGE_RETRIES = 2;
 
   const supabase = useSupabase();
   const { isListening, transcript, startListening, stopListening } =
@@ -415,46 +411,6 @@ export function CoachChatSheet({
               );
             }
           }
-        }
-
-        // ── Coverage Audit for workout options ──
-        // Validate AI-generated workout options and auto-retry if coverage fails
-        if (
-          streamAction === "present_workout_options" &&
-          streamData &&
-          coverageRetryCountRef.current < MAX_COVERAGE_RETRIES
-        ) {
-          const optionsData = streamData as unknown as PresentWorkoutOptionsActionData;
-          if (optionsData.options) {
-            const revisionMsg = buildCoverageRevisionMessage(optionsData.options);
-            if (revisionMsg) {
-              coverageRetryCountRef.current += 1;
-              // Finalize current message first, then auto-send revision
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsgId
-                    ? {
-                        ...m,
-                        content: fullReply,
-                        action: streamAction,
-                        data: streamData,
-                        isStreaming: false,
-                      }
-                    : m,
-                ),
-              );
-              setIsSending(false);
-              setHudState("idle");
-              // Auto-send revision request (will trigger a new sendMessage cycle)
-              setTimeout(() => sendMessage(revisionMsg), 300);
-              return;
-            }
-          }
-          // Reset retry count on successful validation
-          coverageRetryCountRef.current = 0;
-        } else if (streamAction !== "present_workout_options") {
-          // Reset retry count for non-workout-option actions
-          coverageRetryCountRef.current = 0;
         }
 
         // Finalize the assistant message (mark streaming done)

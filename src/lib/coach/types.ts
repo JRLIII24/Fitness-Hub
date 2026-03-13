@@ -320,6 +320,14 @@ export interface CoachContext {
   acwr_status?: "danger" | "high" | "elevated" | "optimal" | "underloaded" | null;
   /** Current fatigue level label from the fatigue engine */
   fatigue_label?: string | null;
+  /** Per-muscle-group recovery snapshot (last 14 days) */
+  muscle_recovery?: Array<{
+    muscle_group: string;
+    hours_since_trained: number | null;
+    total_sets: number;
+    recovery_status: "recovered" | "recovering" | "fatigued" | "untrained";
+    recovery_pct: number;
+  }> | null;
 }
 
 export interface CoachRequest {

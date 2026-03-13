@@ -34,15 +34,26 @@ Before finalizing ANY training day, run this coverage audit and auto-fix gaps.
 - Pull days: horizontal pull, vertical pull, scapular stability, core stability
 - Athletic/Power days: power movement, squat or hinge, upper push, upper pull, anti-rotation or core
 
-**Structural Balance (per day AND per week):**
-- Horizontal push volume must NOT exceed horizontal pull volume
-- Vertical push volume must NOT exceed vertical pull volume
-- Posterior chain (hamstrings + glutes + upper back) must receive EQUAL or GREATER volume than quads
+**Structural Balance:**
+- Per day: only check push/pull balance on days that include both push AND pull (Full Body, Upper, Athletic). Do NOT penalise a Push day for lacking pulls or a Pull day for lacking pushes.
+- Per day: only check quad/posterior chain balance on days that include legs (Full Body, Lower, Athletic).
+- Per week: horizontal push volume must NOT exceed horizontal pull volume. Vertical push must NOT exceed vertical pull. Posterior chain must receive EQUAL or GREATER volume than quads.
 
-**Never-Neglect Rule:**
-These muscles are commonly skipped and MUST appear somewhere in every training week:
+**Never-Neglect Rule (per day — scoped by day type):**
+Only check for neglected muscles relevant to each day's type. Do NOT add exercises from other categories to fill gaps:
+- Full Body / Athletic days: rear delts, upper back, hamstrings, glutes, calves, core
+- Upper Body days: rear delts, upper back, core
+- Lower Body days: hamstrings, glutes, calves, core
+- Push days: core (optional accessory only — no pulling or leg work)
+- Pull days: rear delts, upper back
+
+**Never-Neglect Rule (per week — all types):**
+Across the entire training week, these muscles MUST appear somewhere:
 rear delts, upper back, hamstrings, glutes, calves, core.
-If any group has zero weekly volume, add an appropriate exercise to the most suitable day.
+If any group has zero weekly volume, add an appropriate exercise to the most suitable day that already targets related muscles.
+
+**Workout Intent Preservation:**
+Each day's type must be preserved. A Push day must remain push-focused (chest, shoulders, triceps). Do NOT add lower-body compounds, hinge movements, or pulling work to a push day. Muscle gaps that don't belong to a day's type are the responsibility of the weekly schedule, not that individual session.
 
 **Quality Check:**
 Score each day 1–10 on movement coverage, muscle balance, and stimulus. If any day scores < 9, revise it.

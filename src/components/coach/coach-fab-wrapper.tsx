@@ -11,6 +11,7 @@ import type { CoachContext } from "@/lib/coach/types";
 
 type MacroSummary = CoachContext["daily_macros"];
 type FormReport = CoachContext["latest_form_report"];
+type MuscleRecoveryEntry = NonNullable<CoachContext["muscle_recovery"]>[number];
 
 type CoachProfileContext = {
   fitness_goal: string | null;
@@ -46,6 +47,7 @@ export function CoachFabWrapper() {
   const [profileCtx, setProfileCtx] = useState<CoachProfileContext | null>(null);
   const [readinessScore, setReadinessScore] = useState<number | null>(null);
   const [readinessLevel, setReadinessLevel] = useState<string | null>(null);
+  const [muscleRecovery, setMuscleRecovery] = useState<MuscleRecoveryEntry[] | null>(null);
   const [orbState, setOrbState] = useState<OrbState>("idle");
   const [showTooltip, setShowTooltip] = useState(false);
 
@@ -78,6 +80,33 @@ export function CoachFabWrapper() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) setProfileCtx(data as CoachProfileContext);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Fetch per-muscle-group recovery snapshot
+  useEffect(() => {
+    if (!AI_COACH_ENABLED) return;
+    fetch("/api/fatigue/muscle-groups")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.recoveries) {
+          setMuscleRecovery(
+            (data.recoveries as Array<{
+              muscleGroup: string;
+              hoursSinceTrained: number | null;
+              totalSets: number;
+              recoveryStatus: "recovered" | "recovering" | "fatigued" | "untrained";
+              recoveryPct: number;
+            }>).map((r) => ({
+              muscle_group: r.muscleGroup,
+              hours_since_trained: r.hoursSinceTrained,
+              total_sets: r.totalSets,
+              recovery_status: r.recoveryStatus,
+              recovery_pct: r.recoveryPct,
+            })),
+          );
+        }
       })
       .catch(() => undefined);
   }, []);
@@ -135,6 +164,7 @@ export function CoachFabWrapper() {
     acwr: profileCtx?.acwr ?? null,
     acwr_status: profileCtx?.acwr_status ?? null,
     fatigue_label: profileCtx?.fatigue_label ?? null,
+    muscle_recovery: muscleRecovery,
   };
 
   const orbColor = orbColors[orbState];

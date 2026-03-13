@@ -49,6 +49,8 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
   // Coaching cue — computed once per timer start (stable for the duration)
   const coachingCueRef = useRef<string>("");
   const cueTimerIdRef = useRef<string | null>(null);
+  // Persist timeout across renders so cleanup doesn't cancel it prematurely.
+  const doneTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
@@ -79,17 +81,37 @@ export function RestTimerPill({ className }: RestTimerPillProps) {
     const prevId = prevTimerIdRef.current;
     const currentId = timer?.id ?? null;
 
+    // New timer started while splash was visible -> cancel splash immediately.
+    if (currentId !== null && doneTimeoutRef.current) {
+      clearTimeout(doneTimeoutRef.current);
+      doneTimeoutRef.current = null;
+      setIsDone(false);
+    }
+
     if (prevId !== null && currentId === null) {
-      if (!manuallyDismissedRef.current && !isDone) {
+      if (!manuallyDismissedRef.current) {
         setIsDone(true);
-        const t = setTimeout(() => setIsDone(false), 1800);
-        return () => clearTimeout(t);
+        if (doneTimeoutRef.current) clearTimeout(doneTimeoutRef.current);
+        doneTimeoutRef.current = setTimeout(() => {
+          setIsDone(false);
+          doneTimeoutRef.current = null;
+        }, 1800);
       }
       manuallyDismissedRef.current = false;
     }
 
     prevTimerIdRef.current = currentId;
-  }, [timer, isDone]);
+  }, [timer]);
+
+  // Prevent dangling timeout on unmount.
+  useEffect(() => {
+    return () => {
+      if (doneTimeoutRef.current) {
+        clearTimeout(doneTimeoutRef.current);
+        doneTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Request notification permission on first timer start
   useEffect(() => {

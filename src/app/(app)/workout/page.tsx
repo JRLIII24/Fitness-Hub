@@ -48,6 +48,10 @@ import { useExerciseTrendlines } from "@/hooks/use-exercise-trendlines";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { weightToDisplay, kgToLbs } from "@/lib/units";
 import { POPULAR_WORKOUTS, type WorkoutPresetId } from "@/lib/workout-presets";
+import { WorkoutPlanCard } from "@/components/workout/workout-plan-card";
+import { PlanSwapSheet } from "@/components/workout/plan-swap-sheet";
+import { estimateWorkoutDuration } from "@/lib/workout-duration";
+import type { PlanExercise, WorkoutPlan } from "@/types/workout";
 import {
   isMissingTableError,
   slugify,
@@ -191,6 +195,12 @@ export default function WorkoutPage() {
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
   const [isReorderMode, setIsReorderMode] = useState(false);
 
+  // Plan preview state
+  const [setupPhase, setSetupPhase] = useState<"selection" | "plan-preview">("selection");
+  const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
+  const [planSwapIndex, setPlanSwapIndex] = useState<number | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+
   // DEV: Uncomment to verify WorkoutPage render frequency.
   // Should NOT increment every second -- only on user interactions.
   // if (process.env.NODE_ENV === 'development') console.count('[WorkoutPage] render');
@@ -239,7 +249,7 @@ export default function WorkoutPage() {
   const startTimer = useTimerStore((state) => state.startTimer);
   const getActiveTimers = useTimerStore((state) => state.getActiveTimers);
   const stopTimer = useTimerStore((state) => state.stopTimer);
-  const { sendTemplate } = useSharedItems(userId);
+  const { sendTemplateToMany } = useSharedItems(userId);
   const { preference, unitLabel } = useUnitPreferenceStore();
 
   const toDisplayWeight = useCallback(
@@ -1314,6 +1324,223 @@ export default function WorkoutPage() {
     }
   }
 
+  async function handlePreviewPlan() {
+    const name = workoutName.trim() || "Workout";
+    const activeTemplateId = selectedTemplateId === "none" ? undefined : selectedTemplateId;
+
+    // Validate category for templates tab
+    if (setupTab === "templates") {
+      if (activeTemplateId) {
+        const tpl = templates.find((t) => t.id === activeTemplateId);
+        const categoryToUse = tpl?.primary_muscle_group ?? (pendingCategories.length > 0 ? pendingCategories.join(",") : null);
+        if (!categoryToUse) {
+          toast.error("Please select a workout type before starting.");
+          return;
+        }
+        if (!tpl?.primary_muscle_group && pendingCategories.length > 0) {
+          const joined = pendingCategories.join(",");
+          await supabase
+            .from("workout_templates")
+            .update({ primary_muscle_group: joined })
+            .eq("id", activeTemplateId);
+          setTemplates((prev) =>
+            prev.map((t) => t.id === activeTemplateId ? { ...t, primary_muscle_group: joined } : t)
+          );
+        }
+      } else {
+        // "Start Fresh" — skip plan preview, go directly to handleStartWorkout
+        if (pendingCategories.length === 0) {
+          toast.error("Please select a workout type before starting.");
+          return;
+        }
+        handleStartWorkout();
+        return;
+      }
+    }
+
+    // Custom preset — skip plan preview
+    if (setupTab === "quick" && presetId === "custom") {
+      handleStartWorkout();
+      return;
+    }
+
+    setPlanLoading(true);
+    try {
+      const planExercises: PlanExercise[] = [];
+
+      if (activeTemplateId) {
+        // Template flow
+        const { data: templateExercises, error } = await supabase
+          .from("template_exercises")
+          .select(
+            "sort_order,target_sets,target_reps,target_weight_kg,rest_seconds,exercise_id,exercises(id,name,slug,muscle_group,equipment,category,instructions,form_tips,image_url)"
+          )
+          .eq("template_id", activeTemplateId)
+          .order("sort_order", { ascending: true });
+
+        if (error) {
+          if (isMissingTableError(error)) {
+            setDbFeaturesAvailable(false);
+            handleStartWorkout();
+            return;
+          }
+          throw error;
+        }
+
+        for (const row of templateExercises ?? []) {
+          const exercise = row.exercises as unknown as Exercise | null;
+          if (!exercise) continue;
+
+          const parsedReps = row.target_reps ? Number.parseInt(row.target_reps, 10) : null;
+          planExercises.push({
+            exercise,
+            targetSets: Math.max(1, row.target_sets ?? 1),
+            targetReps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+            targetWeightKg: row.target_weight_kg ?? null,
+            restSeconds: row.rest_seconds ?? 90,
+            muscleGroup: exercise.muscle_group,
+          });
+        }
+      } else if (setupTab === "quick" && presetId !== "custom") {
+        // Preset flow
+        const preset = POPULAR_WORKOUTS.find((item) => item.id === presetId);
+        if (!preset) {
+          handleStartWorkout();
+          return;
+        }
+
+        const liftNames = preset.lifts.map((l) => l.name);
+        const { data: presetExercises } = await supabase
+          .from("exercises")
+          .select(EXERCISE_SELECT_COLS)
+          .in("name", liftNames);
+
+        const exerciseByName = new Map<string, Exercise>();
+        for (const row of presetExercises ?? []) {
+          const ex = row as unknown as Exercise;
+          if (!exerciseByName.has(ex.name)) exerciseByName.set(ex.name, ex);
+        }
+
+        const libraryByName = new Map<string, Exercise>();
+        for (const ex of EXERCISE_LIBRARY) {
+          if (!libraryByName.has(ex.name)) libraryByName.set(ex.name, ex);
+        }
+
+        for (const lift of preset.lifts) {
+          const exercise = exerciseByName.get(lift.name) ?? libraryByName.get(lift.name);
+          if (!exercise) continue;
+
+          const parsedReps = lift.reps ? Number.parseInt(lift.reps, 10) : null;
+          planExercises.push({
+            exercise,
+            targetSets: Math.max(1, lift.sets ?? 1),
+            targetReps: Number.isFinite(parsedReps as number) ? parsedReps : null,
+            targetWeightKg: null,
+            restSeconds: 90,
+            muscleGroup: exercise.muscle_group,
+          });
+        }
+      }
+
+      if (planExercises.length === 0) {
+        // No exercises to preview — fall through to direct start
+        handleStartWorkout();
+        return;
+      }
+
+      const muscleGroups = [...new Set(planExercises.map((e) => e.muscleGroup))];
+
+      setWorkoutPlan({
+        name,
+        source: activeTemplateId ? "template" : "preset",
+        sourceId: activeTemplateId ?? presetId,
+        exercises: planExercises,
+        muscleGroups,
+        estimatedDurationMin: estimateWorkoutDuration(planExercises),
+      });
+      setSetupPhase("plan-preview");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load workout";
+      toast.error(message);
+    } finally {
+      setPlanLoading(false);
+    }
+  }
+
+  async function handleConfirmPlan(plan: WorkoutPlan) {
+    if (!userId) return;
+
+    const activeTemplateId = plan.source === "template" ? plan.sourceId : undefined;
+    startWorkout(plan.name, userId, activeTemplateId);
+
+    if (userId) {
+      void trackSessionIntentSet(supabase, userId, {
+        workout_name: plan.name,
+        template_id: activeTemplateId ?? null,
+        source: activeTemplateId ? "template" : (plan.sourceId ?? "preset"),
+      });
+    }
+
+    try {
+      // Resolve all exercises in batch
+      const resolved = await ensureExerciseRecordsBatch(plan.exercises.map((pe) => pe.exercise));
+
+      for (const pe of plan.exercises) {
+        const source = resolved.get(exerciseKey(pe.exercise)) ?? pe.exercise;
+        addExercise(source);
+
+        const exerciseIndex = useWorkoutStore.getState().activeWorkout?.exercises.length;
+        if (!exerciseIndex) continue;
+        const index = exerciseIndex - 1;
+
+        updateSet(index, 0, {
+          reps: pe.targetReps,
+          weight_kg: pe.targetWeightKg,
+          rest_seconds: pe.restSeconds,
+        });
+
+        for (let i = 1; i < pe.targetSets; i += 1) {
+          addSet(index);
+          updateSet(index, i, {
+            reps: pe.targetReps,
+            weight_kg: pe.targetWeightKg,
+            rest_seconds: pe.restSeconds,
+          });
+        }
+      }
+
+      await applyAutofillFromHistory();
+      toast.success(`Started ${plan.name}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to start workout";
+      toast.error(message);
+    }
+
+    // Clean up plan state
+    setWorkoutPlan(null);
+    setSetupPhase("selection");
+  }
+
+  function handlePlanSwap(exerciseIndex: number, newExercise: Exercise) {
+    setWorkoutPlan((prev) => {
+      if (!prev) return prev;
+      const exercises = [...prev.exercises];
+      exercises[exerciseIndex] = {
+        ...exercises[exerciseIndex],
+        exercise: newExercise,
+        muscleGroup: newExercise.muscle_group,
+      };
+      const muscleGroups = [...new Set(exercises.map((e) => e.muscleGroup))];
+      return {
+        ...prev,
+        exercises,
+        muscleGroups,
+        estimatedDurationMin: estimateWorkoutDuration(exercises),
+      };
+    });
+    setPlanSwapIndex(null);
+  }
+
   async function handleCreateCustomExercise(name: string, muscleGroup: string, equipment: string): Promise<void> {
     try {
       const customExercise = makeCustomExercise(name, muscleGroup as MuscleGroup, equipment);
@@ -1332,7 +1559,7 @@ export default function WorkoutPage() {
     setSaveTemplateDialogOpen(true);
   }
 
-  async function handleSaveTemplate(templateName: string, isPublic: boolean, categories: string[] = []) {
+  async function handleSaveTemplate(templateName: string, categories: string[] = []) {
     if (!activeWorkout || !userId) {
       toast.error("Start a workout first.");
       return;
@@ -1353,7 +1580,7 @@ export default function WorkoutPage() {
         user_id: userId,
         name: templateName.trim(),
         description: `Saved from ${activeWorkout.name}`,
-        is_public: isPublic,
+        is_public: false,
         primary_muscle_group: categories.length > 0 ? categories.join(",") : null,
       })
       .select("id")
@@ -1476,7 +1703,39 @@ export default function WorkoutPage() {
           </>
         ) : null}
 
-        {!isWorkoutActive ? (
+        {!isWorkoutActive && setupPhase === "plan-preview" && workoutPlan ? (
+          <div className="mx-auto w-full max-w-3xl">
+            <WorkoutPlanCard
+              plan={workoutPlan}
+              onConfirm={handleConfirmPlan}
+              onBack={() => {
+                setSetupPhase("selection");
+                setWorkoutPlan(null);
+              }}
+              onSwapExercise={(index) => setPlanSwapIndex(index)}
+              onNameChange={(name) =>
+                setWorkoutPlan((prev) => (prev ? { ...prev, name } : prev))
+              }
+            />
+
+            <PlanSwapSheet
+              open={planSwapIndex !== null}
+              exerciseIndex={planSwapIndex}
+              currentExercise={
+                planSwapIndex !== null
+                  ? (workoutPlan.exercises[planSwapIndex] ?? null)
+                  : null
+              }
+              existingExerciseNames={workoutPlan.exercises.map(
+                (pe) => pe.exercise.name
+              )}
+              onSwap={handlePlanSwap}
+              onClose={() => setPlanSwapIndex(null)}
+            />
+          </div>
+        ) : null}
+
+        {!isWorkoutActive && setupPhase === "selection" ? (
           <Card className="mx-auto w-full max-w-3xl overflow-hidden glass-surface-elevated shadow-xl transition-all duration-300">
             <div className="border-b border-[rgba(255,255,255,0.06)] glass-inner px-5 py-4 sm:px-6">
               <div className="flex items-center gap-3">
@@ -1640,8 +1899,9 @@ export default function WorkoutPage() {
 
               <Button
                 className="h-11 w-full text-base font-semibold"
-                onClick={handleStartWorkout}
+                onClick={handlePreviewPlan}
                 disabled={
+                  planLoading ||
                   ghostIsLoading ||
                   (setupTab === "templates" &&
                     pendingCategories.length === 0 &&
@@ -1649,7 +1909,7 @@ export default function WorkoutPage() {
                       !templates.find((t) => t.id === selectedTemplateId)?.primary_muscle_group))
                 }
               >
-                {ghostIsLoading ? (
+                {(ghostIsLoading || planLoading) ? (
                   <Loader2 className="mr-2 size-4 animate-spin" />
                 ) : null}
                 Start Workout
@@ -1876,9 +2136,13 @@ export default function WorkoutPage() {
             setSendDialogOpen(false);
             setSendingTemplate(null);
           }}
-          onSend={async (recipientId, template, message) => {
-            await sendTemplate(recipientId, template, message);
-            toast.success("Template sent to shared mailbox");
+          onSend={async (recipientIds, template, message) => {
+            await sendTemplateToMany(recipientIds, template!, message);
+            toast.success(
+              recipientIds.length === 1
+                ? "Template sent!"
+                : `Template sent to ${recipientIds.length} people!`
+            );
           }}
         />
 

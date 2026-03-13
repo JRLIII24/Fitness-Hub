@@ -56,7 +56,7 @@ export default function TemplatesPage() {
   const [creating, setCreating] = useState(false);
   const [lastPerformedMap, setLastPerformedMap] = useState<Record<string, string>>({});
 
-  const { sendTemplate } = useSharedItems(currentUserId);
+  const { sendTemplateToMany } = useSharedItems(currentUserId);
   const { favoriteIds, toggleFavorite } = useTemplateFavorites(currentUserId);
 
   // Group templates by training_block; null block → "Other" pinned at the bottom
@@ -317,60 +317,61 @@ export default function TemplatesPage() {
                   return (
                   <Card key={template.id}>
                     <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                            <CardTitle className="text-base">{template.name}</CardTitle>
-                            {gc && template.primary_muscle_group && (
-                              <span
-                                className="rounded-full px-2 py-0.5 text-[10px] font-bold capitalize"
-                                style={{
-                                  background: gc.bgAlpha,
-                                  color:      gc.labelColor,
-                                  border:     `1px solid ${gc.borderAlpha}`,
-                                }}
+                      <div className="space-y-3">
+                        {/* Template info + favorite */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                              <CardTitle className="text-base">{template.name}</CardTitle>
+                              {gc && template.primary_muscle_group && (
+                                <span
+                                  className="rounded-full px-2 py-0.5 text-[10px] font-bold capitalize"
+                                  style={{
+                                    background: gc.bgAlpha,
+                                    color:      gc.labelColor,
+                                    border:     `1px solid ${gc.borderAlpha}`,
+                                  }}
+                                >
+                                  {template.primary_muscle_group.replace(/_/g, " ")}
+                                </span>
+                              )}
+                              {/* Last-performed badge */}
+                              <Badge
+                                variant="outline"
+                                className={
+                                  daysSince != null && daysSince > 14
+                                    ? "border-amber-500 text-amber-500"
+                                    : ""
+                                }
                               >
-                                {template.primary_muscle_group.replace(/_/g, " ")}
-                              </span>
+                                {daysSince == null
+                                  ? "Never done"
+                                  : daysSince === 0
+                                  ? "Done today"
+                                  : `Last done: ${daysSince}d ago`}
+                                {daysSince != null && daysSince > 14 ? " ⚠️" : ""}
+                              </Badge>
+                            </div>
+                            {stripImportFingerprint(template.description) && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {stripImportFingerprint(template.description)}
+                              </p>
                             )}
-                            {/* Last-performed badge */}
-                            <Badge
-                              variant="outline"
-                              className={
-                                daysSince != null && daysSince > 14
-                                  ? "border-amber-500 text-amber-500"
-                                  : ""
-                              }
-                            >
-                              {daysSince == null
-                                ? "Never done"
-                                : daysSince === 0
-                                ? "Done today"
-                                : `Last done: ${daysSince}d ago`}
-                              {daysSince != null && daysSince > 14 ? " ⚠️" : ""}
-                            </Badge>
+                            {template.estimated_duration_min && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Est. {template.estimated_duration_min} min
+                              </p>
+                            )}
+                            {(template.save_count ?? 0) > 0 && (
+                              <Badge variant="secondary" className="mt-1.5 text-xs px-1.5 py-0">
+                                {template.save_count} {template.save_count === 1 ? "athlete" : "athletes"} running this
+                              </Badge>
+                            )}
                           </div>
-                          {stripImportFingerprint(template.description) && (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {stripImportFingerprint(template.description)}
-                            </p>
-                          )}
-                          {template.estimated_duration_min && (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Est. {template.estimated_duration_min} min
-                            </p>
-                          )}
-                          {(template.save_count ?? 0) > 0 && (
-                            <Badge variant="secondary" className="mt-1.5 text-xs px-1.5 py-0">
-                              {template.save_count} {template.save_count === 1 ? "athlete" : "athletes"} running this
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap justify-end gap-2 shrink-0">
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="min-h-[44px]"
+                            className="min-h-[44px] shrink-0"
                             onClick={() => toggleFavorite(template.id)}
                             title={favoriteIds.has(template.id) ? "Remove from favorites" : "Add to favorites"}
                             aria-label={favoriteIds.has(template.id) ? "Remove from favorites" : "Add to favorites"}
@@ -379,39 +380,41 @@ export default function TemplatesPage() {
                               className={`size-4 ${favoriteIds.has(template.id) ? "fill-rose-500 text-rose-500" : "text-muted-foreground"}`}
                             />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="min-h-[44px]"
-                            onClick={() => handleSendOpen(template)}
-                            title="Send to a friend"
-                          >
-                            <Send className="size-3.5" />
-                          </Button>
+                        </div>
+
+                        {/* Action buttons — always visible row below content */}
+                        <div className="flex items-center gap-2 border-t border-border/30 pt-2.5">
                           <Button
                             size="sm"
                             variant="default"
-                            className="min-h-[44px]"
+                            className="min-h-[40px] flex-1"
                             onClick={() => router.push(`/workout?from_launcher=1&template_id=${template.id}`)}
-                            title="Start workout with this template"
                           >
                             <Play className="size-3.5" />
-                            <span className="hidden sm:inline ml-1">Start</span>
+                            <span className="ml-1">Start</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="min-h-[40px] flex-1"
+                            onClick={() => handleSendOpen(template)}
+                          >
+                            <Send className="size-3.5" />
+                            <span className="ml-1">Share</span>
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
-                            className="min-h-[44px]"
+                            className="min-h-[40px]"
                             onClick={() => router.push(`/templates/${template.id}/edit`)}
                             title="Edit exercises"
                           >
                             <Pencil className="size-3.5" />
-                            <span className="hidden sm:inline ml-1">Edit Exercises</span>
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="min-h-[44px]"
+                            className="min-h-[40px]"
                             onClick={() => handleEditOpen(template)}
                             title="Edit name & details"
                           >
@@ -420,7 +423,7 @@ export default function TemplatesPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="min-h-[44px]"
+                            className="min-h-[40px]"
                             onClick={() => setDeleteConfirmId(template.id)}
                             disabled={deletingId === template.id}
                           >
@@ -457,9 +460,13 @@ export default function TemplatesPage() {
         currentUserId={currentUserId}
         template={sendingTemplate}
         onClose={() => { setSendDialogOpen(false); setSendingTemplate(null); }}
-        onSend={async (recipientId, template, message) => {
-          await sendTemplate(recipientId, template!, message);
-          toast.success("Template sent!");
+        onSend={async (recipientIds, template, message) => {
+          await sendTemplateToMany(recipientIds, template!, message);
+          toast.success(
+            recipientIds.length === 1
+              ? "Template sent!"
+              : `Template sent to ${recipientIds.length} people!`
+          );
         }}
       />
 

@@ -26,8 +26,18 @@ export const FOOD_SCAN_PROMPT = `You are a nutrition expert analyzing a food pho
 For each visible food item:
 1. Name the food specifically (e.g., "grilled chicken breast" not just "chicken")
 2. Estimate the portion size shown (e.g., "~6oz / 170g")
-3. Rate your confidence: "high" if clearly identifiable, "medium" if partially visible/uncertain portion, "low" if guessing
-4. Estimate calories, protein, carbs, and fat for that portion
+3. Provide estimated_weight_g — the numeric weight in grams of the portion shown. This must be a number, not a string. For example, if you estimate "~6oz / 170g", set estimated_weight_g to 170.
+4. Rate your confidence: "high" if clearly identifiable, "medium" if partially visible/uncertain portion, "low" if guessing
+5. Estimate calories, protein, carbs, and fat for that portion
+
+## Portion Estimation Guidelines
+- Standard dinner plate = 10-11 inches diameter. Use plate size to estimate food area.
+- A fist = 1 cup (240ml). A palm = 3oz (85g) of meat. A thumb = 1 tbsp.
+- Estimate thickness/depth, not just surface area — a thin spread of rice vs a mound.
+- For meats: estimate cooked weight (not raw). A 6oz raw chicken breast = 4.5oz cooked.
+- For liquids/sauces: estimate tablespoons visible. Each tbsp of oil = ~120 cal, 14g fat.
+- When uncertain, estimate CONSERVATIVELY (slightly higher calories). Users prefer over-estimates to under-estimates for tracking accuracy.
+- Round to nearest 5 for calories, nearest 1g for macros.
 
 ## Rules
 - Be specific about portions — use visual cues (plate size, hand comparison, utensils) to estimate

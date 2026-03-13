@@ -26,14 +26,6 @@ import { getUserTimezone } from "@/lib/timezone";
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB
 
-function getImageMediaType(
-  image: string,
-): "image/jpeg" | "image/png" | "image/webp" {
-  if (image.startsWith("data:image/png")) return "image/png";
-  if (image.startsWith("data:image/webp")) return "image/webp";
-  return "image/jpeg";
-}
-
 function extractBase64Data(image: string): string {
   const commaIdx = image.indexOf(",");
   return commaIdx >= 0 ? image.slice(commaIdx + 1) : image;
@@ -116,7 +108,6 @@ export async function POST(request: Request) {
       `Calories: ${remaining.calories} remaining\nProtein: ${remaining.protein_g}g remaining\nCarbs: ${remaining.carbs_g}g remaining\nFat: ${remaining.fat_g}g remaining`,
     );
 
-    const mediaType = getImageMediaType(image);
 
     const { object } = await generateObject({
       model: provider(SONNET),
@@ -128,7 +119,7 @@ export async function POST(request: Request) {
           content: [
             {
               type: "image",
-              image: `data:${mediaType};base64,${base64Data}`,
+              image: Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0)),
             },
             {
               type: "text",

@@ -18,20 +18,11 @@ import { logger } from "@/lib/logger";
 import { generateObject } from "ai";
 import { getAnthropicProvider, SONNET } from "@/lib/ai-sdk";
 import { FOOD_SCAN_PROMPT } from "@/lib/ai-prompts/vision";
-import {
-  FoodScanResultSchema,
-  type FoodScanResult,
-} from "@/lib/food-scanner/types";
+import { FoodScanResultSchema } from "@/lib/food-scanner/types";
+import type { EnrichedFoodEstimation } from "@/lib/food-scanner/types";
+import { searchFood, scaleToGrams } from "@/lib/usda";
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB
-
-function getImageMediaType(
-  image: string,
-): "image/jpeg" | "image/png" | "image/webp" {
-  if (image.startsWith("data:image/png")) return "image/png";
-  if (image.startsWith("data:image/webp")) return "image/webp";
-  return "image/jpeg";
-}
 
 function extractBase64Data(image: string): string {
   const commaIdx = image.indexOf(",");
@@ -46,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createClient();
-    const { user, response: authErr } = await requireAuth(supabase);
+    const { response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
     const body = await request.json();
@@ -79,8 +70,6 @@ export async function POST(request: Request) {
       descriptionContext,
     );
 
-    const mediaType = getImageMediaType(image);
-
     const { object } = await generateObject({
       model: provider(SONNET),
       schema: FoodScanResultSchema,
@@ -91,7 +80,7 @@ export async function POST(request: Request) {
           content: [
             {
               type: "image",
-              image: `data:${mediaType};base64,${base64Data}`,
+              image: Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0)),
             },
             {
               type: "text",
@@ -103,7 +92,40 @@ export async function POST(request: Request) {
       maxOutputTokens: 2048,
     });
 
-    return NextResponse.json(object);
+    // Enrich with USDA data (all lookups in parallel)
+    const enrichedItems: EnrichedFoodEstimation[] = await Promise.all(
+      object.items.map(async (item) => {
+        if (!process.env.USDA_API_KEY) {
+          return { ...item, usda_match: null, source: "ai-scan" as const };
+        }
+
+        const match = await searchFood(item.food_name);
+        if (!match || item.estimated_weight_g <= 0) {
+          return { ...item, usda_match: null, source: "ai-scan" as const };
+        }
+
+        const scaled = scaleToGrams(match, item.estimated_weight_g);
+
+        return {
+          ...item,
+          estimated_calories: scaled.calories,
+          estimated_protein_g: scaled.protein_g,
+          estimated_carbs_g: scaled.carbs_g,
+          estimated_fat_g: scaled.fat_g,
+          usda_match: {
+            fdc_id: match.fdc_id,
+            description: match.description,
+            data_source: match.data_source,
+          },
+          source: "usda" as const,
+        };
+      }),
+    );
+
+    return NextResponse.json({
+      items: enrichedItems,
+      overall_notes: object.overall_notes,
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to analyze food";

@@ -9,9 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, ChevronLeft, Trash2, Plus, Globe } from "lucide-react";
+import { Loader2, ChevronLeft, Trash2, Plus } from "lucide-react";
 import { AddExerciseToTemplateDialog } from "@/components/workout/add-exercise-to-template-dialog";
-import { Switch } from "@/components/ui/switch";
 import { getMuscleColor, MUSCLE_FILTERS } from "@/lib/muscle-colors";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { weightToDisplay } from "@/lib/units";
@@ -60,8 +59,6 @@ export default function EditTemplatePage() {
   const [template, setTemplate] = useState<Template | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
-  const [togglingPublic, setTogglingPublic] = useState(false);
   const [primaryMuscleGroups, setPrimaryMuscleGroups] = useState<string[]>([]);
   const [addExerciseOpen, setAddExerciseOpen] = useState(false);
   const { preference, unitLabel } = useUnitPreferenceStore();
@@ -97,7 +94,6 @@ export default function EditTemplatePage() {
         setTemplate(t);
         setName(t.name);
         setDescription(t.description || "");
-        setIsPublic(t.is_public ?? false);
         setPrimaryMuscleGroups(t.primary_muscle_group ? t.primary_muscle_group.split(",").map(s => s.trim()).filter(Boolean) : []);
       } finally {
         setLoading(false);
@@ -128,28 +124,6 @@ export default function EditTemplatePage() {
       toast.error("Failed to update template");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handlePublishToggle(newValue: boolean) {
-    // Must have a category set before publishing
-    if (newValue && primaryMuscleGroups.length === 0) {
-      toast.error("Please select a category before publishing to the marketplace.");
-      return;
-    }
-    setTogglingPublic(true);
-    try {
-      const { error } = await supabase
-        .from("workout_templates")
-        .update({ is_public: newValue })
-        .eq("id", templateId);
-      if (error) throw error;
-      setIsPublic(newValue);
-      toast.success(newValue ? "Template published to marketplace" : "Template removed from marketplace");
-    } catch {
-      toast.error("Failed to update visibility");
-    } finally {
-      setTogglingPublic(false);
     }
   }
 
@@ -325,7 +299,7 @@ export default function EditTemplatePage() {
             <Label>
               Workout Type
               <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
-                (select one or more — required to publish)
+                (select one or more)
               </span>
             </Label>
             <div className="flex flex-wrap gap-2">
@@ -355,31 +329,6 @@ export default function EditTemplatePage() {
                 );
               })}
             </div>
-            {primaryMuscleGroups.length === 0 && (
-              <p className="text-[11px] text-muted-foreground">
-                Select at least one category so users can find this template.
-              </p>
-            )}
-          </div>
-
-          {/* ── Publish to Marketplace ────────────────────────────────── */}
-          <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-            <div className="flex items-center gap-2">
-              <Globe className="size-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Publish to Marketplace</p>
-                <p className="text-xs text-muted-foreground">
-                  {primaryMuscleGroups.length > 0
-                    ? "Let the community discover and import your template"
-                    : "Select a category above to enable publishing"}
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={isPublic}
-              onCheckedChange={handlePublishToggle}
-              disabled={togglingPublic || (!isPublic && primaryMuscleGroups.length === 0)}
-            />
           </div>
         </CardContent>
       </Card>

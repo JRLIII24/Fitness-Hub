@@ -204,6 +204,43 @@ export function useSharedItems(userId: string | null) {
     [userId, supabase]
   );
 
+  const sendTemplateToMany = useCallback(
+    async (
+      recipientIds: string[],
+      template: { id: string; name: string; description: string | null; exercises: TemplateSnapshot["exercises"] },
+      message?: string
+    ) => {
+      if (!userId) throw new Error("Not authenticated");
+      if (recipientIds.length === 0) throw new Error("No recipients selected");
+
+      const snapshot: TemplateSnapshot = {
+        name: template.name,
+        description: template.description,
+        exercises: template.exercises,
+      };
+
+      const snapshotBytes = new TextEncoder().encode(JSON.stringify(snapshot)).length;
+      if (snapshotBytes > 50 * 1024) {
+        throw new Error(
+          `Template snapshot too large (${Math.round(snapshotBytes / 1024)} KB). Reduce the number of exercises or sets.`
+        );
+      }
+
+      const rows = recipientIds.map((recipientId) => ({
+        sender_id: userId,
+        recipient_id: recipientId,
+        item_type: "template",
+        template_id: template.id,
+        item_snapshot: snapshot as unknown as import("@/types/database").Json,
+        message: message || null,
+      }));
+
+      const { error } = await supabase.from("shared_items").insert(rows);
+      if (error) throw error;
+    },
+    [userId, supabase]
+  );
+
   const sendMealDay = useCallback(
     async (
       recipientId: string,
@@ -242,6 +279,7 @@ export function useSharedItems(userId: string | null) {
     clearRead,
     clearItem,
     sendTemplate,
+    sendTemplateToMany,
     sendMealDay,
     refetch: fetchItems,
   };

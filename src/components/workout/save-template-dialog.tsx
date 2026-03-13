@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { MUSCLE_FILTERS, getMuscleColor } from "@/lib/muscle-colors";
 
 const CATEGORY_OPTIONS = MUSCLE_FILTERS.filter((f) => f !== "All");
@@ -18,12 +17,11 @@ interface Props {
   defaultName?: string;
   defaultCategories?: string[];
   onClose: () => void;
-  onSave: (name: string, isPublic: boolean, categories: string[]) => Promise<void>;
+  onSave: (name: string, categories: string[]) => Promise<void>;
 }
 
 export function SaveTemplateDialog({ open, defaultName = "", defaultCategories = [], onClose, onSave }: Props) {
   const [loading, setLoading] = useState(false);
-  const [isPublic, setIsPublic] = useState(true);
   const [categories, setCategories] = useState<string[]>(defaultCategories);
   const {
     register,
@@ -39,9 +37,8 @@ export function SaveTemplateDialog({ open, defaultName = "", defaultCategories =
   const onSubmit = async (data: SaveTemplateFormData) => {
     setLoading(true);
     try {
-      await onSave(data.name.trim(), isPublic, categories);
+      await onSave(data.name.trim(), categories);
       reset();
-      setIsPublic(true);
       setCategories([]);
       onClose();
     } catch (err) {
@@ -57,7 +54,6 @@ export function SaveTemplateDialog({ open, defaultName = "", defaultCategories =
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       reset();
-      setIsPublic(true);
       setCategories([]);
       onClose();
     }
@@ -121,21 +117,9 @@ export function SaveTemplateDialog({ open, defaultName = "", defaultCategories =
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border border-border/50 bg-card/40 px-3 py-2.5">
-            <div>
-              <p className="text-sm font-medium">Share to Marketplace</p>
-              <p className="text-xs text-muted-foreground">Let others discover and save this workout</p>
-            </div>
-            <Switch
-              id="tpl-public"
-              checked={isPublic}
-              onCheckedChange={setIsPublic}
-            />
-          </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => {
               reset();
-              setIsPublic(true);
               setCategories([]);
               onClose();
             }}>

@@ -18,6 +18,7 @@ const FoodLogItemSchema = z.object({
   protein_g: z.number().min(0),
   carbs_g: z.number().min(0),
   fat_g: z.number().min(0),
+  source: z.enum(["ai-scan", "usda"]).default("ai-scan"),
 });
 
 const RequestSchema = z.object({
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
           protein_g: item.protein_g,
           carbs_g: item.carbs_g,
           fat_g: item.fat_g,
-          source: "ai-scan",
+          source: item.source,
           created_by: user.id,
         })
         .select("id")

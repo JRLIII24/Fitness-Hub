@@ -2,33 +2,43 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Check, X, AlertTriangle, ChevronDown } from "lucide-react";
+import { Check, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import type { FoodScanResult, FoodEstimation } from "@/lib/food-scanner/types";
+import type { EnrichedFoodScanResult, EnrichedFoodEstimation } from "@/lib/food-scanner/types";
 
 const PORTION_MULTIPLIERS = [0.5, 1, 1.5, 2] as const;
 
-interface ReviewItem extends FoodEstimation {
+interface ReviewItem extends EnrichedFoodEstimation {
   included: boolean;
   multiplier: number;
+  customGrams: number | null;
 }
 
 interface FoodScanReviewProps {
-  result: FoodScanResult;
+  result: EnrichedFoodScanResult;
   onConfirm: (items: Array<{
     food_name: string;
     calories: number;
     protein_g: number;
     carbs_g: number;
     fat_g: number;
+    source?: "ai-scan" | "usda";
   }>) => void;
   onCancel: () => void;
 }
 
+function getEffectiveMultiplier(item: ReviewItem): number {
+  if (item.customGrams !== null && item.estimated_weight_g > 0) {
+    return item.customGrams / item.estimated_weight_g;
+  }
+  return item.multiplier;
+}
+
 export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewProps) {
   const [items, setItems] = useState<ReviewItem[]>(() =>
-    result.items.map((item) => ({ ...item, included: true, multiplier: 1 }))
+    result.items.map((item) => ({ ...item, included: true, multiplier: 1, customGrams: null }))
   );
 
   const toggleItem = useCallback((idx: number) => {
@@ -36,24 +46,36 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
   }, []);
 
   const setMultiplier = useCallback((idx: number, multiplier: number) => {
-    setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, multiplier } : item)));
+    setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, multiplier, customGrams: null } : item)));
+  }, []);
+
+  const setCustomGrams = useCallback((idx: number, grams: number | null) => {
+    setItems((prev) =>
+      prev.map((item, i) =>
+        i === idx ? { ...item, customGrams: grams, multiplier: grams !== null ? 0 : 1 } : item
+      )
+    );
   }, []);
 
   const selectedItems = useMemo(() => items.filter((i) => i.included), [items]);
 
   const totalCalories = useMemo(
-    () => selectedItems.reduce((sum, i) => sum + Math.round(i.estimated_calories * i.multiplier), 0),
+    () => selectedItems.reduce((sum, i) => sum + Math.round(i.estimated_calories * getEffectiveMultiplier(i)), 0),
     [selectedItems]
   );
 
   const handleConfirm = useCallback(() => {
-    const mapped = selectedItems.map((item) => ({
-      food_name: item.food_name,
-      calories: Math.round(item.estimated_calories * item.multiplier),
-      protein_g: Math.round(item.estimated_protein_g * item.multiplier),
-      carbs_g: Math.round(item.estimated_carbs_g * item.multiplier),
-      fat_g: Math.round(item.estimated_fat_g * item.multiplier),
-    }));
+    const mapped = selectedItems.map((item) => {
+      const mult = getEffectiveMultiplier(item);
+      return {
+        food_name: item.food_name,
+        calories: Math.round(item.estimated_calories * mult),
+        protein_g: Math.round(item.estimated_protein_g * mult),
+        carbs_g: Math.round(item.estimated_carbs_g * mult),
+        fat_g: Math.round(item.estimated_fat_g * mult),
+        source: item.source,
+      };
+    });
     onConfirm(mapped);
   }, [selectedItems, onConfirm]);
 
@@ -88,10 +110,11 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
       {/* Item cards */}
       <div className="space-y-3">
         {items.map((item, idx) => {
-          const scaledCal = Math.round(item.estimated_calories * item.multiplier);
-          const scaledP = Math.round(item.estimated_protein_g * item.multiplier);
-          const scaledC = Math.round(item.estimated_carbs_g * item.multiplier);
-          const scaledF = Math.round(item.estimated_fat_g * item.multiplier);
+          const mult = getEffectiveMultiplier(item);
+          const scaledCal = Math.round(item.estimated_calories * mult);
+          const scaledP = Math.round(item.estimated_protein_g * mult);
+          const scaledC = Math.round(item.estimated_carbs_g * mult);
+          const scaledF = Math.round(item.estimated_fat_g * mult);
           const isHighCal = scaledCal > 3000;
 
           return (
@@ -104,7 +127,7 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
                 item.included ? "bg-card/40" : "bg-card/20 opacity-50"
               }`}
             >
-              {/* Top row: checkbox + name + confidence */}
+              {/* Top row: checkbox + name + badges */}
               <div className="flex items-start gap-3">
                 <button
                   onClick={() => toggleItem(idx)}
@@ -121,9 +144,16 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
                   <p className="text-[13px] font-bold text-foreground truncate">{item.food_name}</p>
                   <p className="text-[11px] text-muted-foreground">{item.assumed_portion}</p>
                 </div>
-                <Badge className={`shrink-0 text-[10px] font-bold ${confidenceColor(item.confidence)}`}>
-                  {item.confidence}
-                </Badge>
+                <div className="flex shrink-0 gap-1.5">
+                  {item.source === "usda" && (
+                    <Badge className="text-[10px] font-bold bg-emerald-400/15 text-emerald-400">
+                      USDA
+                    </Badge>
+                  )}
+                  <Badge className={`text-[10px] font-bold ${confidenceColor(item.confidence)}`}>
+                    {item.confidence}
+                  </Badge>
+                </div>
               </div>
 
               {/* Portion multiplier */}
@@ -137,7 +167,7 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
                       key={m}
                       onClick={() => setMultiplier(idx, m)}
                       className={`flex-1 rounded-lg py-1.5 text-[12px] font-bold transition-colors ${
-                        item.multiplier === m
+                        item.customGrams === null && item.multiplier === m
                           ? "bg-primary text-primary-foreground"
                           : "bg-card/60 border border-border/50 text-muted-foreground"
                       }`}
@@ -145,6 +175,24 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
                       {m}x
                     </button>
                   ))}
+                </div>
+                {/* Custom gram input */}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
+                    or
+                  </span>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder={`${item.estimated_weight_g}g`}
+                    value={item.customGrams ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomGrams(idx, val === "" ? null : Math.max(0, Number(val)));
+                    }}
+                    className="h-8 w-24 text-[12px] tabular-nums"
+                  />
+                  <span className="text-[11px] text-muted-foreground">grams</span>
                 </div>
               </div>
 

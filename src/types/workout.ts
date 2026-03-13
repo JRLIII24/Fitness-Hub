@@ -78,3 +78,23 @@ export interface TemplateExercise {
   rest_seconds: number;
   notes: string | null;
 }
+
+// ── Plan Preview types ──────────────────────────────────────────────
+
+export interface PlanExercise {
+  exercise: Exercise;
+  targetSets: number;
+  targetReps: number | null;
+  targetWeightKg: number | null;
+  restSeconds: number;
+  muscleGroup: string;
+}
+
+export interface WorkoutPlan {
+  name: string;
+  source: "template" | "preset" | "custom";
+  sourceId?: string;
+  exercises: PlanExercise[];
+  muscleGroups: string[];
+  estimatedDurationMin: number;
+}

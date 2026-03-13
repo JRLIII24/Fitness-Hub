@@ -7,12 +7,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import type { FoodScanResult } from "@/lib/food-scanner/types";
+import type { EnrichedFoodScanResult } from "@/lib/food-scanner/types";
 import { FoodScanReview } from "./food-scan-review";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function compressImage(dataUrl: string, maxDim = 1024, quality = 0.6): Promise<string> {
+function compressImage(dataUrl: string, maxDim = 1536, quality = 0.8): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -38,7 +38,7 @@ export function FoodScanner() {
   const [state, setState] = useState<ScanState>("idle");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [description, setDescription] = useState("");
-  const [result, setResult] = useState<FoodScanResult | null>(null);
+  const [result, setResult] = useState<EnrichedFoodScanResult | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -122,7 +122,7 @@ export function FoodScanner() {
         const payload = await res.json().catch(() => null);
         throw new Error(payload?.error ?? "Failed to analyze food");
       }
-      const data: FoodScanResult = await res.json();
+      const data: EnrichedFoodScanResult = await res.json();
       setResult(data);
       setState("review");
     } catch (err) {
@@ -146,6 +146,7 @@ export function FoodScanner() {
     protein_g: number;
     carbs_g: number;
     fat_g: number;
+    source?: "ai-scan" | "usda";
   }>) => {
     try {
       const res = await fetch("/api/nutrition/food-log", {

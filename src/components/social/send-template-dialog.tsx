@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSupabase } from "@/hooks/use-supabase";
 import {
   Dialog,
@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserCircle2, Loader2 } from "lucide-react";
+import { UserCircle2, Loader2, Search, ChevronDown, ChevronUp, Check, Dumbbell } from "lucide-react";
 import type { TemplateSnapshot } from "@/hooks/use-shared-items";
 
 interface Recipient {
@@ -31,7 +31,7 @@ interface SendTemplateDialogProps {
     exercises: TemplateSnapshot["exercises"];
   } | null;
   onClose: () => void;
-  onSend: (recipientId: string, template: SendTemplateDialogProps["template"] & object, message?: string) => Promise<void>;
+  onSend: (recipientIds: string[], template: NonNullable<SendTemplateDialogProps["template"]>, message?: string) => Promise<void>;
 }
 
 export function SendTemplateDialog({
@@ -43,15 +43,19 @@ export function SendTemplateDialog({
 }: SendTemplateDialogProps) {
   const supabase = useSupabase();
   const [following, setFollowing] = useState<Recipient[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (!open || !currentUserId) return;
-    setSelectedId(null);
+    setSelectedIds(new Set());
+    setSearch("");
     setMessage("");
+    setPreviewOpen(false);
 
     setLoadingFollowing(true);
     supabase
@@ -70,25 +74,93 @@ export function SendTemplateDialog({
       });
   }, [open, currentUserId, supabase]);
 
+  const filteredFollowing = useMemo(() => {
+    if (!search.trim()) return following;
+    const q = search.toLowerCase();
+    return following.filter(
+      (u) =>
+        u.display_name?.toLowerCase().includes(q) ||
+        u.username?.toLowerCase().includes(q)
+    );
+  }, [following, search]);
+
+  function toggleRecipient(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   async function handleSend() {
-    if (!selectedId || !template) return;
+    if (selectedIds.size === 0 || !template) return;
     setSending(true);
     try {
-      await onSend(selectedId, template, message.trim() || undefined);
+      await onSend(Array.from(selectedIds), template, message.trim() || undefined);
       onClose();
     } finally {
       setSending(false);
     }
   }
 
+  const sendLabel =
+    selectedIds.size <= 1
+      ? "Send"
+      : `Send to ${selectedIds.size} people`;
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-sm max-h-[85dvh] overflow-y-auto" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>Send &ldquo;{template?.name}&rdquo;</DialogTitle>
+          <DialogTitle>Share &ldquo;{template?.name}&rdquo;</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Template Preview */}
+          {template && template.exercises.length > 0 && (
+            <div className="rounded-xl border border-border/50 bg-card/30 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(!previewOpen)}
+                className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Dumbbell className="size-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {template.exercises.length} exercise{template.exercises.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                {previewOpen ? (
+                  <ChevronUp className="size-3.5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                )}
+              </button>
+              {previewOpen && (
+                <div className="border-t border-border/30 px-3 py-2 space-y-1.5">
+                  {template.description && (
+                    <p className="text-[11px] text-muted-foreground mb-2">{template.description}</p>
+                  )}
+                  {template.exercises.map((ex, i) => (
+                    <div key={i} className="flex items-center gap-2 text-[11px]">
+                      <span className="text-foreground/90 font-medium">{ex.name}</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground capitalize">{ex.muscle_group.replace(/_/g, " ")}</span>
+                      {ex.sets.length > 0 && (
+                        <>
+                          <span className="text-muted-foreground">·</span>
+                          <span className="text-muted-foreground">{ex.sets.length} sets</span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Recipients */}
           <div className="space-y-1.5">
             <Label>Send to</Label>
             {loadingFollowing ? (
@@ -98,29 +170,57 @@ export function SendTemplateDialog({
                 You&apos;re not following anyone yet. Follow users from the Social tab first.
               </p>
             ) : (
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {following.map((user) => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    onClick={() => setSelectedId(user.id)}
-                    className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${
-                      selectedId === user.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border/60 hover:bg-accent"
-                    }`}
-                  >
-                    <UserCircle2 className="size-5 text-muted-foreground shrink-0" />
-                    <span>{user.display_name || user.username || "Anonymous"}</span>
-                    {user.username && (
-                      <span className="text-muted-foreground text-xs">@{user.username}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
+              <>
+                {/* Search */}
+                {following.length > 4 && (
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name…"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-8 h-8 text-sm"
+                    />
+                  </div>
+                )}
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {filteredFollowing.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2 text-center">No matches</p>
+                  ) : (
+                    filteredFollowing.map((user) => {
+                      const selected = selectedIds.has(user.id);
+                      return (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => toggleRecipient(user.id)}
+                          className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${
+                            selected
+                              ? "border-primary bg-primary/5"
+                              : "border-border/60 hover:bg-accent"
+                          }`}
+                        >
+                          {selected ? (
+                            <div className="flex items-center justify-center size-5 rounded-full bg-primary shrink-0">
+                              <Check className="size-3 text-primary-foreground" />
+                            </div>
+                          ) : (
+                            <UserCircle2 className="size-5 text-muted-foreground shrink-0" />
+                          )}
+                          <span>{user.display_name || user.username || "Anonymous"}</span>
+                          {user.username && (
+                            <span className="text-muted-foreground text-xs">@{user.username}</span>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
             )}
           </div>
 
+          {/* Message */}
           <div className="space-y-1.5">
             <Label htmlFor="send-msg">Message (optional)</Label>
             <Input
@@ -135,8 +235,8 @@ export function SendTemplateDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSend} disabled={!selectedId || sending}>
-            {sending ? <Loader2 className="size-4 animate-spin" /> : "Send"}
+          <Button onClick={handleSend} disabled={selectedIds.size === 0 || sending}>
+            {sending ? <Loader2 className="size-4 animate-spin" /> : sendLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

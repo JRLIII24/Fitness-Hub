@@ -223,8 +223,8 @@ function startAnimationLoop(get: () => TimerState, set: (partial: Partial<TimerS
       return timer;
     });
 
-    // Remove expired timers that are no longer running
-    const filteredTimers = updatedTimers.filter((t) => t.isRunning || t.endTime > now);
+    // Remove expired timers — only keep ones still running
+    const filteredTimers = updatedTimers.filter((t) => t.isRunning);
 
     // Update lastTickMs to trigger React re-renders
     set({ timers: filteredTimers, lastTickMs: now });

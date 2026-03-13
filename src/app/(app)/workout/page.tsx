@@ -478,7 +478,8 @@ export default function WorkoutPage() {
         return;
       }
 
-      const exerciseIds = exerciseIdKey.split(",").filter(Boolean);
+      // Filter out temporary custom-* IDs (not valid UUIDs)
+      const exerciseIds = exerciseIdKey.split(",").filter((id) => id && !id.startsWith("custom-"));
       if (exerciseIds.length === 0) {
         setPreviousByExerciseId({});
         return;
@@ -2175,18 +2176,6 @@ export default function WorkoutPage() {
           onSave={handleSaveSessionRpe}
           saving={savingSessionRpe}
         />
-
-        {/* Floating Finish FAB — visible once at least 1 set is completed */}
-        {isWorkoutActive && activeWorkout && plannerStats.completedSets > 0 && (
-          <button
-            type="button"
-            onClick={handleFinishWorkout}
-            className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] right-4 z-50 flex h-12 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-lg transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
-          >
-            <Zap className="size-4" />
-            Finish
-          </button>
-        )}
 
         {/* Floating Rest Timer Pill */}
         <RestTimerPill />

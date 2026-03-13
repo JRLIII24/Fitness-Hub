@@ -2,15 +2,24 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Exercise } from "@/types/workout";
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, EQUIPMENT_LABELS } from "@/lib/constants";
 import { getMuscleColor } from "@/lib/muscle-colors";
 import { cn } from "@/lib/utils";
+import { makeCustomExercise } from "@/lib/workout/exercise-resolver";
 
 type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 
@@ -35,6 +44,14 @@ export function ExerciseSwapSheet({
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Custom exercise form state
+  const [customName, setCustomName] = useState("");
+  const [customMuscleGroup, setCustomMuscleGroup] = useState<MuscleGroup>("full_body");
+  const [customEquipment, setCustomEquipment] = useState("bodyweight");
+
+  // Whether the inline "create custom" empty state should show
+  const showInlineCreate = !loading && exercises.length === 0 && search.trim().length >= 2;
+
   // Stable seq counter to discard stale responses
   const searchSeq = useRef(0);
 
@@ -44,8 +61,17 @@ export function ExerciseSwapSheet({
       const mg = currentExercise.muscle_group as MuscleGroup;
       setSelectedMuscleGroup(MUSCLE_GROUPS.includes(mg) ? mg : "chest");
       setSearch("");
+      setCustomName("");
     }
   }, [open, currentExercise]);
+
+  // Sync search query → custom name when no results found
+  useEffect(() => {
+    if (showInlineCreate) {
+      setCustomName(search.trim());
+      setCustomMuscleGroup(selectedMuscleGroup);
+    }
+  }, [showInlineCreate, search, selectedMuscleGroup]);
 
   // Fetch exercises when muscle group or search changes
   useEffect(() => {
@@ -103,6 +129,19 @@ export function ExerciseSwapSheet({
     toast.success(`Swapped to ${exercise.name}`);
   }
 
+  function handleCreateCustomAndSwap() {
+    const name = customName.trim();
+    if (name.length < 3) {
+      toast.error("Custom exercise name must be at least 3 characters.");
+      return;
+    }
+    if (exerciseIndex == null) return;
+    const customExercise = makeCustomExercise(name, customMuscleGroup, customEquipment);
+    onSwap(exerciseIndex, customExercise);
+    onClose();
+    toast.success(`Swapped to ${customExercise.name}`);
+  }
+
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="bottom" className="flex h-[80dvh] flex-col">
@@ -149,7 +188,60 @@ export function ExerciseSwapSheet({
             {loading ? (
               <p className="px-2 py-4 text-sm text-muted-foreground">Loading…</p>
             ) : exercises.length === 0 ? (
-              <p className="px-2 py-4 text-sm text-muted-foreground">No exercises found.</p>
+              showInlineCreate ? (
+                <div className="rounded-xl border border-border/60 bg-card/30 p-4">
+                  <p className="text-[13px] font-bold text-foreground">
+                    Create &ldquo;{search.trim()}&rdquo;
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    No matches found. Add it as a custom exercise.
+                  </p>
+                  <div className="mt-3 space-y-2.5">
+                    <Input
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      placeholder="Exercise name"
+                      className="h-9"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select value={customMuscleGroup} onValueChange={(v) => setCustomMuscleGroup(v as MuscleGroup)}>
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Muscle group" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MUSCLE_GROUPS.map((group) => (
+                            <SelectItem key={group} value={group}>
+                              {MUSCLE_GROUP_LABELS[group]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={customEquipment} onValueChange={setCustomEquipment}>
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Equipment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(EQUIPMENT_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      type="button"
+                      className="h-9 w-full text-xs"
+                      onClick={handleCreateCustomAndSwap}
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      Create & Swap
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="px-2 py-4 text-sm text-muted-foreground">No exercises found.</p>
+              )
             ) : (
               exercises.map((exercise) => {
                 const isCurrent = exercise.id === currentExercise?.id;

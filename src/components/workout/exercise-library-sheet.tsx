@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { Check, ChevronDown, Plus } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -54,7 +53,6 @@ export function ExerciseLibrarySheet({
   const searchSeq = useRef(0);
 
   // Custom exercise form
-  const [showCustomForm, setShowCustomForm] = useState(false);
   const [customName, setCustomName] = useState("");
   const [customMuscleGroup, setCustomMuscleGroup] = useState<MuscleGroup>("full_body");
   const [customEquipment, setCustomEquipment] = useState("bodyweight");
@@ -64,14 +62,24 @@ export function ExerciseLibrarySheet({
     Record<string, { reps: number | null; weight: number | null; performedAt: string | null }>
   >({});
 
+  // Whether the inline "create custom" empty state should show
+  const showInlineCreate = !loading && exercises.length === 0 && search.trim().length >= 2;
+
   // Reset state when sheet opens
   useEffect(() => {
     if (open) {
       setSearch("");
-      setShowCustomForm(false);
       setCustomName("");
     }
   }, [open]);
+
+  // Sync search query → custom name when no results found
+  useEffect(() => {
+    if (showInlineCreate) {
+      setCustomName(search.trim());
+      setCustomMuscleGroup(selectedMuscleGroup);
+    }
+  }, [showInlineCreate, search, selectedMuscleGroup]);
 
   // Fetch exercises when muscle group or search changes
   useEffect(() => {
@@ -172,7 +180,6 @@ export function ExerciseLibrarySheet({
     }
     await onCreateCustomExercise(name, customMuscleGroup, customEquipment);
     setCustomName("");
-    setShowCustomForm(false);
   }
 
   function formatPerf(exerciseId: string) {
@@ -237,7 +244,60 @@ export function ExerciseLibrarySheet({
             {loading ? (
               <p className="px-2 py-4 text-sm text-muted-foreground">Loading…</p>
             ) : exercises.length === 0 ? (
-              <p className="px-2 py-4 text-sm text-muted-foreground">No exercises found.</p>
+              showInlineCreate ? (
+                <div className="rounded-xl border border-border/60 bg-card/30 p-4">
+                  <p className="text-[13px] font-bold text-foreground">
+                    Create &ldquo;{search.trim()}&rdquo;
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    No matches found. Add it as a custom exercise.
+                  </p>
+                  <div className="mt-3 space-y-2.5">
+                    <Input
+                      value={customName}
+                      onChange={(e) => setCustomName(e.target.value)}
+                      placeholder="Exercise name"
+                      className="h-9"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select value={customMuscleGroup} onValueChange={(v) => setCustomMuscleGroup(v as MuscleGroup)}>
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Muscle group" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MUSCLE_GROUPS.map((group) => (
+                            <SelectItem key={group} value={group}>
+                              {MUSCLE_GROUP_LABELS[group]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={customEquipment} onValueChange={setCustomEquipment}>
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Equipment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(EQUIPMENT_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      type="button"
+                      className="h-9 w-full text-xs"
+                      onClick={handleCreateCustom}
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      Create & Add
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="px-2 py-4 text-sm text-muted-foreground">No exercises found.</p>
+              )
             ) : (
               exercises.map((exercise) => {
                 const isAdded = selectedExerciseIds.has(exercise.id);
@@ -292,62 +352,6 @@ export function ExerciseLibrarySheet({
           </div>
         </ScrollArea>
 
-        {/* Custom exercise section */}
-        <div className="mt-2 border-t border-border/40 pt-2">
-          <button
-            type="button"
-            onClick={() => setShowCustomForm((v) => !v)}
-            className="flex w-full items-center justify-between py-1.5 text-xs font-semibold text-muted-foreground"
-          >
-            <span>Create Custom Exercise</span>
-            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showCustomForm && "rotate-180")} />
-          </button>
-
-          {showCustomForm && (
-            <div className="space-y-2.5 pt-1.5 pb-1">
-              <Input
-                value={customName}
-                onChange={(e) => setCustomName(e.target.value)}
-                placeholder="Exercise name"
-                className="h-9"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={customMuscleGroup} onValueChange={(v) => setCustomMuscleGroup(v as MuscleGroup)}>
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue placeholder="Muscle group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MUSCLE_GROUPS.map((group) => (
-                      <SelectItem key={group} value={group}>
-                        {MUSCLE_GROUP_LABELS[group]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={customEquipment} onValueChange={setCustomEquipment}>
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue placeholder="Equipment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(EQUIPMENT_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                type="button"
-                className="h-9 w-full text-xs"
-                onClick={handleCreateCustom}
-              >
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Create & Add
-              </Button>
-            </div>
-          )}
-        </div>
       </SheetContent>
     </Sheet>
   );

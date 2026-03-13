@@ -95,19 +95,16 @@ export default async function SettingsPage() {
               asChild
             >
               <Link href={href}>
-                <span className="flex items-start gap-3 text-left">
+                <span className="flex min-w-0 flex-1 items-start gap-3 text-left">
                   <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10">
                     <Icon className="h-3.5 w-3.5 text-primary" />
                   </span>
-                  <span className="space-y-0.5">
-                    <span className="block text-sm font-semibold text-foreground">{title}</span>
+                  <span className="min-w-0 space-y-0.5">
+                    <span className="block truncate text-sm font-semibold text-foreground">{title}</span>
                     <span className="block text-xs text-muted-foreground">{description}</span>
                   </span>
                 </span>
-                <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                  {cta}
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </Link>
             </Button>
           ))}

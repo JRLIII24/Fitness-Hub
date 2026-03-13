@@ -95,7 +95,7 @@ function getQuickActions(hasActiveWorkout: boolean) {
     ];
   }
   return [
-    { label: "Plan a Workout", icon: Dumbbell, prompt: "Plan a workout for me — show me my options" },
+    { label: "Plan a Workout", icon: Dumbbell, prompt: "Plan a workout for me" },
     { label: "Check Macros", icon: Apple, prompt: "How are my macros?" },
     { label: "My Progress", icon: TrendingUp, prompt: "How is my training going?" },
     { label: "Build Program", icon: CalendarDays, prompt: "Create a program for " },

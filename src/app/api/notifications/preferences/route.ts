@@ -1,5 +1,14 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+
+const PreferencesSchema = z.object({
+  streak_alerts_enabled: z.boolean().optional(),
+  pod_pings_enabled: z.boolean().optional(),
+  workout_reminders_enabled: z.boolean().optional(),
+  quiet_hours_start: z.number().int().min(0).max(23).nullable().optional(),
+  quiet_hours_end: z.number().int().min(0).max(23).nullable().optional(),
+});
 
 export async function GET() {
   const supabase = await createClient();
@@ -33,33 +42,28 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: Record<string, unknown>;
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'Malformed JSON' }, { status: 400 });
   }
 
-  const {
-    streak_alerts_enabled,
-    pod_pings_enabled,
-    workout_reminders_enabled,
-    quiet_hours_start,
-    quiet_hours_end,
-  } = body as {
-    streak_alerts_enabled?: boolean;
-    pod_pings_enabled?: boolean;
-    workout_reminders_enabled?: boolean;
-    quiet_hours_start?: number | null;
-    quiet_hours_end?: number | null;
-  };
+  const parsed = PreferencesSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid preferences' },
+      { status: 400 },
+    );
+  }
 
+  const body = parsed.data;
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (streak_alerts_enabled !== undefined) updates.streak_alerts_enabled = streak_alerts_enabled;
-  if (pod_pings_enabled !== undefined) updates.pod_pings_enabled = pod_pings_enabled;
-  if (workout_reminders_enabled !== undefined) updates.workout_reminders_enabled = workout_reminders_enabled;
-  if (quiet_hours_start !== undefined) updates.quiet_hours_start = quiet_hours_start;
-  if (quiet_hours_end !== undefined) updates.quiet_hours_end = quiet_hours_end;
+  if (body.streak_alerts_enabled !== undefined) updates.streak_alerts_enabled = body.streak_alerts_enabled;
+  if (body.pod_pings_enabled !== undefined) updates.pod_pings_enabled = body.pod_pings_enabled;
+  if (body.workout_reminders_enabled !== undefined) updates.workout_reminders_enabled = body.workout_reminders_enabled;
+  if (body.quiet_hours_start !== undefined) updates.quiet_hours_start = body.quiet_hours_start;
+  if (body.quiet_hours_end !== undefined) updates.quiet_hours_end = body.quiet_hours_end;
 
   const { data, error } = await supabase
     .from('notification_preferences')
@@ -71,7 +75,7 @@ export async function PUT(request: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update preferences' }, { status: 500 });
   }
 
   return NextResponse.json(data);

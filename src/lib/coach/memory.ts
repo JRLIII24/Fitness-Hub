@@ -6,6 +6,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "@/lib/logger";
 
 export type MemoryCategory = "preference" | "injury" | "goal" | "note";
 
@@ -20,9 +21,12 @@ export interface CoachMemory {
 }
 
 const MAX_MEMORIES = 50;
+const STALE_DAYS = 90;
+const EVICTION_THRESHOLD = 40;
 
 /**
  * Fetch all coach memories for a user, ordered by most recently updated.
+ * Automatically evicts stale memories (>90 days untouched) when count exceeds threshold.
  */
 export async function getCoachMemories(
   supabase: SupabaseClient,
@@ -36,11 +40,43 @@ export async function getCoachMemories(
     .limit(MAX_MEMORIES);
 
   if (error) {
-    console.error("Failed to fetch coach memories:", error.message);
+    logger.error("Failed to fetch coach memories:", error.message);
     return [];
   }
 
-  return (data ?? []) as CoachMemory[];
+  const memories = (data ?? []) as CoachMemory[];
+
+  // Evict stale memories when count exceeds threshold (fire-and-forget)
+  if (memories.length >= EVICTION_THRESHOLD) {
+    void evictStaleMemories(supabase, userId);
+  }
+
+  return memories;
+}
+
+/**
+ * Delete memories older than STALE_DAYS that haven't been touched.
+ * Preserves injury memories (safety-critical, never auto-evict).
+ */
+async function evictStaleMemories(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const { error } = await supabase
+      .from("coach_memories")
+      .delete()
+      .eq("user_id", userId)
+      .neq("category", "injury")
+      .lt("updated_at", cutoff);
+
+    if (error) {
+      logger.error("Failed to evict stale coach memories:", error.message);
+    }
+  } catch (err) {
+    logger.error("Unexpected error evicting stale memories:", err);
+  }
 }
 
 /**
@@ -73,7 +109,7 @@ export async function saveCoachMemory(
       .single();
 
     if (error) {
-      console.error("Failed to update coach memory:", error.message);
+      logger.error("Failed to update coach memory:", error.message);
       return null;
     }
     return data as CoachMemory;
@@ -86,7 +122,7 @@ export async function saveCoachMemory(
     .single();
 
   if (error) {
-    console.error("Failed to save coach memory:", error.message);
+    logger.error("Failed to save coach memory:", error.message);
     return null;
   }
 
@@ -108,7 +144,7 @@ export async function deleteCoachMemory(
     .eq("user_id", userId);
 
   if (error) {
-    console.error("Failed to delete coach memory:", error.message);
+    logger.error("Failed to delete coach memory:", error.message);
     return false;
   }
   return true;

@@ -5,8 +5,17 @@
  */
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
+
+const ProgramPatchSchema = z.object({
+  status: z.enum(["draft", "active", "completed", "abandoned"]).optional(),
+  current_week: z.number().int().min(0).max(52).optional(),
+  current_day: z.number().int().min(0).max(7).optional(),
+  is_public: z.boolean().optional(),
+  started_at: z.string().optional(),
+});
 
 export async function GET(
   _request: Request,
@@ -45,10 +54,19 @@ export async function PATCH(
     const { user, response: authErr } = await requireAuth(supabase);
     if (authErr) return authErr;
 
-    const body = await request.json();
+    const raw = await request.json();
+    const parsed = ProgramPatchSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid input", details: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+
+    const body = parsed.data;
     const updates: Record<string, unknown> = {};
 
-    if (body.status && ["draft", "active", "completed", "abandoned"].includes(body.status)) {
+    if (body.status) {
       updates.status = body.status;
       if (body.status === "active" && !body.started_at) {
         updates.started_at = new Date().toISOString();
@@ -57,9 +75,9 @@ export async function PATCH(
         updates.completed_at = new Date().toISOString();
       }
     }
-    if (typeof body.current_week === "number") updates.current_week = body.current_week;
-    if (typeof body.current_day === "number") updates.current_day = body.current_day;
-    if (typeof body.is_public === "boolean") updates.is_public = body.is_public;
+    if (body.current_week !== undefined) updates.current_week = body.current_week;
+    if (body.current_day !== undefined) updates.current_day = body.current_day;
+    if (body.is_public !== undefined) updates.is_public = body.is_public;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });

@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth-utils";
 import { parsePayload } from "@/lib/validation/parse";
 import { fatigueSessionRpeSchema } from "@/lib/validation/fatigue.schemas";
 import { saveSessionRpeAndRecompute } from "@/lib/fatigue/server";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ snapshot });
   } catch (error) {
-    console.error("Session RPE POST error:", error);
+    logger.error("Session RPE POST error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
 import { getCurrentWeekStart } from '@/lib/pods/progress';
+import { logger } from "@/lib/logger";
 
 interface RouteContext {
   params: Promise<{ podId: string }>;
@@ -89,7 +90,7 @@ export async function POST(
     }
 
     if (upsertError) {
-      console.error('Commitment upsert error:', upsertError);
+      logger.error('Commitment upsert error:', upsertError);
       return NextResponse.json({ error: 'Failed to set commitment' }, { status: 500 });
     }
 
@@ -102,7 +103,7 @@ export async function POST(
       }
     });
   } catch (error) {
-    console.error('Set commitment error:', error);
+    logger.error('Set commitment error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

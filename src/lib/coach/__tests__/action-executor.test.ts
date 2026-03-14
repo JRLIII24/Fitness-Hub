@@ -19,9 +19,10 @@ function makeExercise(name: string, id = "ex-1"): Exercise {
     muscle_group: "chest",
     equipment: "barbell",
     category: "compound",
-    is_custom: false,
-    created_by: null,
-  } as Exercise;
+    instructions: null,
+    form_tips: null,
+    image_url: null,
+  } satisfies Exercise;
 }
 
 function makeSet(overrides: Partial<WorkoutSet> = {}): WorkoutSet {

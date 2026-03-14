@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 interface RouteContext {
   params: Promise<{ podId: string }>;
@@ -49,7 +50,7 @@ export async function POST(
       .eq('status', 'active');
 
     if (updateError) {
-      console.error('Leave pod error:', updateError);
+      logger.error('Leave pod error:', updateError);
       return NextResponse.json({ error: 'Failed to leave pod' }, { status: 500 });
     }
 
@@ -58,7 +59,7 @@ export async function POST(
       message: `You left ${pod.name}`
     });
   } catch (error) {
-    console.error('Leave pod error:', error);
+    logger.error('Leave pod error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

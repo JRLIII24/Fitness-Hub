@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { READINESS_SCORE_ENABLED } from "@/lib/features";
 import { getCachedOrComputeReadiness } from "@/lib/readiness/server";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
@@ -17,7 +18,7 @@ export async function GET() {
     const readiness = await getCachedOrComputeReadiness(user.id);
     return NextResponse.json({ readiness });
   } catch (error) {
-    console.error("Readiness GET error:", error);
+    logger.error("Readiness GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 interface RouteContext {
   params: Promise<{ podId: string }>;
@@ -81,7 +82,7 @@ export async function POST(
       .single();
 
     if (insertError) {
-      console.error('Message insert error:', insertError);
+      logger.error('Message insert error:', insertError);
       return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
     }
 
@@ -93,7 +94,7 @@ export async function POST(
       }
     }, { status: 201 });
   } catch (error) {
-    console.error('Send message error:', error);
+    logger.error('Send message error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

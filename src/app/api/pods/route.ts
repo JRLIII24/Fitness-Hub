@@ -10,6 +10,7 @@ import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { parsePayload } from "@/lib/validation/parse";
 import { createPodSchema } from "@/lib/validation/pods.schemas";
+import { logger } from "@/lib/logger";
 
 /**
  * GET /api/pods
@@ -31,7 +32,7 @@ export async function GET() {
       .eq('status', 'active');
 
     if (membershipError) {
-      console.error('Membership fetch error:', membershipError);
+      logger.error('Membership fetch error:', membershipError);
       return NextResponse.json({
         error: 'Failed to fetch memberships',
         details: membershipError.message
@@ -52,7 +53,7 @@ export async function GET() {
       .in('id', podIds);
 
     if (podsError) {
-      console.error('Pods fetch error:', podsError);
+      logger.error('Pods fetch error:', podsError);
       return NextResponse.json({
         error: 'Failed to fetch pods',
         details: podsError.message
@@ -94,7 +95,7 @@ export async function GET() {
 
     return NextResponse.json({ pods });
   } catch (error) {
-    console.error('Pods GET error:', error);
+    logger.error('Pods GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -138,13 +139,13 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (createError) {
-      console.error('Pod creation error:', createError);
+      logger.error('Pod creation error:', createError);
       return NextResponse.json({ error: 'Failed to create pod' }, { status: 500 });
     }
 
     return NextResponse.json({ pod }, { status: 201 });
   } catch (error) {
-    console.error('Pods POST error:', error);
+    logger.error('Pods POST error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 interface RouteContext {
   params: Promise<{ inviteId: string }>;
@@ -59,7 +60,7 @@ export async function POST(
       .eq('id', inviteId);
 
     if (updateError) {
-      console.error('Invite response error:', updateError);
+      logger.error('Invite response error:', updateError);
       return NextResponse.json({ error: 'Failed to respond to invitation' }, { status: 500 });
     }
 
@@ -78,7 +79,7 @@ export async function POST(
         : 'Invitation declined'
     });
   } catch (error) {
-    console.error('Invite response error:', error);
+    logger.error('Invite response error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

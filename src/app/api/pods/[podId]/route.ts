@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
 import { getPodMemberProgress } from '@/lib/pods/progress';
+import { logger } from "@/lib/logger";
 
 interface RouteContext {
   params: Promise<{ podId: string }>;
@@ -116,7 +117,7 @@ export async function GET(
       }
     });
   } catch (error) {
-    console.error('Pod GET error:', error);
+    logger.error('Pod GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -155,13 +156,13 @@ export async function DELETE(
       .eq('id', podId);
 
     if (deleteError) {
-      console.error('Pod deletion error:', deleteError);
+      logger.error('Pod deletion error:', deleteError);
       return NextResponse.json({ error: 'Failed to delete pod' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Pod DELETE error:', error);
+    logger.error('Pod DELETE error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

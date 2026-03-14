@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { PUSH_NOTIFICATIONS_ENABLED } from '@/lib/features';
+
+const RegisterTokenSchema = z.object({
+  token: z.string().min(1).max(512),
+  platform: z.enum(['ios', 'android', 'web']),
+});
 
 export async function POST(request: Request) {
   if (!PUSH_NOTIFICATIONS_ENABLED) {
@@ -13,18 +19,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: Record<string, unknown>;
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'Malformed JSON' }, { status: 400 });
   }
 
-  const { token, platform } = body as { token?: string; platform?: string };
-
-  if (!token || !platform || !['ios', 'android', 'web'].includes(platform)) {
+  const parsed = RegisterTokenSchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid token or platform' }, { status: 400 });
   }
+
+  const { token, platform } = parsed.data;
 
   const { error } = await supabase
     .from('push_device_tokens')
@@ -34,7 +41,7 @@ export async function POST(request: Request) {
     );
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to register device token' }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

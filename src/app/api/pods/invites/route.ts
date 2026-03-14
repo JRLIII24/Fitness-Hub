@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
@@ -30,7 +31,7 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (invitesError) {
-      console.error('Invites fetch error:', invitesError);
+      logger.error('Invites fetch error:', invitesError);
       return NextResponse.json({ error: 'Failed to fetch invites' }, { status: 500 });
     }
 
@@ -53,7 +54,7 @@ export async function GET() {
 
     return NextResponse.json({ invites: formattedInvites });
   } catch (error) {
-    console.error('Invites GET error:', error);
+    logger.error('Invites GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

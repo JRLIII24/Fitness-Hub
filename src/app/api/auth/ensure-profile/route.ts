@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
@@ -8,7 +9,7 @@ export async function POST(request: Request) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error(
+      logger.error(
         "Missing Supabase env vars for ensure-profile route",
         {
           hasSupabaseUrl: Boolean(supabaseUrl),
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      console.error("Error ensuring user profile:", error);
+      logger.error("Error ensuring user profile:", error);
       return Response.json(
         { error: error.message },
         { status: 500 }
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
 
     return Response.json({ success: true });
   } catch (err) {
-    console.error("Unexpected error:", err);
+    logger.error("Unexpected error:", err);
     return Response.json(
       { error: "Internal server error" },
       { status: 500 }

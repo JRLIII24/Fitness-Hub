@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { uuid } from "@/lib/uuid";
+import { logger } from "@/lib/logger";
 
 interface OFFSearchProduct {
   product_name?: string;
@@ -230,7 +231,7 @@ export async function GET(req: NextRequest) {
       .limit(MAX_RESULTS);
 
     if (localError) {
-      console.error("Local search error:", localError);
+      logger.error("Local search error:", localError);
     }
 
     const local = (localResults ?? []) as NormalizedFoodItem[];
@@ -269,7 +270,7 @@ export async function GET(req: NextRequest) {
           .filter((item) => item.calories_per_serving > 0);
       }
     } catch (offErr) {
-      console.error("Open Food Facts search error:", offErr);
+      logger.error("Open Food Facts search error:", offErr);
       // Continue with local results only
     }
 
@@ -301,7 +302,7 @@ export async function GET(req: NextRequest) {
     // by LogFoodForm before insertion into food_log (see ensurePersistedFoodItemId).
     return NextResponse.json(merged.slice(0, MAX_RESULTS));
   } catch (err) {
-    console.error("Search error:", err);
+    logger.error("Search error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

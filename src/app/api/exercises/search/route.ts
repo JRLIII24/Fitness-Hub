@@ -7,6 +7,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { exerciseSearchSchema } from "@/lib/validation/api.schemas";
+import { logger } from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 const FREE_EXERCISE_DB_IMAGE_BASE =
@@ -32,6 +34,13 @@ function normalizeMediaUrl(url: string | null | undefined, source?: string | nul
 
 export async function GET(request: Request) {
   try {
+    // Rate limit by IP to prevent scraping (60 req/min)
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    const allowed = await rateLimit(`exercise-search:${ip}`, 60, 60_000);
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Validate and coerce query parameters via the shared schema.
@@ -106,7 +115,7 @@ export async function GET(request: Request) {
     const { data: exercises, error } = await supabaseQuery;
 
     if (error) {
-      console.error("Exercise search error:", error);
+      logger.error("Exercise search error:", error);
       return NextResponse.json(
         { error: "Failed to search exercises" },
         { status: 500 }
@@ -135,7 +144,7 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } }
     );
   } catch (error) {
-    console.error("Exercise search error:", error);
+    logger.error("Exercise search error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

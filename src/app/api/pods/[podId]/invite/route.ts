@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { findUserByUsername } from '@/lib/pods/progress';
+import { logger } from "@/lib/logger";
 
 interface RouteContext {
   params: Promise<{ podId: string }>;
@@ -107,7 +108,7 @@ export async function POST(
       });
 
     if (insertError) {
-      console.error('Invite creation error:', insertError);
+      logger.error('Invite creation error:', insertError);
       return NextResponse.json({ error: 'Failed to send invitation' }, { status: 500 });
     }
 
@@ -116,7 +117,7 @@ export async function POST(
       message: `Invitation sent to ${invitee.display_name || invitee.username}`
     }, { status: 201 });
   } catch (error) {
-    console.error('Pod invite error:', error);
+    logger.error('Pod invite error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

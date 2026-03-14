@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 interface OpenFoodFactsNutriments {
   "energy-kcal_100g"?: number;
@@ -235,7 +236,7 @@ export async function GET(
       .maybeSingle();
 
     if (dbError) {
-      console.error("DB lookup error:", dbError);
+      logger.error("DB lookup error:", dbError);
     }
 
     if (existingItem && !refresh) {
@@ -296,7 +297,7 @@ export async function GET(
           .single();
 
     if (insertError) {
-      console.error("Failed to store food item:", insertError);
+      logger.error("Failed to store food item:", insertError);
       return NextResponse.json(
         { error: "Failed to save product for logging" },
         { status: 500 }
@@ -305,7 +306,7 @@ export async function GET(
 
     return NextResponse.json(inserted);
   } catch (err) {
-    console.error("Barcode lookup error:", err);
+    logger.error("Barcode lookup error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -5,6 +5,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export async function GET(
         );
       }
 
-      console.error("Exercise fetch error:", error);
+      logger.error("Exercise fetch error:", error);
       return NextResponse.json(
         { error: "Failed to fetch exercise" },
         { status: 500 }
@@ -43,7 +44,7 @@ export async function GET(
 
     return NextResponse.json({ exercise });
   } catch (error) {
-    console.error("Exercise fetch error:", error);
+    logger.error("Exercise fetch error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

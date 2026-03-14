@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth-utils";
 import { parsePayload } from "@/lib/validation/parse";
 import { fatigueCheckinSchema } from "@/lib/validation/fatigue.schemas";
 import { getCachedOrComputeFatigueSnapshot, upsertDailyRecoveryCheckin } from "@/lib/fatigue/server";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     const snapshot = await getCachedOrComputeFatigueSnapshot(user.id, { timezone });
     return NextResponse.json({ snapshot });
   } catch (error) {
-    console.error("Fatigue GET error:", error);
+    logger.error("Fatigue GET error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ snapshot });
   } catch (error) {
-    console.error("Fatigue POST error:", error);
+    logger.error("Fatigue POST error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

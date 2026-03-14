@@ -323,14 +323,9 @@ export function DashboardContent({
                 <XpProgressBar level={level} xp={xp} />
                 {/* Weekly Review */}
                 <WeeklyReviewModal
-                  streak={streak}
                   weeklySessionCount={thisWeekSessionCount}
                   weeklyMomentumGoal={weeklyMomentumGoal}
                   weeklyProgressPct={weeklyProgressPct}
-                  weeklyAverageSessions={weeklyAverageSessions}
-                  projectedSessions90d={projectedSessions90d}
-                  projectedVolumeKg={projectedVolumeKg}
-                  totalSessions={totalSessionCount}
                   unitLabel={unitLabel}
                   toDisplayVolume={toDisplayVolume}
                 />

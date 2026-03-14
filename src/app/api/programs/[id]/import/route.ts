@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 interface ProgramDay {
   day_number: number;
@@ -114,7 +115,7 @@ export async function POST(
       .single();
 
     if (insertErr || !imported) {
-      console.error("[/api/programs/import] insert error:", insertErr);
+      logger.error("[/api/programs/import] insert error:", insertErr);
       return NextResponse.json({ error: "Failed to import program" }, { status: 500 });
     }
 
@@ -123,7 +124,7 @@ export async function POST(
       imported: true,
     });
   } catch (err) {
-    console.error("[/api/programs/import] unexpected error:", err);
+    logger.error("[/api/programs/import] unexpected error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

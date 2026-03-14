@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireAuth } from "@/lib/auth-utils";
 import { streamUserWorkoutData } from '@/lib/services/export.service';
+import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
     const supabase = await createClient();
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
 
                 controller.close();
             } catch (error) {
-                console.error('Export stream error:', error);
+                logger.error('Export stream error:', error);
                 controller.error(error);
             }
         }

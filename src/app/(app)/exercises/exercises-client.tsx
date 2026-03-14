@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Search, ChevronDown, ChevronUp, Dumbbell, PlayCircle, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -235,25 +236,72 @@ export function ExercisesClient({
         Showing {filtered.length} of {exercises.length} exercises
       </p>
 
-      {/* Cards */}
+      {/* Cards — virtualized for performance */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-center">
           <Dumbbell className="h-10 w-10 text-muted-foreground/40" />
           <p className="mt-3 text-sm text-muted-foreground">No exercises match your filters.</p>
         </div>
       ) : (
-        <div className="space-y-1.5">
-          {filtered.map((ex) => (
-            <ExerciseCard
-              key={ex.id}
-              ex={ex}
-              muscleGroupLabels={muscleGroupLabels}
-              equipmentLabels={equipmentLabels}
-              has_video={ex.has_video}
-            />
-          ))}
-        </div>
+        <VirtualizedExerciseList
+          exercises={filtered}
+          muscleGroupLabels={muscleGroupLabels}
+          equipmentLabels={equipmentLabels}
+        />
       )}
+    </div>
+  );
+}
+
+const ESTIMATED_ROW_HEIGHT = 72;
+
+function VirtualizedExerciseList({
+  exercises,
+  muscleGroupLabels,
+  equipmentLabels,
+}: {
+  exercises: ExerciseRow[];
+  muscleGroupLabels: Record<string, string>;
+  equipmentLabels: Record<string, string>;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: exercises.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 8,
+  });
+
+  return (
+    <div
+      ref={parentRef}
+      className="max-h-[calc(100dvh-280px)] overflow-y-auto"
+    >
+      <div
+        className="relative w-full"
+        style={{ height: `${virtualizer.getTotalSize()}px` }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const ex = exercises[virtualRow.index];
+          return (
+            <div
+              key={ex.id}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              className="absolute left-0 top-0 w-full pb-1.5"
+              style={{ transform: `translateY(${virtualRow.start}px)` }}
+            >
+              <ExerciseCard
+                ex={ex}
+                muscleGroupLabels={muscleGroupLabels}
+                equipmentLabels={equipmentLabels}
+                has_video={ex.has_video}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

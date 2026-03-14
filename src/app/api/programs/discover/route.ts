@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 const VALID_SORTS = new Set(["newest", "popular"]);
 const VALID_GOALS = new Set(["strength", "hypertrophy", "general", "weight_loss"]);
@@ -109,7 +110,7 @@ export async function GET(request: NextRequest) {
         console.warn("[/api/programs/discover] schema not yet migrated:", error.message);
         return NextResponse.json({ programs: [], total: 0, page, limit });
       }
-      console.error("[/api/programs/discover] query error:", error);
+      logger.error("[/api/programs/discover] query error:", error);
       return NextResponse.json(
         { error: "Failed to fetch programs", details: error.message },
         { status: 500 },
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
       { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" } },
     );
   } catch (err) {
-    console.error("[/api/programs/discover] unexpected error:", err);
+    logger.error("[/api/programs/discover] unexpected error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

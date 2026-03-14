@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 const DAILY_LIMIT = 100;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
 
     if (!res.ok) {
       const err = await res.text().catch(() => "unknown error");
-      console.error("ElevenLabs API error:", res.status, err);
+      logger.error("ElevenLabs API error:", res.status, err);
       return NextResponse.json(
         { error: "TTS generation failed" },
         { status: 500 },
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("ElevenLabs TTS error:", error);
+    logger.error("ElevenLabs TTS error:", error);
     return NextResponse.json(
       { error: "TTS generation failed" },
       { status: 500 },

@@ -15,6 +15,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { SOCIAL_FEED_ENABLED } from "@/lib/features";
+import { logger } from "@/lib/logger";
 
 const QuerySchema = z.object({
   metric: z.enum(["volume", "consistency", "streak"]).default("volume"),
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
   });
 
   if (error) {
-    console.error("Leaderboard RPC error:", error);
+    logger.error("Leaderboard RPC error:", error);
     return NextResponse.json({ error: "Failed to load leaderboard" }, { status: 500 });
   }
 

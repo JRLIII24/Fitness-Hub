@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/auth-utils";
 import { HEALTHKIT_SYNC_ENABLED } from "@/lib/features";
 import { getUserTimezone, getDateInTimezone } from "@/lib/timezone";
+import { logger } from "@/lib/logger";
 
 const VALID_SOURCES = new Set(["healthkit", "google_fit", "manual"]);
 
@@ -58,13 +59,13 @@ export async function POST(request: NextRequest) {
     );
 
     if (error) {
-      console.error("Health sync upsert error:", error);
+      logger.error("Health sync upsert error:", error);
       return NextResponse.json({ error: "Failed to save health data" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Health sync POST error:", error);
+    logger.error("Health sync POST error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

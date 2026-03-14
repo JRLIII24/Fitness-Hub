@@ -62,6 +62,78 @@ function hexToRgb(hex: string) {
   };
 }
 
+function rgbToHex(r: number, g: number, b: number): string {
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  return `#${clamp(r).toString(16).padStart(2, "0")}${clamp(g).toString(16).padStart(2, "0")}${clamp(b).toString(16).padStart(2, "0")}`;
+}
+
+function rgbToHsl(r: number, g: number, b: number) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+  return { h, s, l };
+}
+
+function hslToRgb(h: number, s: number, l: number) {
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return { r: v, g: v, b: v };
+  }
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  return {
+    r: Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+    g: Math.round(hue2rgb(p, q, h) * 255),
+    b: Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+  };
+}
+
+/**
+ * Clamp the color's lightness so it stays visible on both dark surfaces
+ * (the app background) and light surfaces (the default button gradient).
+ *
+ * Dark mode: lightness between 0.35–0.75
+ *   - Too light (e.g. white) → invisible on the white default-button bg
+ *   - Too dark (e.g. black) → invisible on dark app background
+ *
+ * Light mode: lightness between 0.30–0.60
+ *   - Ensures adequate contrast on light backgrounds
+ */
+function ensureContrastSafe(hex: string): string {
+  const { r, g, b } = hexToRgb(hex);
+  const { h, s, l } = rgbToHsl(r, g, b);
+
+  const isDark = document.documentElement.classList.contains("dark");
+
+  const minL = isDark ? 0.35 : 0.30;
+  const maxL = isDark ? 0.75 : 0.60;
+
+  // If lightness is within range, return original
+  if (l >= minL && l <= maxL) return hex;
+
+  const clampedL = Math.max(minL, Math.min(maxL, l));
+  // Boost saturation slightly when clamping to preserve color vibrancy
+  const adjustedS = Math.min(1, s * 1.1);
+  const clamped = hslToRgb(h, adjustedS, clampedL);
+  return rgbToHex(clamped.r, clamped.g, clamped.b);
+}
+
 function getContrastForeground(hex: string): "#000000" | "#ffffff" {
   const { r, g, b } = hexToRgb(hex);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
@@ -78,17 +150,19 @@ export function applyAccentColor(color: string | null) {
 
   if (!isValidHexColor(color)) return;
 
-  const foreground = getContrastForeground(color);
+  // Adjust color lightness to ensure contrast on all surfaces
+  const safeColor = ensureContrastSafe(color);
+  const foreground = getContrastForeground(safeColor);
 
-  html.style.setProperty("--primary", color);
+  html.style.setProperty("--primary", safeColor);
   html.style.setProperty("--primary-foreground", foreground);
-  html.style.setProperty("--ring", color);
-  html.style.setProperty("--accent", color);
+  html.style.setProperty("--ring", safeColor);
+  html.style.setProperty("--accent", safeColor);
   html.style.setProperty("--accent-foreground", foreground);
-  html.style.setProperty("--sidebar-primary", color);
+  html.style.setProperty("--sidebar-primary", safeColor);
   html.style.setProperty("--sidebar-primary-foreground", foreground);
-  html.style.setProperty("--sidebar-ring", color);
-  html.style.setProperty("--sidebar-accent", color);
+  html.style.setProperty("--sidebar-ring", safeColor);
+  html.style.setProperty("--sidebar-accent", safeColor);
   html.style.setProperty("--sidebar-accent-foreground", foreground);
 }
 

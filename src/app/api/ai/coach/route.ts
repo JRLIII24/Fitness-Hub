@@ -26,6 +26,8 @@ import {
   saveCoachMemory,
   formatMemoriesForPrompt,
 } from "@/lib/coach/memory";
+import { getCachedOrComputeFatigueSnapshot } from "@/lib/fatigue/server";
+import { getCachedOrComputeReadiness } from "@/lib/readiness/server";
 
 // ── SSE helpers ──────────────────────────────────────────────────────────────
 
@@ -52,10 +54,36 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch persistent memories for this user
-    const memories = await getCoachMemories(supabase, user.id);
+    // Fetch persistent memories and safety-critical context server-side
+    const [memories, fatigueSnapshot, readinessResult] = await Promise.all([
+      getCoachMemories(supabase, user.id),
+      getCachedOrComputeFatigueSnapshot(user.id).catch(() => null),
+      getCachedOrComputeReadiness(user.id).catch(() => null),
+    ]);
+
     const memoriesBlock = formatMemoriesForPrompt(memories);
     const systemPrompt = buildCoachSystemPrompt(memoriesBlock || undefined);
+
+    // Compute ACWR status from server data (don't trust client-supplied value)
+    let serverAcwrStatus: string | null = null;
+    if (fatigueSnapshot?.metadata) {
+      const { avgLoad7d, avgLoad28d } = fatigueSnapshot.metadata;
+      if (avgLoad7d != null && avgLoad28d != null && avgLoad28d > 0) {
+        const acr = avgLoad7d / avgLoad28d;
+        if (acr > 1.5) serverAcwrStatus = "danger";
+        else if (acr > 1.3) serverAcwrStatus = "high";
+        else if (acr > 1.1) serverAcwrStatus = "elevated";
+        else if (acr >= 0.8) serverAcwrStatus = "optimal";
+        else serverAcwrStatus = "underloaded";
+      }
+    }
+
+    // Override client context with server-fetched safety-critical fields
+    const serverContext = {
+      ...(body.context ?? {}),
+      ...(serverAcwrStatus != null && { acwr_status: serverAcwrStatus }),
+      ...(readinessResult != null && { readiness_score: readinessResult.readinessScore }),
+    };
 
     // Build conversation messages
     const messages = [
@@ -65,7 +93,7 @@ export async function POST(request: Request) {
       })),
       {
         role: "user" as const,
-        content: `${body.message}\n\n---\nCurrent context: ${JSON.stringify(body.context ?? {})}`,
+        content: `${body.message}\n\n---\nCurrent context: ${JSON.stringify(serverContext)}`,
       },
     ];
 
@@ -111,7 +139,7 @@ export async function POST(request: Request) {
 
           // ACWR safety guardrail — programmatically enforce deload regardless of LLM output
           if (action === "show_prescription" && data) {
-            const acwrStatus = body.context?.acwr_status;
+            const acwrStatus = serverAcwrStatus ?? body.context?.acwr_status;
             if (acwrStatus === "danger" || acwrStatus === "high") {
               data.readiness_factor = "deload";
               if (typeof data.progressive_overload_pct === "number" && data.progressive_overload_pct > 0) {

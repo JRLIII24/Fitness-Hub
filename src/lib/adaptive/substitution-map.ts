@@ -28,3 +28,29 @@ export const SUBSTITUTION_MAP: Record<string, string[]> = {
   forearms: ['biceps', 'triceps'],
   arms: ['shoulders', 'core'],
 };
+
+/**
+ * Maps heavy barbell compounds to machine/cable equivalents for CNS bypass.
+ * When systemic fatigue is high but the target muscle is locally recovered,
+ * swap to the machine variant to reduce CNS demand while preserving volume.
+ */
+export const BARBELL_TO_MACHINE_MAP: Record<string, string> = {
+  "Barbell Squat": "Leg Press",
+  "Back Squat": "Leg Press",
+  "Front Squat": "Hack Squat",
+  "Barbell Deadlift": "Leg Press",
+  "Romanian Deadlift": "Lying Leg Curl",
+  "Barbell Bench Press": "Machine Chest Press",
+  "Incline Barbell Press": "Incline Dumbbell Press",
+  "Barbell Row": "Cable Row",
+  "Bent-Over Row": "Cable Row",
+  "Barbell Overhead Press": "Dumbbell Shoulder Press",
+  "Barbell Curl": "Cable Curl",
+  "Barbell Skullcrusher": "Cable Tricep Pushdown",
+};
+
+/** Systemic score below which CNS bypass is triggered */
+export const CNS_BYPASS_SYSTEMIC_THRESHOLD = 40;
+
+/** Local muscle recovery must be above this for CNS bypass (muscle is ready, CNS is not) */
+export const CNS_BYPASS_LOCAL_RECOVERY_THRESHOLD = 80;

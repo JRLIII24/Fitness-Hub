@@ -1,7 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { ArrowUp, Check, Equal, Flame, Ghost, Trash2, Trophy } from "lucide-react";
+import { ArrowUp, Check, Equal, Flame, Ghost, Trash2, Trophy, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { WorkoutSet } from "@/types/workout";
@@ -106,25 +106,25 @@ export const SetRow = memo(function SetRow({
 
   const handleWeightChange = (value: string) => {
     if (value === "") {
-      onUpdate(exerciseIndex, setIndex, { weight_kg: null });
+      onUpdate(exerciseIndex, setIndex, { weight_kg: null, is_predicted: false });
       return;
     }
 
     const parsed = Number(value);
     if (Number.isFinite(parsed)) {
-      onUpdate(exerciseIndex, setIndex, { weight_kg: fromDisplay(parsed) });
+      onUpdate(exerciseIndex, setIndex, { weight_kg: fromDisplay(parsed), is_predicted: false });
     }
   };
 
   const handleRepsChange = (value: string) => {
     if (value === "") {
-      onUpdate(exerciseIndex, setIndex, { reps: null });
+      onUpdate(exerciseIndex, setIndex, { reps: null, is_predicted: false });
       return;
     }
 
     const parsed = Number.parseInt(value, 10);
     if (Number.isFinite(parsed)) {
-      onUpdate(exerciseIndex, setIndex, { reps: parsed });
+      onUpdate(exerciseIndex, setIndex, { reps: parsed, is_predicted: false });
     }
   };
 
@@ -325,9 +325,21 @@ export const SetRow = memo(function SetRow({
             placeholder={smartSuggestion ? String(toDisplay(smartSuggestion.weightKg)) : suggestedWeight != null ? String(toDisplay(suggestedWeight)) : "0"}
             value={weightValue}
             onChange={(e) => handleWeightChange(e.target.value)}
-            className="h-10 w-full text-center text-[15px] font-semibold tabular-nums text-foreground"
+            className={cn(
+              "h-10 w-full text-center text-[15px] font-semibold tabular-nums",
+              set.is_predicted && !set.completed
+                ? "text-cyan-400/80 italic"
+                : "text-foreground"
+            )}
             disabled={set.completed}
           />
+          {/* Predictive overload Auto badge */}
+          {set.is_predicted && !set.completed && (
+            <span className="mt-0.5 inline-flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-400">
+              <Zap className="h-2.5 w-2.5" />
+              Auto
+            </span>
+          )}
           {/* Progressive overload suggestion chip */}
           <AnimatePresence>
             {!set.completed && set.weight_kg === null && smartSuggestion && (

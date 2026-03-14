@@ -70,3 +70,9 @@ export const MEAL_PLANNING_ENABLED =
 
 export const WEARABLE_INTEGRATIONS_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_WEARABLE_INTEGRATIONS === "true";
+
+export const EXPENDITURE_SYNC_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_EXPENDITURE_SYNC === "true";
+
+export const POD_ARENA_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_POD_ARENA === "true";

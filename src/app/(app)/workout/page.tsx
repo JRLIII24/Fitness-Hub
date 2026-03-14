@@ -72,6 +72,7 @@ import { useGhostSession } from "@/hooks/workout/use-ghost-session";
 import { useExerciseSwap } from "@/hooks/workout/use-exercise-swap";
 import { useWorkoutCompletion } from "@/hooks/workout/use-workout-completion";
 import { useTemplateActions, type WorkoutTemplate } from "@/hooks/workout/use-template-actions";
+import { usePredictiveSets } from "@/hooks/use-predictive-sets";
 
 // Extracted components
 import { WorkoutHeader, ElapsedTime } from "@/components/workout/workout-header";
@@ -224,6 +225,7 @@ export default function WorkoutPage() {
     setExerciseNote,
     setWorkoutNote,
     updateWorkoutName,
+    applyPredictiveOverload,
   } = useWorkoutStore(
     useShallow((s) => ({
       activeWorkout: s.activeWorkout,
@@ -243,6 +245,7 @@ export default function WorkoutPage() {
       setExerciseNote: s.setExerciseNote,
       setWorkoutNote: s.setWorkoutNote,
       updateWorkoutName: s.updateWorkoutName,
+      applyPredictiveOverload: s.applyPredictiveOverload,
     }))
   );
 
@@ -331,6 +334,29 @@ export default function WorkoutPage() {
     setSwapSheetIndex,
     handleSwapExercise,
   } = useExerciseSwap(swapExercise, patchGhostForExercise);
+
+  // Predictive overload: fetch last-session performance and auto-fill sets
+  const predictiveMap = usePredictiveSets(
+    activeWorkout?.exercises ?? [],
+    userId
+  );
+  const predictiveAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (predictiveAppliedRef.current) return;
+    if (predictiveMap.size === 0) return;
+    if (!activeWorkout || activeWorkout.exercises.length === 0) return;
+
+    predictiveAppliedRef.current = true;
+    applyPredictiveOverload(predictiveMap);
+  }, [predictiveMap, activeWorkout, applyPredictiveOverload]);
+
+  // Reset the ref guard when workout changes (new workout started)
+  useEffect(() => {
+    if (!isWorkoutActive) {
+      predictiveAppliedRef.current = false;
+    }
+  }, [isWorkoutActive]);
 
   // Workout completion: finish, cancel, celebration, RPE
   const {

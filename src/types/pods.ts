@@ -9,7 +9,26 @@ export interface Pod {
   creator_id: string;
   created_at: string;
   updated_at: string;
+  arena_level: number;
+  season_score: number;
+  season_start_date: string;
 }
+
+export type ArenaTier = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+export function getArenaTier(score: number): ArenaTier {
+  if (score >= 600) return 'platinum';
+  if (score >= 300) return 'gold';
+  if (score >= 100) return 'silver';
+  return 'bronze';
+}
+
+export const ARENA_TIERS = {
+  bronze:   { label: 'Bronze',   min: 0,   max: 99,  color: '#CD7F32', next: 100 },
+  silver:   { label: 'Silver',   min: 100, max: 299, color: '#C0C0C0', next: 300 },
+  gold:     { label: 'Gold',     min: 300, max: 599, color: '#FFD700', next: 600 },
+  platinum: { label: 'Platinum', min: 600, max: Infinity, color: '#E5E4E2', next: null },
+} as const;
 
 export interface PodMember {
   id: string;

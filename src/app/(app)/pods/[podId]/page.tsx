@@ -435,7 +435,12 @@ export default function PodDetailPage({ params }: PageProps) {
       {POD_CHALLENGES_ENABLED && (
         <>
           <ChallengesSection podId={podId} currentUserId={currentUserId} />
-          <PodLeaderboard podId={podId} />
+          <PodLeaderboard
+            podId={podId}
+            arenaLevel={pod.arena_level}
+            seasonScore={pod.season_score}
+            seasonStartDate={pod.season_start_date}
+          />
         </>
       )}
 

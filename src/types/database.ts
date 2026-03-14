@@ -41,27 +41,36 @@ export type Database = {
     Tables: {
       accountability_pods: {
         Row: {
+          arena_level: number
           created_at: string
           creator_id: string
           description: string | null
           id: string
           name: string
+          season_score: number
+          season_start_date: string
           updated_at: string
         }
         Insert: {
+          arena_level?: number
           created_at?: string
           creator_id: string
           description?: string | null
           id?: string
           name: string
+          season_score?: number
+          season_start_date?: string
           updated_at?: string
         }
         Update: {
+          arena_level?: number
           created_at?: string
           creator_id?: string
           description?: string | null
           id?: string
           name?: string
+          season_score?: number
+          season_start_date?: string
           updated_at?: string
         }
         Relationships: [
@@ -1312,6 +1321,47 @@ export type Database = {
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pod_season_recaps: {
+        Row: {
+          id: string
+          pod_id: string
+          recap_date: string
+          summary: string
+          mvp_user_id: string | null
+          highlights: Json
+          stats: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          pod_id: string
+          recap_date: string
+          summary: string
+          mvp_user_id?: string | null
+          highlights?: Json
+          stats?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          pod_id?: string
+          recap_date?: string
+          summary?: string
+          mvp_user_id?: string | null
+          highlights?: Json
+          stats?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pod_season_recaps_pod_id_fkey"
+            columns: ["pod_id"]
+            isOneToOne: false
+            referencedRelation: "accountability_pods"
             referencedColumns: ["id"]
           },
         ]
@@ -2749,6 +2799,8 @@ export type Database = {
         | "build_muscle"
         | "maintain"
         | "improve_endurance"
+        | "bulk"
+        | "cut"
       food_source_type: "openfoodfacts" | "usda" | "manual" | "ai-scan"
       gender_type: "male" | "female" | "other" | "prefer_not_to_say"
       meal_type: "breakfast" | "lunch" | "dinner" | "snack"

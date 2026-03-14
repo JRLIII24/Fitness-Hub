@@ -24,6 +24,7 @@ export interface WorkoutSet {
   rest_seconds: number | null;
   completed: boolean;
   completed_at: string | null;
+  is_predicted?: boolean;
 }
 
 export interface WorkoutExercise {

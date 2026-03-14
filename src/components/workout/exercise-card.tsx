@@ -428,7 +428,8 @@ export const ExerciseCard = memo(function ExerciseCard({
       ps.completed !== ns.completed ||
       ps.rir !== ns.rir ||
       ps.set_type !== ns.set_type ||
-      ps.id !== ns.id
+      ps.id !== ns.id ||
+      ps.is_predicted !== ns.is_predicted
     ) return false;
   }
 

@@ -1,12 +1,15 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ShieldAlert } from "lucide-react";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { weightToDisplay } from "@/lib/units";
 import type { AutoregulationPrescription } from "@/lib/coach/types";
 
 interface PrescriptionCardProps {
-  prescription: AutoregulationPrescription;
+  prescription: AutoregulationPrescription & {
+    reasoning_flag?: "cns_bypass" | "local_fatigue" | "peak" | "standard";
+    machine_substitute?: string;
+  };
 }
 
 const FACTOR_CONFIG = {
@@ -49,8 +52,38 @@ export function PrescriptionCard({ prescription }: PrescriptionCardProps) {
   const overloadSign = prescription.progressive_overload_pct >= 0 ? "+" : "";
   const overloadText = `${overloadSign}${prescription.progressive_overload_pct.toFixed(1)}%`;
 
+  const isCnsBypass = prescription.reasoning_flag === "cns_bypass";
+
   return (
     <div className="rounded-xl border border-border/50 bg-card/40 p-3">
+      {/* CNS Protection alert */}
+      {isCnsBypass && (
+        <div
+          className="mb-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5"
+          style={{
+            background: "rgba(168, 85, 247, 0.12)",
+            border: "1px solid rgba(168, 85, 247, 0.25)",
+          }}
+        >
+          <ShieldAlert
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: "rgba(168, 85, 247, 1)" }}
+          />
+          <span
+            className="text-[11px] font-semibold leading-tight"
+            style={{ color: "rgba(168, 85, 247, 1)" }}
+          >
+            CNS Protection — Machine variation recommended
+            {prescription.machine_substitute && (
+              <span className="font-normal">
+                {" "}
+                &middot; Use {prescription.machine_substitute}
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+
       {/* Header: exercise name + readiness badge */}
       <div className="mb-2 flex items-start justify-between gap-2">
         <h4 className="text-[13px] font-bold text-foreground leading-tight">

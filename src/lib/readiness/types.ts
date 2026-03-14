@@ -31,4 +31,8 @@ export interface ReadinessResult {
   domains: ReadinessDomainScore;
   confidence: 'low' | 'medium' | 'high';
   recommendation: string;
+  /** Alias for domains.training — 0-100, high = good CNS state */
+  systemic_score: number;
+  /** Muscle group → recovery percentage (0-100) */
+  local_fatigue_map?: Record<string, number>;
 }

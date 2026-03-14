@@ -55,11 +55,25 @@ export async function POST(request: Request) {
     }
 
     // Fetch persistent memories and safety-critical context server-side
-    const [memories, fatigueSnapshot, readinessResult] = await Promise.all([
+    const [memories, fatigueSnapshot, readinessResult, { data: muscleRecoveryRows }] = await Promise.all([
       getCoachMemories(supabase, user.id),
       getCachedOrComputeFatigueSnapshot(user.id).catch(() => null),
       getCachedOrComputeReadiness(user.id).catch(() => null),
+      supabase.rpc('get_muscle_group_recovery', {
+        p_user_id: user.id, p_lookback_days: 7
+      }).then(res => res, () => ({ data: null })),
     ]);
+
+    // Build muscle recovery map: muscle_group → recovery pct (0-100)
+    const muscleRecoveryMap: Record<string, number> | null =
+      muscleRecoveryRows && Array.isArray(muscleRecoveryRows) && muscleRecoveryRows.length > 0
+        ? Object.fromEntries(
+            muscleRecoveryRows.map((row: { muscle_group: string; hours_since_trained: number }) => [
+              row.muscle_group,
+              Math.min(100, Math.round((row.hours_since_trained / 48) * 100)),
+            ])
+          )
+        : null;
 
     const memoriesBlock = formatMemoriesForPrompt(memories);
     const systemPrompt = buildCoachSystemPrompt(memoriesBlock || undefined);
@@ -83,6 +97,8 @@ export async function POST(request: Request) {
       ...(body.context ?? {}),
       ...(serverAcwrStatus != null && { acwr_status: serverAcwrStatus }),
       ...(readinessResult != null && { readiness_score: readinessResult.readinessScore }),
+      ...(readinessResult != null && { systemic_score: readinessResult.systemic_score }),
+      ...(muscleRecoveryMap != null && { muscle_recovery_map: muscleRecoveryMap }),
     };
 
     // Build conversation messages

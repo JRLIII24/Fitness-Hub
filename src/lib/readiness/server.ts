@@ -11,32 +11,46 @@ export async function computeAndCacheReadiness(userId: string): Promise<Readines
   const today = getDateInTimezone(new Date(), timezone);
 
   // 1. Training domain: get fatigue score
-  const fatigueSnapshot = await getCachedOrComputeFatigueSnapshot(userId);
-
   // 2. Nutrition domain: call RPC
-  const { data: nutritionData } = await supabase.rpc('get_nutrition_compliance', {
-    p_user_id: userId, p_days: 3
-  });
-
   // 3. Recovery domain: get latest checkin
-  const { data: checkin } = await supabase
-    .from('fatigue_daily_checkins')
-    .select('sleep_quality, soreness, stress, motivation')
-    .eq('user_id', userId)
-    .order('checkin_date', { ascending: false })
-    .limit(1)
-    .single();
+  // 4. External domain: get latest health sync
+  // 5. Local muscle recovery: get per-muscle recovery data
+  const [fatigueSnapshot, { data: nutritionData }, { data: checkin }, { data: healthData }, { data: muscleRecoveryData }] = await Promise.all([
+    getCachedOrComputeFatigueSnapshot(userId),
+    supabase.rpc('get_nutrition_compliance', {
+      p_user_id: userId, p_days: 3
+    }),
+    supabase
+      .from('fatigue_daily_checkins')
+      .select('sleep_quality, soreness, stress, motivation')
+      .eq('user_id', userId)
+      .order('checkin_date', { ascending: false })
+      .limit(1)
+      .single(),
+    supabase
+      .from('health_sync_data')
+      .select('sleep_hours, resting_heart_rate, hrv_ms, steps')
+      .eq('user_id', userId)
+      .eq('sync_date', today)
+      .limit(1)
+      .single(),
+    supabase.rpc('get_muscle_group_recovery', {
+      p_user_id: userId, p_lookback_days: 7
+    }),
+  ]);
 
   const recoveryRaw = checkin ? deriveRecoveryRaw(checkin) : null;
 
-  // 4. External domain: get latest health sync
-  const { data: healthData } = await supabase
-    .from('health_sync_data')
-    .select('sleep_hours, resting_heart_rate, hrv_ms, steps')
-    .eq('user_id', userId)
-    .eq('sync_date', today)
-    .limit(1)
-    .single();
+  // Build local fatigue map from muscle recovery RPC data
+  const localFatigueMap: Record<string, number> | undefined =
+    muscleRecoveryData && Array.isArray(muscleRecoveryData) && muscleRecoveryData.length > 0
+      ? Object.fromEntries(
+          muscleRecoveryData.map((row: { muscle_group: string; hours_since_trained: number }) => [
+            row.muscle_group,
+            Math.min(100, Math.round((row.hours_since_trained / 48) * 100)),
+          ])
+        )
+      : undefined;
 
   const result = calculateReadiness({
     fatigueScore: fatigueSnapshot?.fatigueScore ?? null,
@@ -53,6 +67,11 @@ export async function computeAndCacheReadiness(userId: string): Promise<Readines
       steps: healthData.steps,
     } : null,
   });
+
+  // Attach local fatigue map if available
+  if (localFatigueMap) {
+    result.local_fatigue_map = localFatigueMap;
+  }
 
   // Cache to DB (upsert)
   await supabase.from('readiness_daily_scores').upsert({
@@ -93,17 +112,19 @@ export async function getCachedOrComputeReadiness(userId: string): Promise<Readi
 
   if (cached) {
     const level = scoreToLevel(cached.readiness_score);
+    const trainingScore = cached.training_score ?? 50;
     return {
       readinessScore: cached.readiness_score,
       level,
       domains: {
-        training: cached.training_score ?? 50,
+        training: trainingScore,
         nutrition: cached.nutrition_score ?? 50,
         recovery: cached.recovery_score ?? 50,
         external: cached.external_score,
       },
       confidence: cached.confidence as 'low' | 'medium' | 'high',
       recommendation: cached.recommendation,
+      systemic_score: trainingScore,
     };
   }
 

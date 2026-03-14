@@ -72,3 +72,16 @@ export const PUSH_NOTIFICATIONS_ENABLED_SERVER =
 // ---------------------------------------------------------------------------
 export const WEEKLY_REPORT_ENABLED_SERVER =
   process.env.ENABLE_WEEKLY_REPORT === "true";
+
+// ---------------------------------------------------------------------------
+// Expenditure Sync (smart-surplus cron adjusting nutrition goals)
+//
+// Consuming files:
+//   src/app/api/cron/expenditure-sync/route.ts
+//
+// Migration: import EXPENDITURE_SYNC_ENABLED_SERVER from this file.
+//   Old env var: NEXT_PUBLIC_ENABLE_EXPENDITURE_SYNC
+//   New env var: ENABLE_EXPENDITURE_SYNC
+// ---------------------------------------------------------------------------
+export const EXPENDITURE_SYNC_ENABLED_SERVER =
+  process.env.ENABLE_EXPENDITURE_SYNC === "true";

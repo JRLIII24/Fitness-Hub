@@ -316,6 +316,10 @@ export interface CoachContext {
   acwr_status?: "danger" | "high" | "elevated" | "optimal" | "underloaded" | null;
   /** Current fatigue level label from the fatigue engine */
   fatigue_label?: string | null;
+  /** Per-muscle-group recovery percentage (0-100, high = recovered) */
+  muscle_recovery_map?: Record<string, number> | null;
+  /** CNS/systemic readiness score (0-100, alias for training domain) */
+  systemic_score?: number | null;
 }
 
 export interface CoachRequest {
@@ -378,6 +382,8 @@ export const AutoregulationPrescriptionSchema = z.object({
   rationale: z.string(),
   readiness_factor: z.enum(["push", "maintain", "deload"]),
   progressive_overload_pct: z.number(),
+  reasoning_flag: z.enum(["cns_bypass", "local_fatigue", "peak", "standard"]).optional(),
+  machine_substitute: z.string().optional(),
 });
 
 export type AutoregulationPrescription = z.infer<

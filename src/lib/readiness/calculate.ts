@@ -139,5 +139,6 @@ export function calculateReadiness(inputs: ReadinessInputs): ReadinessResult {
     domains: { training, nutrition, recovery, external },
     confidence,
     recommendation: RECOMMENDATIONS[level],
+    systemic_score: training,
   };
 }

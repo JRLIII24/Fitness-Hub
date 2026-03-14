@@ -53,6 +53,36 @@ export async function POST() {
       );
     }
 
+    // Build expenditure context from profile goal + recent nutrition adjustments
+    let expenditureContext = "No active expenditure adjustment.";
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("fitness_goal")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile?.fitness_goal) {
+      const { data: recentGoals } = await supabase
+        .from("nutrition_goals")
+        .select("calories_target, effective_from")
+        .eq("user_id", user.id)
+        .order("effective_from", { ascending: false })
+        .limit(2);
+
+      if (recentGoals && recentGoals.length >= 2) {
+        const current = recentGoals[0];
+        const previous = recentGoals[1];
+        if (current.calories_target && previous.calories_target) {
+          const delta = current.calories_target - previous.calories_target;
+          if (delta !== 0) {
+            const direction = delta > 0 ? "+" : "";
+            const goalLabel = profile.fitness_goal.replace("_", " ");
+            expenditureContext = `Weekly adjustment: ${direction}${delta} kcal daily (goal: ${goalLabel}). Current target: ${current.calories_target} kcal.`;
+          }
+        }
+      }
+    }
+
     // Format summary for the prompt (compact table)
     const summaryTable = foodSummary
       .map(
@@ -69,9 +99,9 @@ export async function POST() {
       .join("\n");
 
     const systemPrompt = GROCERY_GENERATION_PROMPT.replace(
-      "{food_log_summary}",
-      summaryTable,
-    );
+      "{expenditure_context}",
+      expenditureContext,
+    ).replace("{food_log_summary}", summaryTable);
 
     const { object: aiOutput } = await generateObject({
       model: provider(HAIKU),

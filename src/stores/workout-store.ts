@@ -40,6 +40,11 @@ interface WorkoutState {
   ) => void;
   removeSet: (exerciseIndex: number, setIndex: number) => void;
   completeSet: (exerciseIndex: number, setIndex: number) => void;
+
+  // Predictive overload
+  applyPredictiveOverload: (
+    predictions: Map<string, { weightKg: number; reps: number | null; intent: string }>
+  ) => void;
 }
 
 function generateId() {
@@ -312,6 +317,41 @@ export const useWorkoutStore = create<WorkoutState>()(
             exercises,
           },
         });
+      },
+
+      applyPredictiveOverload: (
+        predictions: Map<string, { weightKg: number; reps: number | null; intent: string }>
+      ) => {
+        const state = get();
+        if (!state.activeWorkout || predictions.size === 0) return;
+
+        const exercises = [...state.activeWorkout.exercises];
+        let changed = false;
+
+        for (let ei = 0; ei < exercises.length; ei++) {
+          const sets = [...exercises[ei].sets];
+          for (let si = 0; si < sets.length; si++) {
+            const key = `${exercises[ei].exercise.id}:${si}`;
+            const prediction = predictions.get(key);
+            if (!prediction) continue;
+            if (sets[si].weight_kg !== null || sets[si].completed) continue;
+
+            sets[si] = {
+              ...sets[si],
+              weight_kg: prediction.weightKg,
+              reps: sets[si].reps ?? prediction.reps,
+              is_predicted: true,
+            };
+            changed = true;
+          }
+          if (changed) {
+            exercises[ei] = { ...exercises[ei], sets };
+          }
+        }
+
+        if (changed) {
+          set({ activeWorkout: { ...state.activeWorkout, exercises } });
+        }
       },
 
       completeSet: (exerciseIndex: number, setIndex: number) => {

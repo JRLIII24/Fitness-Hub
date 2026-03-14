@@ -1,25 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { usePodLeaderboard } from '@/hooks/use-pod-leaderboard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Trophy, Flame } from 'lucide-react';
+import { Loader2, Trophy, Flame, Shield } from 'lucide-react';
 import { kgToLbs } from '@/lib/units';
 import { useUnitPreferenceStore } from '@/stores/unit-preference-store';
-import type { ChallengeLeaderboard, LeaderboardEntry } from '@/types/pods';
+import { POD_ARENA_ENABLED } from '@/lib/features';
+import { getArenaTier, ARENA_TIERS } from '@/types/pods';
+import type { ChallengeLeaderboard, LeaderboardEntry, ArenaTier } from '@/types/pods';
+import { createClient } from '@/lib/supabase/client';
+import { motion } from 'framer-motion';
 
 interface PodLeaderboardProps {
     podId: string;
+    arenaLevel?: number;
+    seasonScore?: number;
+    seasonStartDate?: string;
 }
 
-export function PodLeaderboard({ podId }: PodLeaderboardProps) {
+export function PodLeaderboard({ podId, arenaLevel, seasonScore, seasonStartDate }: PodLeaderboardProps) {
     const { leaderboards, loading, error } = usePodLeaderboard(podId);
     const unitPreference = useUnitPreferenceStore((state) => state.preference);
-    const [activeTab, setActiveTab] = useState<'volume' | 'consistency'>('volume');
+
+    const showArena = POD_ARENA_ENABLED && arenaLevel !== undefined && seasonScore !== undefined;
+
+    const [activeTab, setActiveTab] = useState<'volume' | 'consistency' | 'arena'>('volume');
 
     if (loading) {
         return (
@@ -66,12 +76,12 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                     defaultValue="volume"
                     value={activeTab}
                     onValueChange={(v) => {
-                        if (v === 'volume' || v === 'consistency') {
-                            setActiveTab(v);
+                        if (v === 'volume' || v === 'consistency' || (v === 'arena' && showArena)) {
+                            setActiveTab(v as typeof activeTab);
                         }
                     }}
                 >
-                    <TabsList className="grid w-full grid-cols-2 mb-6">
+                    <TabsList className={`grid w-full ${showArena ? 'grid-cols-3' : 'grid-cols-2'} mb-6`}>
                         <TabsTrigger value="volume" className="flex items-center gap-1.5">
                             <Trophy className="h-4 w-4" />
                             <span className="hidden sm:inline">Volume</span>
@@ -80,6 +90,12 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                             <Flame className="h-4 w-4" />
                             <span className="hidden sm:inline">Consistency</span>
                         </TabsTrigger>
+                        {showArena && (
+                            <TabsTrigger value="arena" className="flex items-center gap-1.5">
+                                <Shield className="h-4 w-4" />
+                                <span className="hidden sm:inline">Arena</span>
+                            </TabsTrigger>
+                        )}
                     </TabsList>
 
                     <TabsContent value="volume" className="mt-0">
@@ -98,11 +114,222 @@ export function PodLeaderboard({ podId }: PodLeaderboardProps) {
                             unitPreference={unitPreference}
                         />
                     </TabsContent>
+                    {showArena && (
+                        <TabsContent value="arena" className="mt-0">
+                            <ArenaTabContent
+                                podId={podId}
+                                seasonScore={seasonScore!}
+                                seasonStartDate={seasonStartDate}
+                            />
+                        </TabsContent>
+                    )}
                 </Tabs>
             </CardContent>
         </Card>
     );
 }
+
+// ── Arena Tab ────────────────────────────────────────────────────────────────
+
+interface SeasonRecap {
+    id: string;
+    summary: string;
+    highlights: string[];
+    recap_date: string;
+}
+
+function ArenaTabContent({
+    podId,
+    seasonScore,
+    seasonStartDate,
+}: {
+    podId: string;
+    seasonScore: number;
+    seasonStartDate?: string;
+}) {
+    const tier = getArenaTier(seasonScore);
+    const tierInfo = ARENA_TIERS[tier];
+
+    const [recap, setRecap] = useState<SeasonRecap | null>(null);
+    const [recapLoading, setRecapLoading] = useState(true);
+
+    const supabase = useMemo(() => createClient(), []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchRecap() {
+            setRecapLoading(true);
+            const { data } = await supabase
+                .from('pod_season_recaps')
+                .select('id, summary, highlights, recap_date')
+                .eq('pod_id', podId)
+                .order('recap_date', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (!cancelled && data) {
+                setRecap({
+                    id: data.id,
+                    summary: data.summary,
+                    highlights: Array.isArray(data.highlights)
+                        ? (data.highlights as string[])
+                        : [],
+                    recap_date: data.recap_date,
+                });
+            }
+            if (!cancelled) setRecapLoading(false);
+        }
+
+        fetchRecap();
+        return () => { cancelled = true; };
+    }, [podId, supabase]);
+
+    return (
+        <div className="space-y-6">
+            <ArenaTierBadge
+                tier={tier}
+                tierInfo={tierInfo}
+                seasonScore={seasonScore}
+                seasonStartDate={seasonStartDate}
+            />
+
+            {/* Season Recap */}
+            <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Season Recap
+                </p>
+
+                {recapLoading ? (
+                    <div className="flex justify-center py-6">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                ) : recap ? (
+                    <div className="rounded-xl border border-border/50 bg-card/40 p-4 space-y-3">
+                        <p className="text-sm text-foreground leading-relaxed">
+                            {recap.summary}
+                        </p>
+                        {recap.highlights.length > 0 && (
+                            <ul className="space-y-1.5">
+                                {recap.highlights.map((h, i) => (
+                                    <li
+                                        key={i}
+                                        className="flex items-start gap-2 text-sm text-muted-foreground"
+                                    >
+                                        <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                                        {h}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                            {new Date(recap.recap_date).toLocaleDateString('en-US', {
+                                month: 'long',
+                                year: 'numeric',
+                            })}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center space-y-3 rounded-xl border border-dashed border-border/50 bg-muted/20">
+                        <div className="rounded-full bg-muted p-3">
+                            <Shield className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            No season recap yet. Keep competing to unlock your first recap.
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function ArenaTierBadge({
+    tier,
+    tierInfo,
+    seasonScore,
+    seasonStartDate,
+}: {
+    tier: ArenaTier;
+    tierInfo: (typeof ARENA_TIERS)[ArenaTier];
+    seasonScore: number;
+    seasonStartDate?: string;
+}) {
+    const nextThreshold = tierInfo.next;
+    const progressPct =
+        nextThreshold !== null
+            ? Math.min(
+                  100,
+                  ((seasonScore - tierInfo.min) / (nextThreshold - tierInfo.min)) * 100,
+              )
+            : 100;
+
+    return (
+        <div className="rounded-xl border border-border/50 bg-card/40 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div
+                        className="flex h-10 w-10 items-center justify-center rounded-xl"
+                        style={{ backgroundColor: `${tierInfo.color}20`, borderColor: `${tierInfo.color}40`, borderWidth: 1 }}
+                    >
+                        <Shield className="h-5 w-5" style={{ color: tierInfo.color }} />
+                    </div>
+                    <div>
+                        <p
+                            className="text-[13px] font-bold"
+                            style={{ color: tierInfo.color }}
+                        >
+                            {tierInfo.label}
+                        </p>
+                        {seasonStartDate && (
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                                Season started{' '}
+                                {new Date(seasonStartDate).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                })}
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                <motion.span
+                    className="tabular-nums text-[26px] font-black leading-none"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                >
+                    {seasonScore}
+                </motion.span>
+            </div>
+
+            {/* Progress bar */}
+            {nextThreshold !== null && (
+                <div className="space-y-1.5">
+                    <div className="h-2 w-full rounded-full bg-muted/60 overflow-hidden">
+                        <motion.div
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: tierInfo.color }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${progressPct}%` }}
+                            transition={{ duration: 0.6, ease: 'easeOut' }}
+                        />
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                            {tierInfo.label}
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                            {seasonScore} / {nextThreshold}
+                        </span>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Existing Leaderboard Components ──────────────────────────────────────────
 
 function LeaderboardList({
     leaderboard,

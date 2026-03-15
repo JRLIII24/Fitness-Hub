@@ -401,7 +401,7 @@ export function DashboardContent({
                 <span className="truncate">Nutrition</span>
               </Button>
             </Link>
-            <Link href="/workout/calendar">
+            <Link href="/history/progress">
               <Button
                 variant="secondary"
                 className="motion-press h-12 w-full justify-center gap-1.5 rounded-xl text-xs font-semibold sm:gap-2 sm:text-sm"

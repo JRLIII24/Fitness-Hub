@@ -56,9 +56,13 @@ export async function POST(
       ? planned_days.filter((d: unknown) => typeof d === 'string' && VALID_DAYS.includes(d as string))
       : [];
 
-    // Get current week start
-    const weekStart = getCurrentWeekStart();
-    const weekStartDate = weekStart.toISOString().split('T')[0];
+    // Get current week start (timezone-aware — fetch user's tz)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('timezone')
+      .eq('id', user.id)
+      .maybeSingle();
+    const weekStartDate = getCurrentWeekStart(profile?.timezone || 'UTC');
 
     // Upsert commitment for this week
     // Try with planned_days first; fall back without it if column doesn't exist yet

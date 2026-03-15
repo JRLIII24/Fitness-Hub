@@ -1,22 +1,42 @@
 /**
  * Pod Progress Calculator
  * Calculates member progress towards weekly commitments
+ * All date logic is timezone-aware per member.
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { getDateInTimezone } from '@/lib/timezone';
 import type { MemberProgress } from '@/types/pods';
 
+const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
 /**
- * Get the start of the current ISO week (Monday)
+ * Get Monday (ISO week start) for the week containing a YYYY-MM-DD date string.
  */
-export function getCurrentWeekStart(): Date {
-  const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ...
-  const diff = (dayOfWeek + 6) % 7; // Days since Monday
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - diff);
-  monday.setHours(0, 0, 0, 0);
-  return monday;
+function getWeekStartDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const dow = date.getDay(); // 0=Sun
+  const diff = (dow + 6) % 7; // days since Monday
+  date.setDate(date.getDate() - diff);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Get day name ('mon','tue',...) from a YYYY-MM-DD string.
+ */
+function dayNameFromDateStr(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return DAY_NAMES[new Date(y, m - 1, d).getDay()];
+}
+
+/**
+ * Get the start of the current ISO week (Monday) in a given timezone.
+ * Returns YYYY-MM-DD string.
+ */
+export function getCurrentWeekStart(timezone = 'UTC'): string {
+  const todayStr = getDateInTimezone(new Date(), timezone);
+  return getWeekStartDate(todayStr);
 }
 
 /**
@@ -24,15 +44,13 @@ export function getCurrentWeekStart(): Date {
  */
 export async function getPodMemberProgress(podId: string): Promise<MemberProgress[]> {
   const supabase = await createClient();
-  const weekStart = getCurrentWeekStart();
-  const weekStartISO = weekStart.toISOString();
 
-  // Get all active members with their commitments
+  // Get all active members with their profiles (including timezone)
   const { data: members, error: membersError } = await supabase
     .from('pod_members')
     .select(`
       user_id,
-      profiles!inner(display_name, username, avatar_url, preferred_workout_days)
+      profiles!inner(display_name, username, avatar_url, preferred_workout_days, timezone)
     `)
     .eq('pod_id', podId)
     .eq('status', 'active');
@@ -42,68 +60,104 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
     return [];
   }
 
-  // Get commitments for this week (planned_days may not exist yet pre-migration)
-  let commitments: Array<{ user_id: string; workouts_per_week: number; planned_days?: string[] }> | null = null;
-  const weekDate = weekStart.toISOString().split('T')[0];
+  // Use a safe global week start for the DB query (earliest possible Monday across all timezones)
+  // UTC-12 is the furthest behind, so go back 1 extra day from UTC Monday
+  const utcWeekStart = getCurrentWeekStart('UTC');
+  const safeQueryStart = new Date(utcWeekStart + 'T00:00:00Z');
+  safeQueryStart.setDate(safeQueryStart.getDate() - 1);
+  const safeQueryStartISO = safeQueryStart.toISOString();
+
+  // Get commitments — we need to check multiple possible week_start_dates
+  // since different timezones may have different Mondays
+  const uniqueWeekStarts = new Set<string>();
+  const memberTimezones = new Map<string, string>();
+
+  for (const member of members) {
+    const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
+    const tz = (profile as Record<string, unknown>)?.timezone as string || 'UTC';
+    memberTimezones.set(member.user_id, tz);
+    uniqueWeekStarts.add(getCurrentWeekStart(tz));
+  }
+
+  // Get commitments for all relevant week starts
+  let commitments: Array<{ user_id: string; workouts_per_week: number; planned_days?: string[]; week_start_date?: string }> | null = null;
+  const weekStartArray = Array.from(uniqueWeekStarts);
 
   const fullQuery = await supabase
     .from('pod_commitments')
-    .select('user_id, workouts_per_week, planned_days')
+    .select('user_id, workouts_per_week, planned_days, week_start_date')
     .eq('pod_id', podId)
-    .eq('week_start_date', weekDate);
+    .in('week_start_date', weekStartArray);
 
   if (fullQuery.error?.message?.includes('planned_days')) {
-    // Column doesn't exist yet — query without it
     const fallback = await supabase
       .from('pod_commitments')
-      .select('user_id, workouts_per_week')
+      .select('user_id, workouts_per_week, week_start_date')
       .eq('pod_id', podId)
-      .eq('week_start_date', weekDate);
+      .in('week_start_date', weekStartArray);
     commitments = (fallback.data || []).map(c => ({ ...c, planned_days: [] }));
   } else {
     commitments = fullQuery.data || [];
   }
 
+  // Build commitment map keyed by `userId:weekStartDate`
   const commitmentMap = new Map(
-    commitments.map(c => [c.user_id, { workouts_per_week: c.workouts_per_week, planned_days: c.planned_days ?? [] }])
+    (commitments || []).map(c => [
+      `${c.user_id}:${c.week_start_date}`,
+      { workouts_per_week: c.workouts_per_week, planned_days: c.planned_days ?? [] },
+    ])
   );
 
-  // Get workout counts + day data for this week
+  // Get all workouts from the safe start to now
   const userIds = members.map(m => m.user_id);
   const { data: workouts } = await supabase
     .from('workout_sessions')
     .select('user_id, id, started_at, total_volume_kg')
     .in('user_id', userIds)
     .eq('status', 'completed')
-    .gte('started_at', weekStartISO);
+    .gte('started_at', safeQueryStartISO);
 
-  const workoutCounts = new Map<string, number>();
-  const workoutDays = new Map<string, string[]>();
-  const workoutVolume = new Map<string, number>();
-  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-
+  // Group workouts by user_id
+  const workoutsByUser = new Map<string, typeof workouts>();
   (workouts || []).forEach(w => {
-    workoutCounts.set(w.user_id, (workoutCounts.get(w.user_id) || 0) + 1);
-    // Track completed days
-    const day = dayNames[new Date(w.started_at).getDay()];
-    const days = workoutDays.get(w.user_id) || [];
-    if (!days.includes(day)) days.push(day);
-    workoutDays.set(w.user_id, days);
-    // Track volume
-    workoutVolume.set(w.user_id, (workoutVolume.get(w.user_id) || 0) + (w.total_volume_kg || 0));
+    const list = workoutsByUser.get(w.user_id) || [];
+    list.push(w);
+    workoutsByUser.set(w.user_id, list);
   });
 
-  // Calculate progress for each member
+  // Calculate progress for each member (timezone-aware)
   const progress: MemberProgress[] = await Promise.all(
     members.map(async (member) => {
-      const entry = commitmentMap.get(member.user_id) || { workouts_per_week: 0, planned_days: [] };
+      const tz = memberTimezones.get(member.user_id) || 'UTC';
+      const memberWeekStart = getCurrentWeekStart(tz);
+      const entry = commitmentMap.get(`${member.user_id}:${memberWeekStart}`) || { workouts_per_week: 0, planned_days: [] };
       const commitment = entry.workouts_per_week;
-      const completed = workoutCounts.get(member.user_id) || 0;
+
+      // Filter & process workouts in member's timezone
+      const memberWorkouts = workoutsByUser.get(member.user_id) || [];
+      let completed = 0;
+      const completedDays: string[] = [];
+      let volumeKg = 0;
+
+      for (const w of memberWorkouts) {
+        // Convert workout start time to member's timezone date
+        const workoutDateStr = getDateInTimezone(new Date(w.started_at), tz);
+        const workoutWeekStart = getWeekStartDate(workoutDateStr);
+
+        // Only count workouts in this member's current week
+        if (workoutWeekStart !== memberWeekStart) continue;
+
+        completed++;
+        volumeKg += w.total_volume_kg || 0;
+
+        const dayName = dayNameFromDateStr(workoutDateStr);
+        if (!completedDays.includes(dayName)) completedDays.push(dayName);
+      }
+
       const progress_percentage = commitment > 0 ? Math.min(100, Math.round((completed / commitment) * 100)) : 0;
       const is_on_track = completed >= commitment;
 
-      // Calculate streak (consecutive weeks meeting goal)
-      const streak = await calculateStreak(member.user_id, podId);
+      const streak = await calculateStreak(member.user_id, podId, tz);
 
       const profile = Array.isArray(member.profiles) ? member.profiles[0] : member.profiles;
 
@@ -115,11 +169,11 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
         commitment,
         planned_days: entry.planned_days,
         completed,
-        completed_days: workoutDays.get(member.user_id) || [],
+        completed_days: completedDays,
         progress_percentage,
         is_on_track,
         streak,
-        volume_kg: workoutVolume.get(member.user_id) || 0,
+        volume_kg: volumeKg,
         preferred_workout_days: (profile as Record<string, unknown>)?.preferred_workout_days as number[] | null ?? null,
       };
     })
@@ -131,21 +185,23 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
 /**
  * Calculate consecutive weeks user met their commitment
  */
-async function calculateStreak(userId: string, podId: string): Promise<number> {
+async function calculateStreak(userId: string, podId: string, timezone = 'UTC'): Promise<number> {
   const supabase = await createClient();
   let streak = 0;
-  const currentWeek = getCurrentWeekStart();
+  const currentWeekStart = getCurrentWeekStart(timezone);
 
-  // Check last 12 weeks for streak
   for (let i = 0; i < 12; i++) {
-    const weekStartDate = new Date(currentWeek);
-    weekStartDate.setDate(currentWeek.getDate() - (i * 7));
-    const weekStartISO = weekStartDate.toISOString().split('T')[0];
-    const weekEndDate = new Date(weekStartDate);
-    weekEndDate.setDate(weekStartDate.getDate() + 7);
-    const weekEndISO = weekEndDate.toISOString();
+    // Compute week start i weeks ago
+    const [y, m, d] = currentWeekStart.split('-').map(Number);
+    const weekDate = new Date(y, m - 1, d);
+    weekDate.setDate(weekDate.getDate() - (i * 7));
+    const weekStartISO = `${weekDate.getFullYear()}-${String(weekDate.getMonth() + 1).padStart(2, '0')}-${String(weekDate.getDate()).padStart(2, '0')}`;
 
-    // Get commitment for this week
+    // Week end = 7 days after week start
+    const weekEndDate = new Date(weekDate);
+    weekEndDate.setDate(weekDate.getDate() + 7);
+    const weekEndISO = `${weekEndDate.getFullYear()}-${String(weekEndDate.getMonth() + 1).padStart(2, '0')}-${String(weekEndDate.getDate()).padStart(2, '0')}`;
+
     const { data: commitment } = await supabase
       .from('pod_commitments')
       .select('workouts_per_week')
@@ -155,26 +211,37 @@ async function calculateStreak(userId: string, podId: string): Promise<number> {
       .maybeSingle();
 
     if (!commitment) {
-      // No commitment = can't count towards streak
-      if (i === 0) continue; // Current week might not have commitment yet
+      if (i === 0) continue;
       break;
     }
 
-    // Count workouts in this week
+    // Count workouts in this week using timezone-aware date comparison
+    // Query a wide range and filter by timezone-local date
+    const queryStart = new Date(weekStartISO + 'T00:00:00Z');
+    queryStart.setDate(queryStart.getDate() - 1); // buffer for timezone offset
+    const queryEnd = new Date(weekEndISO + 'T00:00:00Z');
+    queryEnd.setDate(queryEnd.getDate() + 1); // buffer
+
     const { data: workouts } = await supabase
       .from('workout_sessions')
-      .select('id')
+      .select('id, started_at')
       .eq('user_id', userId)
       .eq('status', 'completed')
-      .gte('started_at', weekStartDate.toISOString())
-      .lt('started_at', weekEndISO);
+      .gte('started_at', queryStart.toISOString())
+      .lt('started_at', queryEnd.toISOString());
 
-    const workoutCount = workouts?.length || 0;
+    // Filter to workouts whose timezone-local date falls within this week
+    let workoutCount = 0;
+    for (const w of workouts || []) {
+      const wDateStr = getDateInTimezone(new Date(w.started_at), timezone);
+      if (wDateStr >= weekStartISO && wDateStr < weekEndISO) {
+        workoutCount++;
+      }
+    }
 
     if (workoutCount >= commitment.workouts_per_week) {
       streak++;
     } else if (i > 0) {
-      // Streak broken (allow current week to be incomplete)
       break;
     }
   }
@@ -198,12 +265,20 @@ export async function findUserByUsername(username: string): Promise<{ id: string
 }
 
 /**
- * Get current week's commitment for a user in a pod
+ * Get current week's commitment for a user in a pod (timezone-aware)
  */
 export async function getCurrentCommitment(userId: string, podId: string): Promise<number> {
   const supabase = await createClient();
-  const weekStart = getCurrentWeekStart();
-  const weekStartISO = weekStart.toISOString().split('T')[0];
+
+  // Get user timezone
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('timezone')
+    .eq('id', userId)
+    .maybeSingle();
+
+  const tz = profile?.timezone || 'UTC';
+  const weekStartISO = getCurrentWeekStart(tz);
 
   const { data: commitment } = await supabase
     .from('pod_commitments')

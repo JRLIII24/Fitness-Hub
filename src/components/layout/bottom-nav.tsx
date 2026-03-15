@@ -118,7 +118,7 @@ export function BottomNav() {
   ];
 
   const isTabActive = (href: string) => {
-    if (href === "/dashboard") return pathname.startsWith("/dashboard");
+    if (href === "/dashboard") return pathname.startsWith("/dashboard") || pathname.startsWith("/history");
     // "Train" tab owns workout, programs, and templates routes
     if (href === "/workout") {
       return (

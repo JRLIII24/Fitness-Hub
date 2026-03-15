@@ -174,7 +174,7 @@ export function statusCfg(status: PlayerStatus) {
 
 /** Derive player status from MemberProgress */
 export function getPlayerStatus(progress: MemberProgress): PlayerStatus {
-  const { completed, commitment, is_on_track, preferred_workout_days } = progress;
+  const { completed, commitment, is_on_track, preferred_workout_days, planned_days, completed_days } = progress;
 
   if (commitment === 0) return "warning";
   if (is_on_track) return "active";
@@ -184,20 +184,48 @@ export function getPlayerStatus(progress: MemberProgress): PlayerStatus {
   const dayOfWeek = now.getDay();
   const sessionsNeeded = commitment - completed;
 
-  // Count remaining training days this week (Mon=start)
-  let daysLeft: number;
-  if (preferred_workout_days && preferred_workout_days.length > 0) {
-    // Count how many preferred days are left today or later this week
-    daysLeft = 0;
-    for (let d = dayOfWeek; d <= 6; d++) {
-      if (preferred_workout_days.includes(d)) daysLeft++;
-    }
-    // Also check Sunday (0) if we haven't passed it
-    if (dayOfWeek > 0 && preferred_workout_days.includes(0)) daysLeft++;
-  } else {
-    daysLeft = dayOfWeek === 0 ? 1 : 7 - dayOfWeek;
+  const dayNameToDow: Record<string, number> = {
+    sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
+  };
+  const dowToDayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+  // Build the effective list of expected training days this week
+  // Priority: planned_days (from commitment) > preferred_workout_days (from profile schedule)
+  let expectedDays: string[] = [];
+  if (planned_days && planned_days.length > 0) {
+    expectedDays = planned_days;
+  } else if (preferred_workout_days && preferred_workout_days.length > 0) {
+    expectedDays = preferred_workout_days.map(d => dowToDayName[d]).filter(Boolean);
   }
 
+  if (expectedDays.length > 0) {
+    // Count how many expected training days have passed WITHOUT a workout
+    const missedDays = expectedDays.filter(d => {
+      const dow = dayNameToDow[d];
+      if (dow === undefined) return false;
+      const dayIdx = dow === 0 ? 6 : dow - 1; // Mon=0..Sun=6
+      const todayIdx = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      return dayIdx < todayIdx && !completed_days.includes(d);
+    });
+
+    // If no expected days have been missed, user is on pace — just BEHIND not SLIPPING
+    if (missedDays.length === 0) return "warning";
+
+    // Count remaining expected training days (today or later)
+    const remainingDays = expectedDays.filter(d => {
+      const dow = dayNameToDow[d];
+      if (dow === undefined) return false;
+      const dayIdx = dow === 0 ? 6 : dow - 1;
+      const todayIdx = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      return dayIdx >= todayIdx;
+    });
+
+    if (sessionsNeeded > remainingDays.length) return "critical";
+    return "warning";
+  }
+
+  // No schedule info at all — use simple remaining-calendar-days check
+  const daysLeft = dayOfWeek === 0 ? 1 : 7 - dayOfWeek;
   if (sessionsNeeded > daysLeft) return "critical";
   return "warning";
 }

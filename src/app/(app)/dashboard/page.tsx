@@ -41,7 +41,7 @@ export default async function DashboardPage() {
     supabase
       .from("profiles")
       .select(
-        "display_name, fitness_goal, current_streak, streak_milestones_unlocked, streak_freeze_available, xp, level"
+        "display_name, fitness_goal, current_streak, streak_milestones_unlocked, streak_freeze_available, xp, level, preferred_workout_days"
       )
       .eq("id", user.id)
       .single(),
@@ -103,6 +103,7 @@ export default async function DashboardPage() {
           streak_freeze_available: boolean;
           xp: number;
           level: number;
+          preferred_workout_days: number[] | null;
         } | null)
       : null;
 
@@ -223,7 +224,15 @@ export default async function DashboardPage() {
     yesterdayWorkoutResult.status === "fulfilled" &&
     (yesterdayWorkoutResult.value.data?.length ?? 0) > 0;
 
-  const streakAtRisk = !workedOutToday && streak > 0;
+  // Rest day detection: today's DOW not in preferred_workout_days
+  const preferredDays: number[] | null = profile?.preferred_workout_days ?? null;
+  // Get DOW in user's timezone (0=Sun..6=Sat) using weekday formatter
+  const todayDow = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].indexOf(
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "long" }).format(now)
+  );
+  const isRestDay = preferredDays !== null && preferredDays.length > 0 && !preferredDays.includes(todayDow);
+
+  const streakAtRisk = !workedOutToday && streak > 0 && !isRestDay;
   const momentumUrgency: "low" | "medium" | "high" =
     !streakAtRisk ? "low" : hourNow >= 20 ? "high" : hourNow >= 14 ? "medium" : "low";
   const weeklyMomentumGoal = 4;
@@ -289,6 +298,7 @@ export default async function DashboardPage() {
       workedOutToday={workedOutToday}
       workedOutYesterday={workedOutYesterday}
       streakAtRisk={streakAtRisk}
+      isRestDay={isRestDay}
       momentumUrgency={momentumUrgency}
       weeklyMomentumGoal={weeklyMomentumGoal}
       weeklyProgressPct={weeklyProgressPct}

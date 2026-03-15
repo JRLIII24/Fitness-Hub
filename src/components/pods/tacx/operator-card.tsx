@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, Moon } from "lucide-react";
 import { Y2K, getPlayerStatus, statusCfg, tierCfg, getInitials, formatVolume } from "@/lib/pods/y2k-tokens";
 import type { MemberProgress, ArenaTier } from "@/types/pods";
 import { Panel } from "./panel";
@@ -10,6 +10,11 @@ import { StatusBadge } from "./status-badge";
 import { HpPips } from "./hp-pips";
 import { WeekDots } from "./week-dots";
 import { Flame, Zap } from "lucide-react";
+
+function isMemberRestDay(preferredDays?: number[] | null): boolean {
+  if (!preferredDays || preferredDays.length === 0) return false;
+  return !preferredDays.includes(new Date().getDay());
+}
 
 interface PlayerCardProps {
   progress: MemberProgress;
@@ -32,6 +37,7 @@ export function PlayerCard({
   workoutName,
   workoutStartedAt,
 }: PlayerCardProps) {
+  const restDay = isMemberRestDay(progress.preferred_workout_days);
   const weeklyStatus = getPlayerStatus(progress);
   const status = isTraining ? "training" as const : weeklyStatus;
   const sc = statusCfg(status);
@@ -152,7 +158,30 @@ export function PlayerCard({
           </div>
 
           {/* Status badge */}
-          <StatusBadge status={status} />
+          {restDay && !isTraining ? (
+            <span
+              className="inline-flex items-center gap-1"
+              style={{
+                background: "rgba(52,211,153,0.10)",
+                border: "1px solid rgba(52,211,153,0.25)",
+                borderRadius: Y2K.rFull,
+                padding: "2px 6px",
+                color: "#34D399",
+                fontFamily: Y2K.fontDisplay,
+                fontSize: "9px",
+                fontWeight: 900,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <Moon size={10} strokeWidth={2.5} />
+              REST DAY
+            </span>
+          ) : (
+            <StatusBadge status={status} />
+          )}
 
           {/* Message button */}
           {!isCurrentUser && onComms && (

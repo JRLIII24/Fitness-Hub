@@ -76,6 +76,7 @@ export interface DashboardContentProps {
   workedOutToday: boolean;
   workedOutYesterday: boolean;
   streakAtRisk: boolean;
+  isRestDay: boolean;
   momentumUrgency: "low" | "medium" | "high";
   weeklyMomentumGoal: number;
   weeklyProgressPct: number;
@@ -126,6 +127,7 @@ export function DashboardContent({
   workedOutToday,
   workedOutYesterday,
   streakAtRisk,
+  isRestDay,
   momentumUrgency,
   weeklyMomentumGoal,
   weeklyProgressPct,
@@ -363,6 +365,7 @@ export function DashboardContent({
               currentStreak={streak}
               milestonesUnlocked={milestonesUnlocked}
               freezeAvailable={freezeAvailable}
+              isRestDay={isRestDay}
               level={level}
             />
           </div>

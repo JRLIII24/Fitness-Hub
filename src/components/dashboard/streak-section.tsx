@@ -12,6 +12,7 @@ interface StreakSectionProps {
   currentStreak: number;
   milestonesUnlocked: number[];
   freezeAvailable: boolean;
+  isRestDay: boolean;
   level: number;
 }
 
@@ -20,6 +21,7 @@ export function StreakSection({
   currentStreak,
   milestonesUnlocked,
   freezeAvailable,
+  isRestDay,
   level,
 }: StreakSectionProps) {
   const supabase = useSupabase();
@@ -52,6 +54,7 @@ export function StreakSection({
         currentStreak={currentStreak}
         milestonesUnlocked={milestonesUnlocked}
         freezeAvailable={freezeAvailable}
+        isRestDay={isRestDay}
         onUseFreeze={handleUseFreeze}
         className="mt-1"
       />

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Flame, Snowflake, Trophy } from "lucide-react";
+import { Flame, Moon, Snowflake, Trophy } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ interface StreakBadgeProps {
   currentStreak: number;
   milestonesUnlocked: number[];
   freezeAvailable: boolean;
+  isRestDay?: boolean;
   onUseFreeze?: () => void;
   className?: string;
 }
@@ -35,6 +36,7 @@ export function StreakBadge({
   currentStreak,
   milestonesUnlocked = [],
   freezeAvailable,
+  isRestDay = false,
   onUseFreeze,
   className,
 }: StreakBadgeProps) {
@@ -97,7 +99,13 @@ export function StreakBadge({
                   {currentStreak}
                   <span className="ml-1 text-sm font-normal text-muted-foreground">day streak</span>
                 </p>
-                {daysToNext && (
+                {isRestDay && (
+                  <p className="flex items-center gap-1 text-xs text-emerald-400">
+                    <Moon className="h-3 w-3" />
+                    Rest day — streak safe
+                  </p>
+                )}
+                {!isRestDay && daysToNext && (
                   <p className="text-xs text-muted-foreground">
                     {daysToNext} days until {MILESTONE_LABELS[nextMilestone!]}
                   </p>

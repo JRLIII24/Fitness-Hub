@@ -174,7 +174,7 @@ export function statusCfg(status: PlayerStatus) {
 
 /** Derive player status from MemberProgress */
 export function getPlayerStatus(progress: MemberProgress): PlayerStatus {
-  const { completed, commitment, is_on_track } = progress;
+  const { completed, commitment, is_on_track, preferred_workout_days } = progress;
 
   if (commitment === 0) return "warning";
   if (is_on_track) return "active";
@@ -182,8 +182,21 @@ export function getPlayerStatus(progress: MemberProgress): PlayerStatus {
 
   const now = new Date();
   const dayOfWeek = now.getDay();
-  const daysLeft = dayOfWeek === 0 ? 1 : 7 - dayOfWeek;
   const sessionsNeeded = commitment - completed;
+
+  // Count remaining training days this week (Mon=start)
+  let daysLeft: number;
+  if (preferred_workout_days && preferred_workout_days.length > 0) {
+    // Count how many preferred days are left today or later this week
+    daysLeft = 0;
+    for (let d = dayOfWeek; d <= 6; d++) {
+      if (preferred_workout_days.includes(d)) daysLeft++;
+    }
+    // Also check Sunday (0) if we haven't passed it
+    if (dayOfWeek > 0 && preferred_workout_days.includes(0)) daysLeft++;
+  } else {
+    daysLeft = dayOfWeek === 0 ? 1 : 7 - dayOfWeek;
+  }
 
   if (sessionsNeeded > daysLeft) return "critical";
   return "warning";

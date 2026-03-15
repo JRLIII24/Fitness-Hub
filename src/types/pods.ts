@@ -82,6 +82,7 @@ export interface MemberProgress {
   is_on_track: boolean; // >= commitment
   streak: number; // consecutive weeks meeting goal
   volume_kg: number; // total volume lifted this week
+  preferred_workout_days?: number[] | null; // 0=Sun..6=Sat from profile schedule
 }
 
 export interface PodDetail extends PodWithMembers {

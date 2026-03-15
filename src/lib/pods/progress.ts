@@ -32,7 +32,7 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
     .from('pod_members')
     .select(`
       user_id,
-      profiles!inner(display_name, username, avatar_url)
+      profiles!inner(display_name, username, avatar_url, preferred_workout_days)
     `)
     .eq('pod_id', podId)
     .eq('status', 'active');
@@ -119,7 +119,8 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
         progress_percentage,
         is_on_track,
         streak,
-        volume_kg: workoutVolume.get(member.user_id) || 0
+        volume_kg: workoutVolume.get(member.user_id) || 0,
+        preferred_workout_days: (profile as Record<string, unknown>)?.preferred_workout_days as number[] | null ?? null,
       };
     })
   );

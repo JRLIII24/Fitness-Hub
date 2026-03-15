@@ -1414,6 +1414,7 @@ export type Database = {
           level: number
           onboarding_completed: boolean
           preferred_workout_days: number[] | null
+          preferred_workout_days_set_at: string | null
           show_weight: boolean
           spotify_access_token: string | null
           spotify_connected_at: string | null
@@ -1457,6 +1458,7 @@ export type Database = {
           level?: number
           onboarding_completed?: boolean
           preferred_workout_days?: number[] | null
+          preferred_workout_days_set_at?: string | null
           show_weight?: boolean
           spotify_access_token?: string | null
           spotify_connected_at?: string | null
@@ -1500,6 +1502,7 @@ export type Database = {
           level?: number
           onboarding_completed?: boolean
           preferred_workout_days?: number[] | null
+          preferred_workout_days_set_at?: string | null
           show_weight?: boolean
           spotify_access_token?: string | null
           spotify_connected_at?: string | null

@@ -9,6 +9,7 @@ import { BarChart3, ChevronRight, Scale, Dumbbell, LayoutList } from "lucide-rea
 import { PageHeader } from "@/components/shared/page-header";
 import { ExportDataCard } from "./export-data-card";
 import { NotificationPreferencesCard } from "./notification-preferences-card";
+import { TrainingScheduleCard } from "./training-schedule-card";
 import { SignOutButton } from "./sign-out-button";
 
 const QUICK_ACCESS_LINKS = [
@@ -74,6 +75,11 @@ export default async function SettingsPage() {
         profile={profile}
         email={user.email ?? ""}
         userId={user.id}
+      />
+
+      <TrainingScheduleCard
+        userId={user.id}
+        initialDays={profile?.preferred_workout_days ?? null}
       />
 
       <Card className="glass-surface">

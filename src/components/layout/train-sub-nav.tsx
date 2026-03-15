@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const TRAIN_TABS = [
-  { href: "/workout", label: "Workout" },
-  { href: "/programs", label: "Programs" },
-  { href: "/templates", label: "Templates" },
+  { href: "/workout", label: "Workout", exact: true },
+  { href: "/programs", label: "Programs", exact: false },
+  { href: "/templates", label: "Templates", exact: false },
+  { href: "/workout/calendar", label: "Calendar", exact: false },
 ] as const;
 
 export function TrainSubNav() {
@@ -19,7 +20,9 @@ export function TrainSubNav() {
       className="flex rounded-full border border-border/60 bg-muted/40 p-1 backdrop-blur-sm"
     >
       {TRAIN_TABS.map((tab) => {
-        const isActive = pathname.startsWith(tab.href);
+        const isActive = tab.exact
+          ? pathname === tab.href
+          : pathname.startsWith(tab.href);
         return (
           <Link
             key={tab.href}

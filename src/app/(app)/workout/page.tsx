@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -68,7 +68,7 @@ import { WorkoutCompleteCelebration } from "@/components/workout/workout-complet
 import { LevelUpCelebration } from "@/components/dashboard/level-up-celebration";
 
 // Extracted hooks
-import { useGhostSession } from "@/hooks/workout/use-ghost-session";
+import { useGhostSession, type GhostSetData } from "@/hooks/workout/use-ghost-session";
 import { useExerciseSwap } from "@/hooks/workout/use-exercise-swap";
 import { useWorkoutCompletion } from "@/hooks/workout/use-workout-completion";
 import { useTemplateActions, type WorkoutTemplate } from "@/hooks/workout/use-template-actions";
@@ -225,7 +225,6 @@ export default function WorkoutPage() {
     setExerciseNote,
     setWorkoutNote,
     updateWorkoutName,
-    applyPredictiveOverload,
   } = useWorkoutStore(
     useShallow((s) => ({
       activeWorkout: s.activeWorkout,
@@ -245,7 +244,6 @@ export default function WorkoutPage() {
       setExerciseNote: s.setExerciseNote,
       setWorkoutNote: s.setWorkoutNote,
       updateWorkoutName: s.updateWorkoutName,
-      applyPredictiveOverload: s.applyPredictiveOverload,
     }))
   );
 
@@ -308,25 +306,12 @@ export default function WorkoutPage() {
 
   // --- Extracted hooks ---
 
-  // Build exerciseId -> muscleGroup map for smart overload suggestions
-  const exerciseMuscleGroups = useMemo(() => {
-    const map: Record<string, string> = {};
-    if (activeWorkout) {
-      for (const ex of activeWorkout.exercises) {
-        map[ex.exercise.id] = ex.exercise.muscle_group;
-      }
-    }
-    return map;
-  }, [activeWorkout]);
-
   // Ghost session: loads ghost data for selected template
   const {
-    ghostWorkoutData,
+    ghostWorkoutData: templateGhostWorkoutData,
     ghostIsLoading,
-    suggestedWeightsByKey,
-    smartSuggestions,
     patchGhostForExercise,
-  } = useGhostSession(supabase, userId, selectedTemplateId, preference, exerciseMuscleGroups);
+  } = useGhostSession(supabase, userId, selectedTemplateId);
 
   // Exercise swap: manages swap sheet state + targeted ghost refetch
   const {
@@ -340,23 +325,64 @@ export default function WorkoutPage() {
     activeWorkout?.exercises ?? [],
     userId
   );
-  const predictiveAppliedRef = useRef(false);
-
-  useEffect(() => {
-    if (predictiveAppliedRef.current) return;
-    if (predictiveMap.size === 0) return;
-    if (!activeWorkout || activeWorkout.exercises.length === 0) return;
-
-    predictiveAppliedRef.current = true;
-    applyPredictiveOverload(predictiveMap);
-  }, [predictiveMap, activeWorkout, applyPredictiveOverload]);
-
-  // Reset the ref guard when workout changes (new workout started)
-  useEffect(() => {
-    if (!isWorkoutActive) {
-      predictiveAppliedRef.current = false;
+  // Derive exercise-based ghost sets from predictive history so every workout entry point
+  // can render "Last session" and per-set "Previous" data.
+  const predictiveGhostByExercise = useMemo(() => {
+    if (predictiveMap.size === 0) return {} as Record<string, GhostSetData[]>;
+    const result: Record<string, GhostSetData[]> = {};
+    for (const [key, entry] of predictiveMap) {
+      const [exerciseId, setIndexStr] = key.split(":");
+      const setIndex = Number(setIndexStr);
+      if (!result[exerciseId]) result[exerciseId] = [];
+      result[exerciseId].push({
+        setNumber: setIndex + 1,
+        reps: entry.previousReps,
+        weight: entry.previousWeightKg,
+        rir: null,
+      });
     }
-  }, [isWorkoutActive]);
+    // Sort by set number
+    for (const sets of Object.values(result)) {
+      sets.sort((a, b) => a.setNumber - b.setNumber);
+    }
+    return result;
+  }, [predictiveMap]);
+
+  const effectiveGhostSetsByExercise = useMemo(() => {
+    const result: Record<string, GhostSetData[]> = {};
+
+    for (const [exerciseId, sets] of Object.entries(predictiveGhostByExercise)) {
+      result[exerciseId] = [...sets].sort((a, b) => a.setNumber - b.setNumber);
+    }
+
+    for (const [exerciseId, templateSets] of Object.entries(
+      templateGhostWorkoutData?.exercises ?? {}
+    )) {
+      const bySetNumber = new Map<number, GhostSetData>();
+
+      for (const set of result[exerciseId] ?? []) {
+        bySetNumber.set(set.setNumber, set);
+      }
+      for (const set of templateSets) {
+        bySetNumber.set(set.setNumber, set);
+      }
+
+      result[exerciseId] = Array.from(bySetNumber.values()).sort(
+        (a, b) => a.setNumber - b.setNumber
+      );
+    }
+
+    return result;
+  }, [templateGhostWorkoutData, predictiveGhostByExercise]);
+
+  const effectiveGhostWorkoutData = useMemo(() => {
+    if (Object.keys(effectiveGhostSetsByExercise).length === 0) return null;
+
+    return {
+      sessionDate: templateGhostWorkoutData?.sessionDate ?? "",
+      exercises: effectiveGhostSetsByExercise,
+    };
+  }, [templateGhostWorkoutData, effectiveGhostSetsByExercise]);
 
   // Workout completion: finish, cancel, celebration, RPE
   const {
@@ -382,7 +408,7 @@ export default function WorkoutPage() {
     finishWorkout,
     cancelWorkout,
     previousByExerciseId,
-    ghostWorkoutData,
+    ghostWorkoutData: effectiveGhostWorkoutData,
     toDisplayWeight,
     toDisplayVolume,
     unitLabel,
@@ -773,22 +799,28 @@ export default function WorkoutPage() {
           if (!exerciseIndex) continue;
 
           const index = exerciseIndex - 1;
-          const setsToCreate = launcherEx.target_sets || 3;
-          const lastSet = launcherEx.last_performance?.[0];
-          const targetReps = lastSet?.reps || launcherEx.target_reps || 10;
-          const targetWeight = lastSet?.weight_kg || launcherEx.target_weight_kg || null;
+          const setsToCreate = Math.max(1, launcherEx.target_sets || 3);
+          const rawLastPerformance = (launcherEx as { last_performance?: unknown }).last_performance;
+          const lastPerformanceSets = Array.isArray(rawLastPerformance)
+            ? rawLastPerformance
+            : rawLastPerformance && typeof rawLastPerformance === "object"
+              ? [rawLastPerformance]
+              : [];
 
-          updateSet(index, 0, {
-            reps: targetReps,
-            weight_kg: targetWeight,
-            rest_seconds: 90,
-          });
+          const fallbackReps =
+            typeof launcherEx.target_reps === "number" ? launcherEx.target_reps : 10;
+          const fallbackWeight = launcherEx.target_weight_kg ?? null;
 
-          for (let i = 1; i < setsToCreate; i += 1) {
-            addSet(index);
+          for (let i = 0; i < setsToCreate; i += 1) {
+            if (i > 0) addSet(index);
+
+            const perfSet = (lastPerformanceSets[
+              Math.min(i, Math.max(0, lastPerformanceSets.length - 1))
+            ] ?? {}) as { reps?: number | null; weight_kg?: number | null };
+
             updateSet(index, i, {
-              reps: targetReps,
-              weight_kg: targetWeight,
+              reps: perfSet.reps ?? fallbackReps,
+              weight_kg: perfSet.weight_kg ?? fallbackWeight,
               rest_seconds: 90,
             });
           }
@@ -2008,7 +2040,7 @@ export default function WorkoutPage() {
                   </div>
                 )}
 
-                {ghostWorkoutData && !isReorderMode ? (
+                {templateGhostWorkoutData && !isReorderMode ? (
                   <div className="glass-inner rounded-lg px-3 py-1.5 text-[11px] text-muted-foreground">
                     Ghost workout active — training against your last session.
                   </div>
@@ -2042,10 +2074,8 @@ export default function WorkoutPage() {
                           exerciseId={`${exerciseBlock.exercise.id}-${exerciseIndex}`}
                           exerciseBlock={exerciseBlock}
                           exerciseIndex={exerciseIndex}
-                          ghostSets={ghostWorkoutData?.exercises[exerciseBlock.exercise.id]}
+                          ghostSets={effectiveGhostSetsByExercise[exerciseBlock.exercise.id]}
                           previousSets={previousByExerciseId[exerciseBlock.exercise.id]}
-                          suggestedWeights={suggestedWeightsByKey[exerciseBlock.exercise.id]}
-                          smartSuggestions={smartSuggestions[exerciseBlock.exercise.id]}
                           trendline={exerciseTrendlines[exerciseBlock.exercise.id]}
                           preference={preference}
                           onUpdateSet={updateSet}

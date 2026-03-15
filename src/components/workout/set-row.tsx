@@ -1,11 +1,10 @@
 "use client";
 
 import { memo } from "react";
-import { ArrowUp, Check, Equal, Flame, Ghost, Trash2, Trophy, Zap } from "lucide-react";
+import { Check, Flame, Ghost, Trash2, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { WorkoutSet } from "@/types/workout";
-import type { OverloadSuggestion } from "@/lib/progressive-overload";
 import { cn } from "@/lib/utils";
 import { REST_PRESETS } from "@/lib/constants";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,10 +31,6 @@ interface SetRowProps {
   ghostWeight?: number | null;
   /** Ghost reps (null if no ghost) */
   ghostReps?: number | null;
-  /** Display-only suggested weight in kg (never written to store) */
-  suggestedWeight?: number | null;
-  /** Smart overload suggestion with intent (increase vs maintain) */
-  smartSuggestion?: OverloadSuggestion;
   autoFocusWeight?: boolean;
   onUpdate: (exerciseIndex: number, setIndex: number, updates: Partial<WorkoutSet>) => void;
   onComplete: (exerciseIndex: number, setIndex: number) => void;
@@ -61,8 +56,6 @@ export const SetRow = memo(function SetRow({
   previousSet,
   ghostWeight = null,
   ghostReps = null,
-  suggestedWeight = null,
-  smartSuggestion,
   autoFocusWeight = false,
   onUpdate,
   onComplete,
@@ -322,58 +315,12 @@ export const SetRow = memo(function SetRow({
             autoFocus={autoFocusWeight}
             type="number"
             inputMode="decimal"
-            placeholder={smartSuggestion ? String(toDisplay(smartSuggestion.weightKg)) : suggestedWeight != null ? String(toDisplay(suggestedWeight)) : "0"}
+            placeholder="0"
             value={weightValue}
             onChange={(e) => handleWeightChange(e.target.value)}
-            className={cn(
-              "h-10 w-full text-center text-[15px] font-semibold tabular-nums",
-              set.is_predicted && !set.completed
-                ? "text-cyan-400/80 italic"
-                : "text-foreground"
-            )}
+            className="h-10 w-full text-center text-[15px] font-semibold tabular-nums text-foreground"
             disabled={set.completed}
           />
-          {/* Predictive overload Auto badge */}
-          {set.is_predicted && !set.completed && (
-            <span className="mt-0.5 inline-flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-400">
-              <Zap className="h-2.5 w-2.5" />
-              Auto
-            </span>
-          )}
-          {/* Progressive overload suggestion chip */}
-          <AnimatePresence>
-            {!set.completed && set.weight_kg === null && smartSuggestion && (
-              <motion.button
-                type="button"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-                onClick={() => {
-                  onUpdate(exerciseIndex, setIndex, { weight_kg: smartSuggestion.weightKg });
-                  triggerHaptic("light");
-                }}
-                className={cn(
-                  "mt-0.5 inline-flex w-full items-center justify-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums transition-colors",
-                  smartSuggestion.intent === "increase"
-                    ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                    : "border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-                )}
-              >
-                {smartSuggestion.intent === "increase" ? (
-                  <>
-                    <ArrowUp className="h-2.5 w-2.5" />
-                    {toDisplay(smartSuggestion.weightKg)} {unitLabel}
-                  </>
-                ) : (
-                  <>
-                    <Equal className="h-2.5 w-2.5" />
-                    {toDisplay(smartSuggestion.weightKg)} {unitLabel}
-                  </>
-                )}
-              </motion.button>
-            )}
-          </AnimatePresence>
         </div>
 
         <div className="space-y-0.5">

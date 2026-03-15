@@ -252,7 +252,7 @@ export default function TemplatesPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 px-4 pt-6 pb-28">
+      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-6 pb-28 md:px-6 lg:px-10">
         <TrainSubNav />
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Workout Templates</h1>
@@ -270,7 +270,7 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 pt-6 pb-28">
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-6 pb-28 md:px-6 lg:px-10">
       <TrainSubNav />
 
       <div className="flex items-start justify-between gap-2">

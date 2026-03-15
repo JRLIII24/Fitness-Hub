@@ -43,7 +43,8 @@ interface WorkoutState {
 
   // Predictive overload
   applyPredictiveOverload: (
-    predictions: Map<string, { weightKg: number; reps: number | null; intent: string }>
+    predictions: Map<string, { weightKg: number; reps: number | null; intent: string }>,
+    options?: { forceKeys?: Iterable<string> }
   ) => void;
 }
 
@@ -320,32 +321,58 @@ export const useWorkoutStore = create<WorkoutState>()(
       },
 
       applyPredictiveOverload: (
-        predictions: Map<string, { weightKg: number; reps: number | null; intent: string }>
+        predictions: Map<string, { weightKg: number; reps: number | null; intent: string }>,
+        options?: { forceKeys?: Iterable<string> }
       ) => {
         const state = get();
         if (!state.activeWorkout || predictions.size === 0) return;
 
         const exercises = [...state.activeWorkout.exercises];
+        const forceKeys = new Set(options?.forceKeys ?? []);
         let changed = false;
 
         for (let ei = 0; ei < exercises.length; ei++) {
           const sets = [...exercises[ei].sets];
+          let exerciseChanged = false;
           for (let si = 0; si < sets.length; si++) {
             const key = `${exercises[ei].exercise.id}:${si}`;
             const prediction = predictions.get(key);
             if (!prediction) continue;
-            if (sets[si].weight_kg !== null || sets[si].completed) continue;
+            if (sets[si].completed) continue;
+
+            const forceApply = forceKeys.has(key);
+            const shouldApplyWeight =
+              forceApply || sets[si].weight_kg === null || Boolean(sets[si].is_predicted);
+            const shouldApplyReps =
+              prediction.reps !== null &&
+              (forceApply || sets[si].reps === null || Boolean(sets[si].is_predicted));
+
+            if (!shouldApplyWeight && !shouldApplyReps) continue;
+
+            const nextWeight = shouldApplyWeight
+              ? prediction.weightKg
+              : sets[si].weight_kg;
+            const nextReps = shouldApplyReps ? prediction.reps : sets[si].reps;
+
+            if (
+              sets[si].weight_kg === nextWeight &&
+              sets[si].reps === nextReps &&
+              sets[si].is_predicted === true
+            ) {
+              continue;
+            }
 
             sets[si] = {
               ...sets[si],
-              weight_kg: prediction.weightKg,
-              reps: sets[si].reps ?? prediction.reps,
+              weight_kg: nextWeight,
+              reps: nextReps,
               is_predicted: true,
             };
-            changed = true;
+            exerciseChanged = true;
           }
-          if (changed) {
+          if (exerciseChanged) {
             exercises[ei] = { ...exercises[ei], sets };
+            changed = true;
           }
         }
 

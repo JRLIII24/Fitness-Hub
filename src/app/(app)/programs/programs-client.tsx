@@ -50,7 +50,7 @@ export function ProgramsClient({ initialPrograms }: ProgramsClientProps) {
   const [tab, setTab] = useState<Tab>("mine");
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 pb-24 pt-4">
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 pt-6 pb-28 md:px-6 lg:px-10">
       <TrainSubNav />
 
       {/* Header */}

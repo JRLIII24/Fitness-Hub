@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useMemo, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeftRight, ChevronDown, ChevronUp, GripVertical, NotebookPen, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,6 @@ import { RpeDeloadAlert } from "@/components/workout/rpe-deload-alert";
 import { weightToDisplay } from "@/lib/units";
 import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS } from "@/lib/constants";
 import type { WorkoutExercise, WorkoutSet } from "@/types/workout";
-import { calcSuggestedWeight, type OverloadSuggestion } from "@/lib/progressive-overload";
 
 export interface ExerciseCardProps {
   exerciseBlock: WorkoutExercise;
@@ -25,10 +24,6 @@ export interface ExerciseCardProps {
   ghostSets: Array<{ setNumber: number; reps: number | null; weight: number | null }> | undefined;
   /** Previous session sets for this exercise (for PR detection ghost) */
   previousSets: Array<{ reps: number | null; weight: number | null }> | undefined;
-  /** Suggested weights per set index */
-  suggestedWeights: Record<number, number> | undefined;
-  /** Smart overload suggestions with intent metadata per set index */
-  smartSuggestions: Record<number, OverloadSuggestion> | undefined;
   /** Trendline data for sparkline */
   trendline: { weights: number[]; slope: number } | undefined;
   /** Unit preference */
@@ -51,8 +46,6 @@ export const ExerciseCard = memo(function ExerciseCard({
   exerciseIndex,
   ghostSets,
   previousSets,
-  suggestedWeights,
-  smartSuggestions,
   trendline,
   preference,
   dragHandleProps,
@@ -65,23 +58,6 @@ export const ExerciseCard = memo(function ExerciseCard({
   onSetExerciseNote,
   onStartRest,
 }: ExerciseCardProps) {
-  // Fallback: when ghost-based smartSuggestions is empty but previousSets has data,
-  // compute overload suggestions from previous performance so the chip still shows.
-  const effectiveSuggestions = useMemo(() => {
-    if (smartSuggestions && Object.keys(smartSuggestions).length > 0) return smartSuggestions;
-    if (!previousSets) return smartSuggestions;
-    const fallback: Record<number, OverloadSuggestion> = {};
-    previousSets.forEach((prev, idx) => {
-      if (prev.weight != null) {
-        fallback[idx] = {
-          weightKg: calcSuggestedWeight(prev.weight, preference),
-          intent: "increase",
-        };
-      }
-    });
-    return Object.keys(fallback).length > 0 ? fallback : smartSuggestions;
-  }, [smartSuggestions, previousSets, preference]);
-
   const [showGhosts, setShowGhosts] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("fithub_show_ghost_sets") !== "false";
@@ -329,8 +305,6 @@ export const ExerciseCard = memo(function ExerciseCard({
                     previousSet={previousSets?.[setIndex]}
                     ghostWeight={matchedGhostSet?.weight ?? null}
                     ghostReps={matchedGhostSet?.reps ?? null}
-                    suggestedWeight={suggestedWeights?.[setIndex] ?? null}
-                    smartSuggestion={effectiveSuggestions?.[setIndex]}
                     autoFocusWeight={setIndex === exerciseBlock.sets.length - 1 && !set.completed}
                     onUpdate={onUpdateSet}
                     onComplete={onCompleteSet}
@@ -435,8 +409,6 @@ export const ExerciseCard = memo(function ExerciseCard({
 
   if (prev.ghostSets !== next.ghostSets) return false;
   if (prev.previousSets !== next.previousSets) return false;
-  if (prev.suggestedWeights !== next.suggestedWeights) return false;
-  if (prev.smartSuggestions !== next.smartSuggestions) return false;
   if (prev.trendline !== next.trendline) return false;
   if (prev.dragHandleProps !== next.dragHandleProps) return false;
   if (prev.onUpdateSet !== next.onUpdateSet) return false;

@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutGroup, motion } from "framer-motion";
-import { CalendarDays, TrendingUp, Trophy, BarChart3 } from "lucide-react";
+import { TrendingUp, Trophy, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { href: "/history", label: "Calendar", icon: CalendarDays },
   { href: "/history/progress", label: "Progress", icon: TrendingUp },
   { href: "/history/prs", label: "PRs", icon: Trophy },
   { href: "/history/stats", label: "Stats", icon: BarChart3 },
@@ -17,7 +16,6 @@ export function HistoryNav() {
   const pathname = usePathname();
 
   function isActive(href: string) {
-    if (href === "/history") return pathname === "/history";
     return pathname.startsWith(href);
   }
 

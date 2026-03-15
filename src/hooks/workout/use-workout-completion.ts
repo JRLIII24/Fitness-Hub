@@ -231,7 +231,20 @@ export function useWorkoutCompletion({
       return;
     }
 
-    // ---- ONLINE PATH: existing Supabase flow ----
+    // ---- ONLINE PATH: show celebration immediately, then save in background ----
+    setCelebrationWorkoutName(workout.name);
+    setCelebrationStats({
+      duration: durationString,
+      exerciseCount: workout.exercises.length,
+      totalVolume: toDisplayVolume(totalVolume),
+      unitLabel,
+      prCount,
+      totalSets: allSets.length,
+      beatGhostCount: ghostWorkoutData ? beatGhostCount : undefined,
+      exercises: exerciseRecap,
+    });
+    setShowCelebration(true);
+
     const { data: session, error: sessionError } = await supabase
       .from("workout_sessions")
       .insert({
@@ -271,18 +284,7 @@ export function useWorkoutCompletion({
             description: "It will sync automatically when you reconnect.",
             duration: 5000,
           });
-          setCelebrationWorkoutName(workout.name);
-          setCelebrationStats({
-            duration: durationString,
-            exerciseCount: workout.exercises.length,
-            totalVolume: toDisplayVolume(totalVolume),
-            unitLabel,
-            prCount,
-            totalSets: allSets.length,
-            beatGhostCount: ghostWorkoutData ? beatGhostCount : undefined,
-            exercises: exerciseRecap,
-          });
-          setShowCelebration(true);
+          // Celebration already shown above
           return;
         } catch {
           // If even queueing fails, show the original error
@@ -457,19 +459,7 @@ export function useWorkoutCompletion({
       void err;
     }
 
-    // Show celebration modal with stats
-    setCelebrationWorkoutName(workout.name);
-    setCelebrationStats({
-      duration: durationString,
-      exerciseCount: workout.exercises.length,
-      totalVolume: toDisplayVolume(totalVolume),
-      unitLabel,
-      prCount,
-      totalSets: allSets.length,
-      beatGhostCount: ghostWorkoutData ? beatGhostCount : undefined,
-      exercises: exerciseRecap,
-    });
-    setShowCelebration(true);
+    // Set session ID for RPE prompt (celebration already shown above)
     setPendingSessionId(session.id);
 
     if (programCompleted) {

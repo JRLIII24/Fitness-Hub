@@ -77,9 +77,11 @@ export interface MemberProgress {
   commitment: number; // workouts per week goal
   planned_days: string[]; // e.g. ['mon','wed','fri']
   completed: number; // workouts completed this week
+  completed_days: string[]; // e.g. ['mon','wed'] — days with logged sessions this week
   progress_percentage: number; // 0-100
   is_on_track: boolean; // >= commitment
   streak: number; // consecutive weeks meeting goal
+  volume_kg: number; // total volume lifted this week
 }
 
 export interface PodDetail extends PodWithMembers {

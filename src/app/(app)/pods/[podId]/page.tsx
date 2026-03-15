@@ -2,13 +2,18 @@
 
 import { use, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, UserPlus, Target, MessageSquare, Trash2, LogOut, Plus, Trophy, Calendar, Flame, Dumbbell } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ArrowLeft,
+  UserPlus,
+  Target,
+  Zap,
+  X,
+  Plus,
+  AlertTriangle,
+  Loader2,
+  Radio,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,37 +25,90 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePodDetail } from "@/hooks/use-pods";
+import { usePodPresence } from "@/hooks/use-pod-presence";
+import { Y2K, tierCfg, getPlayerStatus, getCrewPressure } from "@/lib/pods/y2k-tokens";
+import { getArenaTier } from "@/types/pods";
+import { POD_CHALLENGES_ENABLED } from "@/lib/features";
+import { createClient } from "@/lib/supabase/client";
+import type { PodChallenge } from "@/types/pods";
+import {
+  StarGrid,
+  Panel,
+  HeroPanel,
+  TierBadge,
+  Y2KTabs,
+  PlayerCard,
+  CrewBar,
+  QuestCard,
+  Scoreboard,
+  RecapCard,
+  FeedItem,
+  SendMessage,
+} from "@/components/pods/tacx";
 import { InviteMemberDialog } from "@/components/pods/invite-member-dialog";
 import { SetCommitmentDialog } from "@/components/pods/set-commitment-dialog";
-import { SendMessageDialog } from "@/components/pods/send-message-dialog";
 import { CreateChallengeDialog } from "@/components/pods/create-challenge-dialog";
-import { PodLeaderboard } from "@/components/pods/pod-leaderboard";
-import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
-import { POD_CHALLENGES_ENABLED } from "@/lib/features";
-import type { PodChallenge } from "@/types/pods";
+import {
+  containerVariants,
+  itemVariants,
+  tabContentVariants,
+} from "@/lib/pods/transitions";
+
+type LoungeTab = "players" | "quests" | "scoreboard" | "feed";
+
+const LOUNGE_TABS = [
+  { id: "players" as const, label: "PLAYERS" },
+  { id: "quests" as const, label: "QUESTS" },
+  { id: "scoreboard" as const, label: "SCOREBOARD" },
+  { id: "feed" as const, label: "FEED" },
+] as const;
 
 interface PageProps {
   params: Promise<{ podId: string }>;
 }
 
-function formatChallengeDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+export default function PodDetailPage({ params }: PageProps) {
+  const { podId } = use(params);
+  const router = useRouter();
+  const {
+    pod,
+    loading,
+    error,
+    inviteMember,
+    setCommitment,
+    sendMessage,
+    leavePod,
+    deletePod,
+    refetch,
+  } = usePodDetail(podId);
 
-function ChallengeTypeIcon({ type }: { type: PodChallenge["challenge_type"] }) {
-  if (type === "volume") return <Trophy className="h-3.5 w-3.5" />;
-  return <Flame className="h-3.5 w-3.5" />;
-}
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { isInGym, getPresence } = usePodPresence(podId, currentUserId);
+  const [activeTab, setActiveTab] = useState<LoungeTab>("players");
+  const [commsOpen, setCommsOpen] = useState(false);
+  const [commsTargetId, setCommsTargetId] = useState<string | undefined>();
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [commitmentOpen, setCommitmentOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
-function ChallengesSection({ podId, currentUserId }: { podId: string; currentUserId: string | null }) {
+  // Challenges state
   const [challenges, setChallenges] = useState<(PodChallenge & { is_active: boolean })[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [createOpen, setCreateOpen] = useState(false);
+  const [challengesLoading, setChallengesLoading] = useState(true);
+  const [createChallengeOpen, setCreateChallengeOpen] = useState(false);
   const [deleteChallengeId, setDeleteChallengeId] = useState<string | null>(null);
 
+  useEffect(() => {
+    createClient()
+      .auth.getUser()
+      .then(({ data: { user } }) => {
+        if (user) setCurrentUserId(user.id);
+      });
+  }, []);
+
   const fetchChallenges = useCallback(async () => {
-    setLoading(true);
+    if (!POD_CHALLENGES_ENABLED) return;
+    setChallengesLoading(true);
     try {
       const res = await fetch(`/api/pods/${podId}/challenges`);
       if (res.ok) {
@@ -60,7 +118,7 @@ function ChallengesSection({ podId, currentUserId }: { podId: string; currentUse
     } catch {
       // non-critical
     } finally {
-      setLoading(false);
+      setChallengesLoading(false);
     }
   }, [podId]);
 
@@ -68,417 +126,565 @@ function ChallengesSection({ podId, currentUserId }: { podId: string; currentUse
     fetchChallenges();
   }, [fetchChallenges]);
 
-  async function handleDelete(challengeId: string) {
-    const res = await fetch(`/api/pods/${podId}/challenges/${challengeId}`, { method: "DELETE" });
-    if (res.ok) {
-      setChallenges((prev) => prev.filter((c) => c.id !== challengeId));
-    }
+  async function handleDeleteChallenge(challengeId: string) {
+    const res = await fetch(`/api/pods/${podId}/challenges/${challengeId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) setChallenges((prev) => prev.filter((c) => c.id !== challengeId));
     setDeleteChallengeId(null);
   }
 
-  const activeChallenges = challenges.filter((c) => c.is_active);
-  const pastChallenges = challenges.filter((c) => !c.is_active);
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
-          <Trophy className="h-3.5 w-3.5" />
-          Challenges
-        </h2>
-        <Button
-          size="sm"
-          variant="outline"
-          className="min-h-[44px] px-3 text-xs"
-          onClick={() => setCreateOpen(true)}
-        >
-          <Plus className="h-3 w-3 mr-1" />
-          New
-        </Button>
-      </div>
-
-      {loading ? (
-        <Card><CardContent className="pt-4"><Skeleton className="h-12 w-full" /></CardContent></Card>
-      ) : challenges.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center">
-            <Trophy className="h-7 w-7 mx-auto mb-2 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">No challenges yet</p>
-            <p className="text-xs text-muted-foreground mt-1">Create one to compete with your pod!</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {activeChallenges.map((challenge) => (
-            <Card key={challenge.id} className="border-primary/30 bg-primary/5">
-              <CardContent className="pt-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <ChallengeTypeIcon type={challenge.challenge_type} />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{challenge.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatChallengeDate(challenge.start_date)} – {formatChallengeDate(challenge.end_date)}
-                        {challenge.target_value && (
-                          <> · target: {challenge.target_value} {challenge.challenge_type === "volume" ? "kg" : "sessions"}</>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-500/20 text-green-600 border-green-500/30">
-                      Active
-                    </Badge>
-                    {currentUserId === challenge.created_by && (
-                      <button
-                        onClick={() => setDeleteChallengeId(challenge.id)}
-                        className="text-muted-foreground/50 hover:text-destructive transition-colors text-xs"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {pastChallenges.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground pl-1">Past challenges</p>
-              {pastChallenges.map((challenge) => (
-                <Card key={challenge.id} className="opacity-60">
-                  <CardContent className="py-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ChallengeTypeIcon type={challenge.challenge_type} />
-                        <p className="text-sm truncate">{challenge.name}</p>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] text-muted-foreground">
-                          ended {formatChallengeDate(challenge.end_date)}
-                        </span>
-                        {currentUserId === challenge.created_by && (
-                          <button
-                            onClick={() => setDeleteChallengeId(challenge.id)}
-                            className="text-muted-foreground/50 hover:text-destructive transition-colors text-xs"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      <CreateChallengeDialog
-        open={createOpen}
-        podId={podId}
-        onClose={() => setCreateOpen(false)}
-        onCreated={fetchChallenges}
-      />
-
-      <AlertDialog open={!!deleteChallengeId} onOpenChange={(o) => !o && setDeleteChallengeId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete challenge?</AlertDialogTitle>
-            <AlertDialogDescription>This will remove the challenge and all its data.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteChallengeId && handleDelete(deleteChallengeId)}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
-
-export default function PodDetailPage({ params }: PageProps) {
-  const { podId } = use(params);
-  const router = useRouter();
-  const { pod, loading, error, inviteMember, setCommitment, sendMessage, leavePod, deletePod } = usePodDetail(podId);
-
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [commitmentOpen, setCommitmentOpen] = useState(false);
-  const [messageOpen, setMessageOpen] = useState(false);
-  const [selectedRecipient, setSelectedRecipient] = useState<string | null>(null);
-  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-
-  useEffect(() => {
-    createClient().auth.getUser().then(({ data: { user } }) => {
-      if (user) setCurrentUserId(user.id);
-    });
-  }, []);
-
   const isCreator = pod && currentUserId && pod.creator_id === currentUserId;
-  const currentUserProgress = pod?.members_progress.find((m) => m.user_id === currentUserId);
+  const currentUserProgress = pod?.members_progress.find(
+    (m) => m.user_id === currentUserId
+  );
 
   async function handleLeave() {
     const success = await leavePod();
     if (success) router.push("/pods");
   }
-
   async function handleDelete() {
     const success = await deletePod(podId);
     if (success) router.push("/pods");
   }
-
   async function handleInvite(username: string) {
     const result = await inviteMember(username);
-    if (result.success) {
-      alert(result.message);
-      setInviteOpen(false);
-    } else {
-      alert(result.message);
-    }
+    if (result.success) setInviteOpen(false);
   }
-
   async function handleSetCommitment(workouts: number, plannedDays?: string[]) {
     const success = await setCommitment(workouts, plannedDays);
     if (success) setCommitmentOpen(false);
   }
-
-  async function handleSendMessage(message: string, recipientId?: string) {
+  async function handleSendComms(message: string, recipientId?: string) {
     const success = await sendMessage(message, recipientId);
     if (success) {
-      setMessageOpen(false);
-      setSelectedRecipient(null);
+      setCommsOpen(false);
+      setCommsTargetId(undefined);
     }
   }
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-lg px-4 pt-5 pb-28 space-y-4 md:max-w-2xl">
-        <Skeleton className="h-8 w-48" />
-        <Card><CardContent className="pt-6"><Skeleton className="h-24 w-full" /></CardContent></Card>
-        <Card><CardContent className="pt-6"><Skeleton className="h-32 w-full" /></CardContent></Card>
+      <div
+        className="relative mx-auto max-w-lg px-4 pt-5 pb-28"
+        style={{ minHeight: "100vh", background: Y2K.bg0 }}
+      >
+        <StarGrid />
+        <div
+          className="relative flex items-center justify-center"
+          style={{ zIndex: 1, padding: "48px 0" }}
+        >
+          <Loader2
+            size={20}
+            style={{ color: Y2K.text2, animation: "spin 1s linear infinite" }}
+          />
+        </div>
       </div>
     );
   }
 
   if (error || !pod) {
     return (
-      <div className="mx-auto w-full max-w-lg px-4 pt-5 pb-28 md:max-w-2xl">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-4 min-h-[44px]">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <Card className="border-destructive">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">{error || "Pod not found"}</p>
-          </CardContent>
-        </Card>
+      <div
+        className="relative mx-auto max-w-lg px-4 pt-5 pb-28"
+        style={{ minHeight: "100vh", background: Y2K.bg0 }}
+      >
+        <StarGrid />
+        <div className="relative flex flex-col gap-3" style={{ zIndex: 1 }}>
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-1"
+            style={{
+              padding: "8px 12px",
+              background: "transparent",
+              border: "none",
+              color: Y2K.text2,
+              fontFamily: Y2K.fontDisplay,
+              fontSize: "11px",
+              fontWeight: 900,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+            }}
+          >
+            <ArrowLeft size={14} />
+            BACK
+          </button>
+          <Panel accent={Y2K.status.critical.fg}>
+            <p style={{ fontFamily: Y2K.fontSans, fontSize: "12px", color: Y2K.status.critical.fg }}>
+              {error || "Crew not found"}
+            </p>
+          </Panel>
+        </div>
       </div>
     );
   }
 
+  const tier = getArenaTier(pod.season_score ?? 0);
+  const dc = tierCfg(tier);
+  const pressure = getCrewPressure(pod.members_progress);
+  const criticalCount = pod.members_progress.filter(
+    (m) => getPlayerStatus(m) === "critical"
+  ).length;
+  const warningCount = pod.members_progress.filter(
+    (m) => getPlayerStatus(m) === "warning"
+  ).length;
+
+  const activeChallenges = challenges.filter((c) => c.is_active);
+  const pastChallenges = challenges.filter((c) => !c.is_active);
+
   return (
-    <div className="mx-auto w-full max-w-lg px-4 pt-5 pb-28 space-y-4 md:max-w-2xl">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <div className="flex items-center gap-2">
-          {isCreator ? (
-            <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => setDeleteConfirmOpen(true)}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={() => setLeaveConfirmOpen(true)}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Leave
-            </Button>
-          )}
-        </div>
-      </div>
+    <div
+      className="relative mx-auto max-w-lg px-4 pt-5 pb-28"
+      style={{ minHeight: "100vh", background: Y2K.bg0 }}
+    >
+      <StarGrid />
 
-      {/* Pod Info */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle>{pod.name}</CardTitle>
-              {pod.description && (
-                <p className="text-sm text-muted-foreground mt-1">{pod.description}</p>
-              )}
+      <motion.div
+        className="relative flex flex-col gap-3"
+        style={{ zIndex: 1 }}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.28 }}
+      >
+        {/* Header bar */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-1"
+            style={{
+              padding: "8px 12px",
+              background: "transparent",
+              border: "none",
+              color: Y2K.text2,
+              fontFamily: Y2K.fontDisplay,
+              fontSize: "9px",
+              fontWeight: 900,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              minHeight: "44px",
+            }}
+          >
+            <ArrowLeft size={14} />
+            <span>
+              <span style={{ display: "block", color: Y2K.text3, fontSize: "7px" }}>
+                LOUNGE
+              </span>
+              {pod.name.toUpperCase()}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setCommsOpen(true)}
+            className="flex items-center gap-1"
+            style={{
+              padding: "8px 12px",
+              borderRadius: Y2K.r8,
+              background: Y2K.cyanBg,
+              border: `1px solid ${Y2K.cyanBorder}`,
+              color: Y2K.cyan,
+              fontFamily: Y2K.fontDisplay,
+              fontSize: "9px",
+              fontWeight: 900,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              minHeight: "44px",
+            }}
+          >
+            <Radio size={12} />
+            MESSAGE
+          </button>
+        </div>
+
+        {/* Hero Banner */}
+        <HeroPanel tier={tier}>
+          <div className="flex items-start justify-between" style={{ marginBottom: "8px" }}>
+            <div className="flex-1" style={{ minWidth: 0 }}>
+              <span
+                style={{
+                  fontFamily: Y2K.fontDisplay,
+                  fontSize: "8px",
+                  fontWeight: 900,
+                  letterSpacing: "0.14em",
+                  color: Y2K.text3,
+                  textTransform: "uppercase",
+                  display: "block",
+                  marginBottom: "2px",
+                }}
+              >
+                Season 1 · {pod.member_count}/8 Players
+              </span>
+              <h1
+                style={{
+                  fontFamily: Y2K.fontDisplay,
+                  fontSize: "26px",
+                  fontWeight: 900,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.02em",
+                  color: Y2K.text1,
+                  margin: "0 0 6px",
+                }}
+              >
+                {pod.name}
+              </h1>
+              <div className="flex items-center gap-2">
+                <TierBadge tier={tier} score={pod.season_score ?? 0} />
+                {pod.season_start_date && (
+                  <span
+                    style={{
+                      fontFamily: Y2K.fontDisplay,
+                      fontSize: "8px",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      color: Y2K.text3,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    SINCE{" "}
+                    {new Date(pod.season_start_date).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    }).toUpperCase()}
+                  </span>
+                )}
+              </div>
             </div>
-            <Badge variant="secondary">{pod.member_count} / 8</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => setCommitmentOpen(true)} className="flex-1 min-w-[120px] min-h-[44px]">
-              <Target className="h-4 w-4 mr-2" />
-              {currentUserProgress && currentUserProgress.commitment > 0
-                ? `${currentUserProgress.commitment}x/week`
-                : "Set Goal"}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setMessageOpen(true)} className="flex-1 min-w-[120px] min-h-[44px]">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Encourage
-            </Button>
-            {isCreator && (
-              <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} className="shrink-0 min-h-[44px]">
-                <UserPlus className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Member Progress */}
-      <div className="space-y-3">
-        <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">This Week&apos;s Progress</h2>
-        {pod.members_progress.map((member) => {
-          const isCurrentUser = member.user_id === currentUserId;
-          const dayLabels: Record<string, string> = { mon: "M", tue: "T", wed: "W", thu: "T", fri: "F", sat: "S", sun: "S" };
-          const allDays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-          return (
-            <Card key={member.user_id} className={isCurrentUser ? "border-primary/40" : ""}>
-              <CardContent className="pt-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Avatar className="size-8 shrink-0">
-                      {member.avatar_url && (
-                        <AvatarImage src={member.avatar_url} alt={member.display_name || "User"} />
-                      )}
-                      <AvatarFallback className="text-xs font-semibold bg-primary/15 text-primary">
-                        {(member.display_name || member.username || "U").slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                    <p className="text-[13px] font-bold text-foreground">
-                      {member.display_name || member.username || "Unknown"}
-                      {isCurrentUser && <span className="text-[10px] font-medium text-muted-foreground ml-1.5">(You)</span>}
-                    </p>
-                    {member.commitment > 0 ? (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {member.completed} / {member.commitment} workouts
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground/50 italic mt-0.5">No goal set yet</p>
-                    )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {member.streak > 0 && (
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
-                        <Flame className="inline h-3 w-3" /> {member.streak}wk
-                      </Badge>
-                    )}
-                    {!isCurrentUser && (
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        onClick={() => {
-                          setSelectedRecipient(member.user_id);
-                          setMessageOpen(true);
-                        }}
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                {/* Day dots */}
-                {member.planned_days && member.planned_days.length > 0 && (
-                  <div className="flex gap-1">
-                    {allDays.map((d) => (
-                      <div
-                        key={d}
-                        className={cn(
-                          "flex h-6 w-6 items-center justify-center rounded-md text-[9px] font-bold",
-                          member.planned_days.includes(d)
-                            ? "bg-primary/15 text-primary border border-primary/30"
-                            : "bg-card/20 text-muted-foreground/30 border border-transparent"
-                        )}
-                      >
-                        {dayLabels[d]}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {member.commitment > 0 && (
-                  <div className="space-y-1">
-                    <Progress
-                      value={member.progress_percentage}
-                      className={member.is_on_track ? "[&>div]:bg-green-500" : ""}
-                    />
-                    <p className="text-[10px] text-muted-foreground">
-                      {member.is_on_track ? <span className="inline-flex items-center gap-1">On track <Dumbbell className="inline h-3 w-3" /></span> : `${member.commitment - member.completed} to go`}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+            {/* Combat score */}
+            <div className="flex flex-col items-end">
+              <span
+                style={{
+                  fontFamily: Y2K.fontDisplay,
+                  fontSize: "26px",
+                  fontWeight: 900,
+                  color: dc.fg,
+                  fontVariantNumeric: "tabular-nums",
+                  lineHeight: 1,
+                  textShadow: dc.glow,
+                }}
+              >
+                {pod.season_score ?? 0}
+              </span>
+              <span
+                style={{
+                  fontFamily: Y2K.fontDisplay,
+                  fontSize: "7px",
+                  fontWeight: 900,
+                  letterSpacing: "0.10em",
+                  color: Y2K.text3,
+                }}
+              >
+                SCORE
+              </span>
+            </div>
+          </div>
 
-      {/* Challenges + Live Leaderboard */}
-      {POD_CHALLENGES_ENABLED && (
-        <>
-          <ChallengesSection podId={podId} currentUserId={currentUserId} />
-          <PodLeaderboard
-            podId={podId}
-            arenaLevel={pod.arena_level}
-            seasonScore={pod.season_score}
-            seasonStartDate={pod.season_start_date}
+          {/* Fireteam bar */}
+          <CrewBar members={pod.members_progress} />
+        </HeroPanel>
+
+        {/* Action buttons */}
+        <div className="grid grid-cols-4 gap-1">
+          <ActionBtn
+            label="SET GOAL"
+            icon={<Target size={14} />}
+            onClick={() => setCommitmentOpen(true)}
           />
-        </>
-      )}
-
-      {/* Recent Messages */}
-      {pod.recent_messages.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Recent Messages</h2>
-          <div className="space-y-2">
-            {pod.recent_messages.map((msg) => (
-              <Card key={msg.id}>
-                <CardContent className="pt-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                      {(msg.sender_name || "?")[0].toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-[13px] font-bold">{msg.sender_name}</p>
-                        {msg.recipient_id && (
-                          <span className="text-xs text-muted-foreground">
-                            → {msg.recipient_name}
-                          </span>
-                        )}
-                        <span className="text-xs text-muted-foreground ml-auto">
-                          {new Date(msg.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">{msg.message}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <ActionBtn
+            label="SEND"
+            icon={<Zap size={14} />}
+            onClick={() => setCommsOpen(true)}
+            accent={Y2K.cyan}
+          />
+          {isCreator && (
+            <ActionBtn
+              label="INVITE"
+              icon={<UserPlus size={14} />}
+              onClick={() => setInviteOpen(true)}
+              accent="#00C4E8"
+            />
+          )}
+          <ActionBtn
+            label="LEAVE"
+            icon={<X size={14} />}
+            onClick={() =>
+              isCreator ? setDeleteConfirmOpen(true) : setLeaveConfirmOpen(true)
+            }
+            accent={Y2K.status.critical.fg}
+          />
         </div>
-      )}
 
-      {/* Dialogs */}
+        {/* Threat alert */}
+        {criticalCount > 0 && (
+          <Panel accent={Y2K.status.critical.fg}>
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={12} style={{ color: Y2K.status.critical.fg }} />
+              <span
+                style={{
+                  fontFamily: Y2K.fontDisplay,
+                  fontSize: "9px",
+                  fontWeight: 900,
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: Y2K.status.critical.fg,
+                }}
+              >
+                {criticalCount} player{criticalCount > 1 ? "s" : ""} ghosting
+              </span>
+            </div>
+          </Panel>
+        )}
+        {warningCount > 0 && criticalCount === 0 && (
+          <Panel accent={Y2K.status.warning.fg}>
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={12} style={{ color: Y2K.status.warning.fg }} />
+              <span
+                style={{
+                  fontFamily: Y2K.fontDisplay,
+                  fontSize: "9px",
+                  fontWeight: 900,
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: Y2K.status.warning.fg,
+                }}
+              >
+                {warningCount} player{warningCount > 1 ? "s" : ""} slipping
+              </span>
+            </div>
+          </Panel>
+        )}
+
+        {/* Section tabs */}
+        <Y2KTabs
+          tabs={LOUNGE_TABS}
+          active={activeTab}
+          onChange={setActiveTab}
+          accent={dc.fg}
+        />
+
+        {/* Tab content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            variants={tabContentVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            {activeTab === "players" && (
+              <div className="flex flex-col gap-2">
+                {/* Section header */}
+                <span
+                  style={{
+                    fontFamily: Y2K.fontDisplay,
+                    fontSize: "8px",
+                    fontWeight: 900,
+                    letterSpacing: "0.14em",
+                    color: Y2K.text3,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  PLAYERS
+                </span>
+
+                {/* Current user first, then rest */}
+                {[
+                  ...pod.members_progress.filter((m) => m.user_id === currentUserId),
+                  ...pod.members_progress.filter((m) => m.user_id !== currentUserId),
+                ].map((member, i) => (
+                  <PlayerCard
+                    key={member.user_id}
+                    progress={member}
+                    tier={tier}
+                    isCurrentUser={member.user_id === currentUserId}
+                    index={i}
+                    isTraining={isInGym(member.user_id)}
+                    workoutName={getPresence(member.user_id)?.workout_name}
+                    workoutStartedAt={getPresence(member.user_id)?.started_at}
+                    onComms={() => {
+                      setCommsTargetId(member.user_id);
+                      setCommsOpen(true);
+                    }}
+                  />
+                ))}
+
+                {/* AAR Card */}
+                <RecapCard podId={podId} tier={tier} />
+              </div>
+            )}
+
+            {activeTab === "quests" && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span
+                    style={{
+                      fontFamily: Y2K.fontDisplay,
+                      fontSize: "8px",
+                      fontWeight: 900,
+                      letterSpacing: "0.14em",
+                      color: Y2K.text3,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    ACTIVE QUESTS
+                  </span>
+                  <button
+                    onClick={() => setCreateChallengeOpen(true)}
+                    className="flex items-center gap-1"
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: Y2K.r8,
+                      background: Y2K.cyanBg,
+                      border: `1px solid ${Y2K.cyanBorder}`,
+                      color: Y2K.cyan,
+                      fontFamily: Y2K.fontDisplay,
+                      fontSize: "8px",
+                      fontWeight: 900,
+                      letterSpacing: "0.10em",
+                      cursor: "pointer",
+                      minHeight: "32px",
+                    }}
+                  >
+                    <Plus size={10} strokeWidth={3} />
+                    NEW
+                  </button>
+                </div>
+
+                {challengesLoading ? (
+                  <div className="flex justify-center" style={{ padding: "24px 0" }}>
+                    <Loader2 size={16} style={{ color: Y2K.text3, animation: "spin 1s linear infinite" }} />
+                  </div>
+                ) : activeChallenges.length === 0 && pastChallenges.length === 0 ? (
+                  <Panel>
+                    <p
+                      className="text-center"
+                      style={{
+                        fontFamily: Y2K.fontSans,
+                        fontSize: "12px",
+                        color: Y2K.text3,
+                        padding: "16px 0",
+                      }}
+                    >
+                      No quests created yet
+                    </p>
+                  </Panel>
+                ) : (
+                  <>
+                    {activeChallenges.map((c, i) => {
+                      const now = new Date();
+                      const end = new Date(c.end_date + "T23:59:59");
+                      const daysLeft = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400000));
+                      return (
+                        <QuestCard
+                          key={c.id}
+                          challenge={c}
+                          isActive
+                          daysLeft={daysLeft}
+                          index={i}
+                        />
+                      );
+                    })}
+
+                    {pastChallenges.length > 0 && (
+                      <>
+                        <span
+                          style={{
+                            fontFamily: Y2K.fontDisplay,
+                            fontSize: "8px",
+                            fontWeight: 900,
+                            letterSpacing: "0.14em",
+                            color: Y2K.text3,
+                            textTransform: "uppercase",
+                            marginTop: "8px",
+                          }}
+                        >
+                          COMPLETED QUESTS
+                        </span>
+                        {pastChallenges.map((c, i) => (
+                          <QuestCard key={c.id} challenge={c} isActive={false} index={i} />
+                        ))}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab === "scoreboard" && (
+              <Scoreboard
+                podId={podId}
+                tier={tier}
+                seasonScore={pod.season_score}
+                seasonStartDate={pod.season_start_date}
+              />
+            )}
+
+            {activeTab === "feed" && (
+              <div className="flex flex-col gap-1">
+                <span
+                  style={{
+                    fontFamily: Y2K.fontDisplay,
+                    fontSize: "8px",
+                    fontWeight: 900,
+                    letterSpacing: "0.14em",
+                    color: Y2K.text3,
+                    textTransform: "uppercase",
+                    marginBottom: "4px",
+                  }}
+                >
+                  MESSAGES
+                </span>
+
+                {pod.recent_messages.length === 0 ? (
+                  <Panel>
+                    <p
+                      className="text-center"
+                      style={{
+                        fontFamily: Y2K.fontSans,
+                        fontSize: "12px",
+                        color: Y2K.text3,
+                        padding: "16px 0",
+                      }}
+                    >
+                      No messages yet
+                    </p>
+                  </Panel>
+                ) : (
+                  <Panel noPad style={{ padding: "8px" }}>
+                    {pod.recent_messages.map((msg) => (
+                      <FeedItem
+                        key={msg.id}
+                        senderName={msg.sender_name}
+                        recipientName={msg.recipient_name}
+                        body={msg.message}
+                        timestamp={msg.created_at}
+                      />
+                    ))}
+                  </Panel>
+                )}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
+
+      {/* SendComms bottom sheet */}
+      <SendMessage
+        open={commsOpen}
+        onClose={() => {
+          setCommsOpen(false);
+          setCommsTargetId(undefined);
+        }}
+        onSend={handleSendComms}
+        members={pod.members_progress}
+        currentUserId={currentUserId || ""}
+        podName={pod.name}
+        tier={tier}
+      />
+
+      {/* Existing dialogs (keep working) */}
       {isCreator && (
         <InviteMemberDialog
           open={inviteOpen}
@@ -495,22 +701,40 @@ export default function PodDetailPage({ params }: PageProps) {
         currentPlannedDays={currentUserProgress?.planned_days}
       />
 
-      <SendMessageDialog
-        open={messageOpen}
-        onClose={() => {
-          setMessageOpen(false);
-          setSelectedRecipient(null);
-        }}
-        onSendMessage={handleSendMessage}
-        members={pod.members}
-        recipientId={selectedRecipient}
+      <CreateChallengeDialog
+        open={createChallengeOpen}
+        podId={podId}
+        onClose={() => setCreateChallengeOpen(false)}
+        onCreated={fetchChallenges}
       />
+
+      <AlertDialog open={!!deleteChallengeId} onOpenChange={(o) => !o && setDeleteChallengeId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete quest?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the quest and all its data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteChallengeId && handleDeleteChallenge(deleteChallengeId)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Leave this pod?</AlertDialogTitle>
-            <AlertDialogDescription>You can rejoin by invite if you change your mind.</AlertDialogDescription>
+            <AlertDialogTitle>Leave this crew?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You can rejoin by invite if you change your mind.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -522,8 +746,10 @@ export default function PodDetailPage({ params }: PageProps) {
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this pod?</AlertDialogTitle>
-            <AlertDialogDescription>This permanently deletes the pod, all members, messages, and challenges. This cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>Delete this crew?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the crew, all players, messages, and quests. Cannot be undone.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -536,6 +762,61 @@ export default function PodDetailPage({ params }: PageProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <style jsx global>{`
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(0.75); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
+  );
+}
+
+// ── Action button component ───────────────────────────────────────────────────
+
+function ActionBtn({
+  label,
+  icon,
+  onClick,
+  accent,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  accent?: string;
+}) {
+  const color = accent || Y2K.text2;
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center justify-center gap-1"
+      style={{
+        padding: "8px 4px",
+        borderRadius: Y2K.r8,
+        background: accent ? `${accent}08` : "rgba(255,255,255,0.03)",
+        border: `1px solid ${accent ? `${accent}25` : Y2K.border1}`,
+        color,
+        cursor: "pointer",
+        minHeight: "44px",
+      }}
+    >
+      {icon}
+      <span
+        style={{
+          fontFamily: Y2K.fontDisplay,
+          fontSize: "7px",
+          fontWeight: 900,
+          letterSpacing: "0.10em",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </span>
+    </button>
   );
 }

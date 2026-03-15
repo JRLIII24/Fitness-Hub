@@ -49,7 +49,7 @@ export async function GET() {
     // Get pod details
     const { data: podsData, error: podsError } = await supabase
       .from('accountability_pods')
-      .select('id, name, description, creator_id, created_at, updated_at')
+      .select('id, name, description, creator_id, created_at, updated_at, season_score, arena_level')
       .in('id', podIds);
 
     if (podsError) {

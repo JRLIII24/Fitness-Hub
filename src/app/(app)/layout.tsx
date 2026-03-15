@@ -7,6 +7,7 @@ import { OfflineBanner } from "@/components/layout/offline-banner";
 import { SplashDismisser } from "@/components/layout/splash-dismisser";
 import { HealthGuard } from "@/components/layout/health-guard";
 import { CoachFabWrapper } from "@/components/coach/coach-fab-wrapper";
+import { WorkoutPresenceProvider } from "@/components/layout/workout-presence-provider";
 
 export default async function AppLayout({
   children,
@@ -37,6 +38,7 @@ export default async function AppLayout({
       <SplashDismisser />
       <HealthGuard />
       <CoachFabWrapper />
+      <WorkoutPresenceProvider />
     </div>
   );
 }

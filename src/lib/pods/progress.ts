@@ -68,18 +68,29 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
     commitments.map(c => [c.user_id, { workouts_per_week: c.workouts_per_week, planned_days: c.planned_days ?? [] }])
   );
 
-  // Get workout counts for this week
+  // Get workout counts + day data for this week
   const userIds = members.map(m => m.user_id);
   const { data: workouts } = await supabase
     .from('workout_sessions')
-    .select('user_id, id')
+    .select('user_id, id, started_at, total_volume_kg')
     .in('user_id', userIds)
     .eq('status', 'completed')
     .gte('started_at', weekStartISO);
 
   const workoutCounts = new Map<string, number>();
+  const workoutDays = new Map<string, string[]>();
+  const workoutVolume = new Map<string, number>();
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
   (workouts || []).forEach(w => {
     workoutCounts.set(w.user_id, (workoutCounts.get(w.user_id) || 0) + 1);
+    // Track completed days
+    const day = dayNames[new Date(w.started_at).getDay()];
+    const days = workoutDays.get(w.user_id) || [];
+    if (!days.includes(day)) days.push(day);
+    workoutDays.set(w.user_id, days);
+    // Track volume
+    workoutVolume.set(w.user_id, (workoutVolume.get(w.user_id) || 0) + (w.total_volume_kg || 0));
   });
 
   // Calculate progress for each member
@@ -104,9 +115,11 @@ export async function getPodMemberProgress(podId: string): Promise<MemberProgres
         commitment,
         planned_days: entry.planned_days,
         completed,
+        completed_days: workoutDays.get(member.user_id) || [],
         progress_percentage,
         is_on_track,
-        streak
+        streak,
+        volume_kg: workoutVolume.get(member.user_id) || 0
       };
     })
   );

@@ -3,7 +3,7 @@
  * React hook for managing accountability pods
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { PodWithMembers, PodDetail } from '@/types/pods';
 import {
@@ -25,10 +25,12 @@ export function usePods(): UsePods {
   const [pods, setPods] = useState<PodWithMembers[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasFetched = useRef(false);
 
   const fetchPods = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show loading spinner on initial load (not background refetches)
+      if (!hasFetched.current) setLoading(true);
       setError(null);
       const res = await fetch('/api/pods');
       if (!res.ok) {
@@ -38,6 +40,7 @@ export function usePods(): UsePods {
       }
       const data = await res.json();
       setPods(data.pods || []);
+      hasFetched.current = true;
     } catch (err) {
       console.error('Fetch pods error:', err);
       setError(err instanceof Error ? err.message : 'Failed to load pods');

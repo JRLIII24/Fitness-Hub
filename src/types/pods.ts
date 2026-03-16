@@ -63,6 +63,7 @@ export interface PodWithMembers extends Pod {
     user_id: string;
     display_name: string | null;
     username: string | null;
+    avatar_url?: string | null;
     joined_at: string;
     status: 'active' | 'left';
   }>;

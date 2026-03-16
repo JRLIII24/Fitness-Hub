@@ -163,7 +163,7 @@ export const ExerciseCard = memo(function ExerciseCard({
             {/* Collapse toggle */}
             <button
               type="button"
-              className="flex h-8 w-8 items-center justify-center"
+              className="flex h-9 w-9 min-h-[44px] min-w-[44px] items-center justify-center"
               onClick={() => setIsCollapsed((prev) => !prev)}
               aria-label={isCollapsed ? "Expand exercise" : "Collapse exercise"}
             >
@@ -174,7 +174,7 @@ export const ExerciseCard = memo(function ExerciseCard({
             </button>
             <button
               type="button"
-              className="flex h-8 w-8 items-center justify-center"
+              className="flex h-9 w-9 min-h-[44px] min-w-[44px] items-center justify-center"
               onClick={() => onSwapExercise(exerciseIndex)}
               aria-label="Swap exercise"
             >
@@ -182,7 +182,7 @@ export const ExerciseCard = memo(function ExerciseCard({
             </button>
             <button
               type="button"
-              className="flex h-8 w-8 items-center justify-center"
+              className="flex h-9 w-9 min-h-[44px] min-w-[44px] items-center justify-center"
               onClick={() => onRemoveExercise(exerciseIndex)}
               aria-label="Remove exercise"
             >

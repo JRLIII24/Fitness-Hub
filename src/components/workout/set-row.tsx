@@ -284,8 +284,8 @@ export const SetRow = memo(function SetRow({
       {/* Ghost workout indicator */}
       {hasGhost && !set.completed && (
         <div className="rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-1 text-[12px]">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-cyan-400/70">
+          <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-0.5">
+            <span className="flex min-w-0 items-center gap-1.5 text-cyan-400/70">
               <Ghost className="h-3.5 w-3.5 shrink-0" />
               <span className="font-medium">Previous:</span>
               <span className="font-semibold tabular-nums">
@@ -293,7 +293,7 @@ export const SetRow = memo(function SetRow({
               </span>
             </span>
             {ghostPercentage != null && ghostPercentage < 100 && (
-              <span className="text-muted-foreground">
+              <span className="shrink-0 text-muted-foreground">
                 {ghostPercentage}% of ghost
               </span>
             )}
@@ -318,7 +318,7 @@ export const SetRow = memo(function SetRow({
             placeholder="0"
             value={weightValue}
             onChange={(e) => handleWeightChange(e.target.value)}
-            className="h-10 w-full text-center text-[15px] font-semibold tabular-nums text-foreground"
+            className="h-10 w-full text-center text-base font-semibold tabular-nums text-foreground"
             disabled={set.completed}
           />
         </div>
@@ -337,7 +337,7 @@ export const SetRow = memo(function SetRow({
             placeholder="0"
             value={repsValue}
             onChange={(e) => handleRepsChange(e.target.value)}
-            className="h-10 w-full text-center text-[15px] font-semibold tabular-nums text-foreground"
+            className="h-10 w-full text-center text-base font-semibold tabular-nums text-foreground"
             disabled={set.completed}
           />
         </div>
@@ -361,7 +361,7 @@ export const SetRow = memo(function SetRow({
             placeholder="—"
             value={rirValue}
             onChange={(e) => handleRirChange(e.target.value)}
-            className="h-8 w-full text-center text-sm tabular-nums text-foreground"
+            className="h-10 w-full text-center text-sm tabular-nums text-foreground"
             disabled={set.completed}
           />
         </div>
@@ -377,7 +377,7 @@ export const SetRow = memo(function SetRow({
             value={String(restSeconds)}
             onValueChange={(value) => onUpdate(exerciseIndex, setIndex, { rest_seconds: Number.parseInt(value, 10) })}
           >
-            <SelectTrigger className="h-8 w-full text-xs" aria-labelledby={`rest-label-${set.id}`}>
+            <SelectTrigger className="h-10 w-full text-xs" aria-labelledby={`rest-label-${set.id}`}>
               <SelectValue placeholder="Rest" />
             </SelectTrigger>
             <SelectContent>
@@ -393,12 +393,12 @@ export const SetRow = memo(function SetRow({
 
       {previousSet && (previousSet.weight != null || previousSet.reps != null) ? (
         <div className={cn(
-          "flex items-center justify-between rounded-md border px-2 py-1 text-[12px] transition-all duration-300",
+          "flex flex-wrap items-center justify-between gap-y-0.5 rounded-md border px-2 py-1 text-[12px] transition-all duration-300",
           beatPrevious && set.completed
             ? "border-yellow-400/30 bg-gradient-to-r from-yellow-500/10 to-amber-500/10"
             : "border-border/50 bg-muted/30"
         )}>
-          <span className="text-muted-foreground">
+          <span className="min-w-0 text-muted-foreground">
             LAST: <span className="font-medium text-foreground">{previousWeightText} x {previousRepsText}</span>
             {(set.weight_kg != null || set.reps != null) ? (
               <>

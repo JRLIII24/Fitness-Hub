@@ -94,7 +94,7 @@ export function FoodLogCard({ entry, onDelete, onEdit }: Props) {
           )}
 
           {(entry.protein_g != null || entry.carbs_g != null || entry.fat_g != null) && (
-            <div className="mt-1.5 flex gap-3 text-xs text-muted-foreground">
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
               {entry.protein_g != null && (
                 <span>
                   <span className={`font-medium ${MACRO_COLORS.protein}`}>P</span> {Math.round(entry.protein_g)}g
@@ -122,7 +122,7 @@ export function FoodLogCard({ entry, onDelete, onEdit }: Props) {
                 {showMore ? "less" : "more"}
               </button>
               {showMore && (
-                <div className="mt-1 flex gap-3 text-[11px] text-muted-foreground">
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                   {totalFiber > 0 && (
                     <span>
                       <span className={`font-medium ${MACRO_COLORS.fiber}`}>Fi</span> {Math.round(totalFiber)}g

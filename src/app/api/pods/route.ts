@@ -49,7 +49,7 @@ export async function GET() {
     // Get pod details
     const { data: podsData, error: podsError } = await supabase
       .from('accountability_pods')
-      .select('id, name, description, creator_id, created_at, updated_at, season_score, arena_level')
+      .select('id, name, description, creator_id, created_at, updated_at, season_score, arena_level, season_start_date')
       .in('id', podIds);
 
     if (podsError) {
@@ -63,7 +63,7 @@ export async function GET() {
     // Batch-fetch all active members for these pods in one query (replaces N per-pod queries).
     const { data: allMembers } = await supabase
       .from('pod_members')
-      .select('pod_id, user_id, joined_at, status, profiles!inner(display_name, username)')
+      .select('pod_id, user_id, joined_at, status, profiles!inner(display_name, username, avatar_url)')
       .in('pod_id', podIds)
       .eq('status', 'active');
 
@@ -86,6 +86,7 @@ export async function GET() {
             user_id: m.user_id,
             display_name: profile?.display_name || null,
             username: profile?.username || null,
+            avatar_url: (profile as Record<string, unknown>)?.avatar_url as string | null ?? null,
             joined_at: m.joined_at,
             status: m.status
           };
@@ -133,7 +134,10 @@ export async function POST(request: NextRequest) {
       .insert({
         name: name.trim(),
         description: description?.trim() || null,
-        creator_id: user.id
+        creator_id: user.id,
+        season_start_date: new Date().toISOString().split('T')[0],
+        season_score: 0,
+        arena_level: 1,
       })
       .select()
       .single();

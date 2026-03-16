@@ -185,7 +185,7 @@ export function FoodLogForm({
           <span className="text-sm text-muted-foreground">Calories</span>
           <span className="text-lg font-bold font-display tabular-nums text-foreground">{calculatedCalories} kcal</span>
         </div>
-        <div className="mt-1 flex gap-3 text-xs text-muted-foreground">
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
           {calculatedProtein != null && (
             <span><span className={MACRO_COLORS.protein}>P</span> {calculatedProtein}g</span>
           )}

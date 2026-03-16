@@ -59,6 +59,7 @@ function toStubProgress(members: PodWithMembers["members"]): MemberProgress[] {
     user_id: m.user_id,
     display_name: m.display_name,
     username: m.username,
+    avatar_url: m.avatar_url ?? null,
     commitment: 0,
     planned_days: [],
     completed: 0,

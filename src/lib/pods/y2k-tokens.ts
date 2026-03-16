@@ -176,7 +176,7 @@ export function statusCfg(status: PlayerStatus) {
 export function getPlayerStatus(progress: MemberProgress): PlayerStatus {
   const { completed, commitment, is_on_track, preferred_workout_days, planned_days, completed_days } = progress;
 
-  if (commitment === 0) return "warning";
+  if (commitment === 0) return "active";
   if (is_on_track) return "active";
   if (completed > 0 && commitment - completed === 1) return "clutch";
 

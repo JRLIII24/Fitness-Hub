@@ -27,7 +27,7 @@ export function FoodResultCard({ food }: { food: FoodItem }) {
         food.fiber_g != null ||
         food.sugar_g != null ||
         food.sodium_mg != null) && (
-        <div className="mt-2 flex gap-3 text-xs text-muted-foreground">
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
           {food.protein_g != null && (
             <span>
               <span className={`font-medium ${MACRO_COLORS.protein}`}>P</span> {Math.round(food.protein_g)}g

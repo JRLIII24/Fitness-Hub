@@ -259,7 +259,7 @@ export function ExerciseLibrarySheet({
                       placeholder="Exercise name"
                       className="h-9"
                     />
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <Select value={customMuscleGroup} onValueChange={(v) => setCustomMuscleGroup(v as MuscleGroup)}>
                         <SelectTrigger className="h-9 text-xs">
                           <SelectValue placeholder="Muscle group" />

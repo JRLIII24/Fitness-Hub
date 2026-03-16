@@ -97,7 +97,7 @@ export async function GET(
       .order('created_at', { ascending: false })
       .limit(20);
 
-    const recentMessages = (messages || []).map(m => ({
+    const recentMessages = (messages || []).reverse().map(m => ({
       id: m.id,
       sender_id: m.sender_id,
       sender_name: (Array.isArray(m.sender) ? m.sender[0] : m.sender)?.display_name || null,

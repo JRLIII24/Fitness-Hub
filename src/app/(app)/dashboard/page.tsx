@@ -57,6 +57,7 @@ export default async function DashboardPage() {
     supabase.rpc("get_dashboard_nutrition_summary", {
       p_user_id: user.id,
       p_date_str: todayStr,
+      p_timezone: timezone,
     }),
     supabase
       .from("food_log")

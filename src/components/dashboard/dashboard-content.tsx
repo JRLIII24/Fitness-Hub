@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { glassMotionVariants } from "@/lib/motion";
 
@@ -149,11 +150,23 @@ export function DashboardContent({
   fatigueSnapshot,
   dashboardPhase,
 }: DashboardContentProps) {
+  const router = useRouter();
   const { preference, unitLabel } = useUnitPreferenceStore();
   const toDisplayVolume = (kgVolume: number) =>
     preference === "imperial"
       ? Math.round(kgToLbs(kgVolume))
       : Math.round(kgVolume);
+
+  // Auto-refresh server data when the user navigates back to the dashboard
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [router]);
 
   const nutritionCard = (
     <SectionCard key="nutrition">

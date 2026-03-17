@@ -152,18 +152,29 @@ interface CoachFeedItemProps {
   onDismissAction?: (msgId: string) => void;
   isConfirming?: boolean;
   onSelectOption?: (text: string) => void;
+  onTypingDone?: (msgId: string) => void;
+  skipTypewriter?: boolean;
 }
 
-export function CoachFeedItem({ message, isLatest, index, totalCount, onConfirmAction, onDismissAction, isConfirming, onSelectOption }: CoachFeedItemProps) {
+export function CoachFeedItem({ message, isLatest, index, totalCount, onConfirmAction, onDismissAction, isConfirming, onSelectOption, onTypingDone, skipTypewriter }: CoachFeedItemProps) {
   const isUser = message.role === "user";
   const hasMutation = message.action ? isMutationAction(message.action) : false;
   // When streaming, text arrives progressively — skip typewriter and render directly.
   // Only use typewriter for non-streaming assistant messages (e.g. from history).
+  // Skip typewriter entirely for messages that have already been displayed (e.g. after close/reopen).
   const isStreaming = message.isStreaming === true;
+  const shouldTypewrite = !isUser && isLatest && !isStreaming && !skipTypewriter;
   const { displayed, done } = useTypewriter(
     message.content,
-    !isUser && isLatest && !isStreaming,
+    shouldTypewrite,
   );
+  // Notify parent when typewriter finishes so re-opens don't re-animate
+  useEffect(() => {
+    if (done && shouldTypewrite) {
+      onTypingDone?.(message.id);
+    }
+  }, [done, shouldTypewrite, message.id, onTypingDone]);
+
   // For streaming messages, show content directly and treat as "not done" while streaming
   const shownText = isStreaming ? message.content : displayed;
   const isComplete = isStreaming ? !isStreaming : done;

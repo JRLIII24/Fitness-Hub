@@ -138,6 +138,7 @@ export function CoachChatSheet({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const initialMessageSentRef = useRef(false);
+  const typingDoneIds = useRef<Set<string>>(new Set());
 
   const supabase = useSupabase();
   const { isListening, transcript, startListening, stopListening } =
@@ -414,6 +415,7 @@ export function CoachChatSheet({
         }
 
         // Finalize the assistant message (mark streaming done)
+        typingDoneIds.current.add(assistantMsgId);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
@@ -490,6 +492,10 @@ export function CoachChatSheet({
     [workoutStore, timerStore, router, userId],
   );
 
+  const handleTypingDone = useCallback((msgId: string) => {
+    typingDoneIds.current.add(msgId);
+  }, []);
+
   const handleDismissAction = useCallback((msgId: string) => {
     setMessages((prev) =>
       prev.map((m) =>
@@ -553,6 +559,8 @@ export function CoachChatSheet({
           onConfirmAction={handleConfirmAction}
           onDismissAction={handleDismissAction}
           onSelectOption={handleSelectOption}
+          onTypingDone={handleTypingDone}
+          typingDoneIds={typingDoneIds.current}
           scrollRef={scrollRef}
           inputRef={inputRef}
         />
@@ -889,6 +897,8 @@ function HudShell({
   onConfirmAction,
   onDismissAction,
   onSelectOption,
+  onTypingDone,
+  typingDoneIds,
   scrollRef,
   inputRef,
 }: {
@@ -910,6 +920,8 @@ function HudShell({
   onConfirmAction: (msgId: string, pending: PendingAction) => void;
   onDismissAction: (msgId: string) => void;
   onSelectOption: (text: string) => void;
+  onTypingDone: (msgId: string) => void;
+  typingDoneIds: Set<string>;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
@@ -1178,6 +1190,8 @@ function HudShell({
                   onConfirmAction={onConfirmAction}
                   onDismissAction={onDismissAction}
                   onSelectOption={onSelectOption}
+                  onTypingDone={onTypingDone}
+                  skipTypewriter={typingDoneIds.has(msg.id)}
                   isConfirming={confirmingMsgId === msg.id}
                 />
               ))}

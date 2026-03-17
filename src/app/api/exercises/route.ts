@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         is_custom: true,
         created_by: user.id,
       })
-      .select("id, name, muscle_group, equipment, category, instructions")
+      .select("id, name, slug, muscle_group, equipment, category, instructions, is_custom")
       .single();
 
     if (error) throw error;

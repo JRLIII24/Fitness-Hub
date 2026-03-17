@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, ChevronLeft, Check, Trash2 } from "lucide-react";
+import { Loader2, ChevronLeft, Check, Pencil, Trash2 } from "lucide-react";
+import { EQUIPMENT_TYPES, EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS } from "@/lib/constants";
 import { celebratePR, triggerHaptic } from "@/lib/celebrations";
 import { useUnitPreferenceStore } from "@/stores/unit-preference-store";
 import { weightToDisplay, lbsToKg } from "@/lib/units";
@@ -43,6 +44,7 @@ interface WorkoutSession {
       instructions: string | null;
       form_tips: string[] | null;
       image_url: string | null;
+      is_custom: boolean;
     } | null;
   }>;
 }
@@ -77,7 +79,7 @@ async function loadWorkout(
     const { data: setsData, error: setsError } = await supabase
       .from("workout_sets")
       .select(
-        "id,exercise_id,set_number,set_type,reps,weight_kg,duration_seconds,rpe,rest_seconds,exercises(id,name,slug,muscle_group,equipment,category,instructions,form_tips,image_url)"
+        "id,exercise_id,set_number,set_type,reps,weight_kg,duration_seconds,rpe,rest_seconds,exercises(id,name,slug,muscle_group,equipment,category,instructions,form_tips,image_url,is_custom)"
       )
       .eq("session_id", workoutId)
       .order("sort_order", { ascending: true });
@@ -118,6 +120,7 @@ async function loadWorkout(
           instructions: set.exercises.instructions,
           form_tips: set.exercises.form_tips,
           image_url: set.exercises.image_url,
+          is_custom: set.exercises.is_custom,
         });
       }
 
@@ -162,6 +165,7 @@ async function loadWorkout(
       started_at: session.started_at,
       exercises,
       notes: session.notes || "",
+      workout_type: (session as unknown as { workout_type?: string | null }).workout_type ?? null,
     };
 
     return { session, activeWorkout };
@@ -297,6 +301,8 @@ export default function EditWorkoutPage() {
   const [workoutName, setWorkoutName] = useState("");
   const [workoutNotes, setWorkoutNotes] = useState("");
   const [exercises, setExercises] = useState<EditableExerciseBlock[]>([]);
+  const [editingNameIndex, setEditingNameIndex] = useState<number | null>(null);
+  const [draftExerciseName, setDraftExerciseName] = useState("");
 
   const toDisplayWeight = (kg: number) =>
     weightToDisplay(kg, preference === "imperial", 1);
@@ -348,6 +354,26 @@ export default function EditWorkoutPage() {
     setExercises((prev) => prev.filter((_, i) => i !== exerciseIndex));
   };
 
+  const handleUpdateExerciseName = (exerciseIndex: number, name: string) => {
+    const trimmed = name.trim();
+    if (trimmed.length < 2) return;
+    const newExercises = [...exercises];
+    newExercises[exerciseIndex] = {
+      ...newExercises[exerciseIndex],
+      exercise: { ...newExercises[exerciseIndex].exercise, name: trimmed },
+    };
+    setExercises(newExercises);
+  };
+
+  const handleUpdateExerciseEquipment = (exerciseIndex: number, equipment: string) => {
+    const newExercises = [...exercises];
+    newExercises[exerciseIndex] = {
+      ...newExercises[exerciseIndex],
+      exercise: { ...newExercises[exerciseIndex].exercise, equipment },
+    };
+    setExercises(newExercises);
+  };
+
   const handleRemoveSet = (exerciseIndex: number, setIndex: number) => {
     const newExercises = [...exercises];
     newExercises[exerciseIndex].sets = newExercises[exerciseIndex].sets.filter(
@@ -371,6 +397,7 @@ export default function EditWorkoutPage() {
         started_at: new Date().toISOString(),
         exercises,
         notes: workoutNotes,
+        workout_type: null,
       };
 
       await saveWorkoutEdits(supabase, workoutId, activeWorkout);
@@ -465,21 +492,73 @@ export default function EditWorkoutPage() {
       {/* Exercises */}
       {exercises.map((exerciseBlock, exerciseIndex) => (
         <div key={exerciseIndex} className="rounded-2xl border border-border/60 bg-card/30 overflow-hidden">
-          <div className="px-5 py-3 border-b border-border/40 flex items-center justify-between">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <p className="text-[13px] font-bold min-w-0 truncate">{exerciseBlock.exercise.name}</p>
-              <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-muted/50 text-muted-foreground">
-                {exerciseBlock.exercise.muscle_group}
-              </span>
+          <div className="px-5 py-3 border-b border-border/40 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                {exerciseBlock.exercise.is_custom && editingNameIndex === exerciseIndex ? (
+                  <Input
+                    autoFocus
+                    value={draftExerciseName}
+                    onChange={(e) => setDraftExerciseName(e.target.value)}
+                    onBlur={() => {
+                      handleUpdateExerciseName(exerciseIndex, draftExerciseName);
+                      setEditingNameIndex(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleUpdateExerciseName(exerciseIndex, draftExerciseName);
+                        setEditingNameIndex(null);
+                      }
+                      if (e.key === "Escape") setEditingNameIndex(null);
+                    }}
+                    className="h-8 border-transparent bg-transparent px-0 text-[13px] font-bold focus:border-border focus:bg-background"
+                  />
+                ) : exerciseBlock.exercise.is_custom ? (
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 min-w-0 text-left"
+                    onClick={() => {
+                      setDraftExerciseName(exerciseBlock.exercise.name);
+                      setEditingNameIndex(exerciseIndex);
+                    }}
+                  >
+                    <p className="text-[13px] font-bold min-w-0 truncate">{exerciseBlock.exercise.name}</p>
+                    <Pencil className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  </button>
+                ) : (
+                  <p className="text-[13px] font-bold min-w-0 truncate">{exerciseBlock.exercise.name}</p>
+                )}
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest bg-muted/50 text-muted-foreground shrink-0">
+                  {MUSCLE_GROUP_LABELS[exerciseBlock.exercise.muscle_group] ?? exerciseBlock.exercise.muscle_group}
+                </span>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => handleRemoveExercise(exerciseIndex)}
+                className="h-11 w-11 rounded-lg shrink-0"
+              >
+                <Trash2 className="size-4 text-destructive" />
+              </Button>
             </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => handleRemoveExercise(exerciseIndex)}
-              className="h-11 w-11 rounded-lg shrink-0"
-            >
-              <Trash2 className="size-4 text-destructive" />
-            </Button>
+            {exerciseBlock.exercise.is_custom ? (
+              <select
+                value={exerciseBlock.exercise.equipment ?? "bodyweight"}
+                onChange={(e) => handleUpdateExerciseEquipment(exerciseIndex, e.target.value)}
+                className="h-7 cursor-pointer rounded-full border border-border/60 bg-muted/50 px-2.5 text-[10px] font-semibold text-muted-foreground outline-none"
+                aria-label="Change equipment"
+              >
+                {EQUIPMENT_TYPES.map((eq) => (
+                  <option key={eq} value={eq}>
+                    {EQUIPMENT_LABELS[eq] ?? eq}
+                  </option>
+                ))}
+              </select>
+            ) : exerciseBlock.exercise.equipment ? (
+              <span className="rounded-full border border-border/60 bg-muted/50 px-2.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                {EQUIPMENT_LABELS[exerciseBlock.exercise.equipment] ?? exerciseBlock.exercise.equipment}
+              </span>
+            ) : null}
           </div>
           <div className="divide-y divide-border/30">
             {exerciseBlock.sets.map((set: WorkoutSet, setIndex: number) => (

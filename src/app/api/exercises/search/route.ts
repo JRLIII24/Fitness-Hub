@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     // Start building the query
     let supabaseQuery = supabase
       .from("exercises")
-      .select("id, name, slug, muscle_group, equipment, category, instructions, image_url, gif_url, source");
+      .select("id, name, slug, muscle_group, equipment, category, instructions, image_url, gif_url, source, is_custom");
 
     // Apply filters
     if (muscleGroups) {

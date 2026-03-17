@@ -45,7 +45,7 @@ export function SavedMealsList({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: idx * 0.04 }}
-          className="flex items-center gap-3 rounded-xl border border-border/50 bg-card/40 p-3.5"
+          className="flex items-center gap-2 overflow-hidden rounded-xl border border-border/50 bg-card/40 p-3.5"
         >
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-semibold">{t.name}</p>

@@ -80,106 +80,111 @@ export function FoodLogCard({ entry, onDelete, onEdit }: Props) {
 
   return (
     <>
-      <div className="flex items-start justify-between gap-3 glass-inner rounded-lg p-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-foreground truncate">{displayName}</p>
-          {displayBrand && (
-            <p className="text-xs text-muted-foreground truncate">{displayBrand}</p>
-          )}
-          <p className="text-xs text-muted-foreground mt-0.5">{displayServing}</p>
-          {entry.food_items?.serving_size_g != null && (
-            <p className="text-[11px] text-muted-foreground">
-              ~{Math.round(entry.food_items.serving_size_g * (entry.servings ?? 1) * 10) / 10}g total
-            </p>
-          )}
+      <div className="max-w-full overflow-hidden glass-inner rounded-lg p-2.5 sm:p-3 space-y-1.5">
+        {/* Top row: name + calories + actions */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <div className="min-w-0 sm:flex-1">
+            <p className="font-semibold text-foreground truncate">{displayName}</p>
+            {displayBrand && (
+              <p className="text-xs text-muted-foreground truncate">{displayBrand}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{displayServing}</p>
+            {entry.food_items?.serving_size_g != null && (
+              <p className="text-[11px] text-muted-foreground">
+                ~{Math.round(entry.food_items.serving_size_g * (entry.servings ?? 1) * 10) / 10}g total
+              </p>
+            )}
+          </div>
 
-          {(entry.protein_g != null || entry.carbs_g != null || entry.fat_g != null) && (
-            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-              {entry.protein_g != null && (
-                <span>
-                  <span className={`font-medium ${MACRO_COLORS.protein}`}>P</span> {Math.round(entry.protein_g)}g
-                </span>
-              )}
-              {entry.carbs_g != null && (
-                <span>
-                  <span className={`font-medium ${MACRO_COLORS.carbs}`}>C</span> {Math.round(entry.carbs_g)}g
-                </span>
-              )}
-              {entry.fat_g != null && (
-                <span>
-                  <span className={`font-medium ${MACRO_COLORS.fat}`}>F</span> {Math.round(entry.fat_g)}g
-                </span>
-              )}
+          {/* Calories + inline actions */}
+          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0 sm:justify-end sm:gap-0.5">
+            <div className="text-right sm:pr-0.5">
+              <p className="font-bold font-display tabular-nums text-foreground text-sm leading-tight">{Math.round(entry.calories_consumed)}</p>
+              <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">kcal</p>
             </div>
-          )}
-          {(totalFiber > 0 || totalSugar > 0 || totalSodium > 0) && (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowMore((v) => !v)}
-                className="mt-0.5 text-[10px] font-medium text-muted-foreground/70 hover:text-muted-foreground"
+            <div className="flex items-center gap-0.5">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-9 min-h-[36px] min-w-[36px] shrink-0 sm:size-11 sm:min-h-[44px] sm:min-w-[44px]"
+                onClick={() => setEditDialogOpen(true)}
+                aria-label="Edit entry"
               >
-                {showMore ? "less" : "more"}
-              </button>
-              {showMore && (
-                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                  {totalFiber > 0 && (
-                    <span>
-                      <span className={`font-medium ${MACRO_COLORS.fiber}`}>Fi</span> {Math.round(totalFiber)}g
-                    </span>
-                  )}
-                  {totalSugar > 0 && (
-                    <span>
-                      <span className="font-medium text-[var(--macro-carbs)]">Su</span> {Math.round(totalSugar)}g
-                    </span>
-                  )}
-                  {totalSodium > 0 && (
-                    <span>
-                      <span className="font-medium text-[var(--status-neutral)]">Na</span> {Math.round(totalSodium)}mg
-                    </span>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-          {sourceLabel && (
-            <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-              {sourceLabel}
-            </p>
-          )}
+                <Pencil className="size-3.5 text-muted-foreground" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-9 min-h-[36px] min-w-[36px] shrink-0 sm:size-11 sm:min-h-[44px] sm:min-w-[44px]"
+                onClick={handleDelete}
+                disabled={deleting}
+                aria-label="Delete entry"
+              >
+                {deleting ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="size-3.5 text-destructive" />
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-2">
-          <div className="text-right">
-            <p className="font-bold font-display tabular-nums text-foreground text-sm">{Math.round(entry.calories_consumed)}</p>
-            <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">kcal</p>
+        {/* Macros row */}
+        {(entry.protein_g != null || entry.carbs_g != null || entry.fat_g != null) && (
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+            {entry.protein_g != null && (
+              <span>
+                <span className={`font-medium ${MACRO_COLORS.protein}`}>P</span> {Math.round(entry.protein_g)}g
+              </span>
+            )}
+            {entry.carbs_g != null && (
+              <span>
+                <span className={`font-medium ${MACRO_COLORS.carbs}`}>C</span> {Math.round(entry.carbs_g)}g
+              </span>
+            )}
+            {entry.fat_g != null && (
+              <span>
+                <span className={`font-medium ${MACRO_COLORS.fat}`}>F</span> {Math.round(entry.fat_g)}g
+              </span>
+            )}
           </div>
-          <div className="flex gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-11 w-11 shrink-0"
-              onClick={() => setEditDialogOpen(true)}
-              aria-label="Edit entry"
+        )}
+        {(totalFiber > 0 || totalSugar > 0 || totalSodium > 0) && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowMore((v) => !v)}
+              className="text-[10px] font-medium text-muted-foreground/70 hover:text-muted-foreground"
             >
-              <Pencil className="size-4 text-muted-foreground" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-11 shrink-0"
-              onClick={handleDelete}
-              disabled={deleting}
-              aria-label="Delete entry"
-            >
-              {deleting ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Trash2 className="size-4 text-destructive" />
-              )}
-            </Button>
-          </div>
-        </div>
+              {showMore ? "less" : "more"}
+            </button>
+            {showMore && (
+              <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+                {totalFiber > 0 && (
+                  <span>
+                    <span className={`font-medium ${MACRO_COLORS.fiber}`}>Fi</span> {Math.round(totalFiber)}g
+                  </span>
+                )}
+                {totalSugar > 0 && (
+                  <span>
+                    <span className="font-medium text-[var(--macro-carbs)]">Su</span> {Math.round(totalSugar)}g
+                  </span>
+                )}
+                {totalSodium > 0 && (
+                  <span>
+                    <span className="font-medium text-[var(--status-neutral)]">Na</span> {Math.round(totalSodium)}mg
+                  </span>
+                )}
+              </div>
+            )}
+          </>
+        )}
+        {sourceLabel && (
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            {sourceLabel}
+          </p>
+        )}
       </div>
 
       <EditFoodDialog

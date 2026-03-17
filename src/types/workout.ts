@@ -9,6 +9,7 @@ export interface Exercise {
   form_tips: string[] | null;
   image_url: string | null;
   gif_url?: string | null;
+  is_custom?: boolean;
 }
 
 export interface WorkoutSet {
@@ -41,6 +42,7 @@ export interface ActiveWorkout {
   started_at: string;
   exercises: WorkoutExercise[];
   notes: string;
+  workout_type: string | null;
 }
 
 export interface WorkoutSession {
@@ -55,6 +57,7 @@ export interface WorkoutSession {
   session_rpe: number | null;
   notes: string | null;
   total_volume_kg: number | null;
+  workout_type: string | null;
 }
 
 export interface WorkoutTemplate {

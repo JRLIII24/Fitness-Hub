@@ -51,7 +51,7 @@ export function TemplateManagerPanel({
         <button
           type="button"
           onClick={onToggleManager}
-          className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/70 bg-card/70 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
         >
           <LayoutList className="size-3" />
           {showTemplateManager ? "Hide Manager" : "Template Manager"}
@@ -76,7 +76,7 @@ export function TemplateManagerPanel({
                   : "border-border/70 bg-card/70"
                   }`}
               >
-                <p className="truncate text-sm font-semibold">{template.name}</p>
+                <p className="min-w-0 truncate text-sm font-semibold">{template.name}</p>
                 <div className="mt-2 flex flex-wrap gap-1">
                   <Button
                     type="button"
@@ -170,14 +170,14 @@ export function TemplateManagerPanel({
                 event.preventDefault();
                 onSelectTemplate(template.id, template.name);
               }}
-              className={`rounded-xl border px-3 py-2 text-left transition ${selectedTemplateId === template.id
+              className={`overflow-hidden rounded-xl border px-3 py-2 text-left transition ${selectedTemplateId === template.id
                 ? "border-primary/40 bg-primary/10"
                 : "border-border/70 bg-card/70 hover:bg-card"
                 }`}
             >
-              <div className="flex items-start justify-between gap-1 mb-0.5">
-                <p className="truncate text-sm font-semibold">{template.name}</p>
-                <div className="flex shrink-0 items-center gap-1">
+              <div className="flex items-start justify-between gap-1 mb-0.5 min-w-0">
+                <p className="min-w-0 truncate text-sm font-semibold">{template.name}</p>
+                <div className="flex shrink-0 flex-wrap items-center gap-1">
                   {likedTemplateIds.has(template.id) ? (
                     <Heart className="h-3.5 w-3.5 text-rose-400" />
                   ) : null}

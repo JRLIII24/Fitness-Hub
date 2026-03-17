@@ -112,6 +112,9 @@ export async function POST(request: Request) {
           estimated_protein_g: scaled.protein_g,
           estimated_carbs_g: scaled.carbs_g,
           estimated_fat_g: scaled.fat_g,
+          estimated_fiber_g: scaled.fiber_g,
+          estimated_sugar_g: scaled.sugar_g,
+          estimated_sodium_mg: scaled.sodium_mg,
           usda_match: {
             fdc_id: match.fdc_id,
             description: match.description,

@@ -392,7 +392,6 @@ export default function WorkoutCalendarPage() {
                     selected
                       ? {
                           backgroundColor: primaryColor,
-                          color: "white",
                           boxShadow: `0 0 12px 2px ${primaryColor}44`,
                         }
                       : hasWorkout && !selected
@@ -406,7 +405,7 @@ export default function WorkoutCalendarPage() {
                   <span
                     className={`text-[13px] tabular-nums font-semibold leading-none ${
                       selected
-                        ? "text-white"
+                        ? "text-primary-foreground"
                         : !inMonth
                         ? "text-muted-foreground/30"
                         : hasWorkout
@@ -423,13 +422,15 @@ export default function WorkoutCalendarPage() {
                   {/* Workout indicator dot */}
                   {hasWorkout && (
                     <div
-                      className="mt-0.5 h-1.5 w-1.5 rounded-full"
-                      style={{
-                        backgroundColor: selected ? "white" : primaryColor,
-                        boxShadow: selected
-                          ? "0 0 4px rgba(255,255,255,0.6)"
-                          : `0 0 4px ${primaryColor}66`,
-                      }}
+                      className={`mt-0.5 h-1.5 w-1.5 rounded-full ${selected ? "bg-primary-foreground" : ""}`}
+                      style={
+                        selected
+                          ? { boxShadow: "0 0 4px rgba(255,255,255,0.6)" }
+                          : {
+                              backgroundColor: primaryColor,
+                              boxShadow: `0 0 4px ${primaryColor}66`,
+                            }
+                      }
                     />
                   )}
 

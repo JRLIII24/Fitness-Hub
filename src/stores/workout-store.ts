@@ -19,6 +19,9 @@ interface WorkoutState {
 
   // Workout metadata actions
   updateWorkoutName: (name: string) => void;
+  setWorkoutType: (workoutType: string | null) => void;
+  updateExerciseEquipment: (exerciseIndex: number, equipment: string) => void;
+  updateExerciseName: (exerciseIndex: number, name: string) => void;
 
   // Notes actions
   setWorkoutNote: (note: string) => void;
@@ -90,6 +93,7 @@ export const useWorkoutStore = create<WorkoutState>()(
             started_at: startedAt,
             exercises: [],
             notes: "",
+            workout_type: null,
           },
           isWorkoutActive: true,
           editingWorkoutId: null,
@@ -111,6 +115,56 @@ export const useWorkoutStore = create<WorkoutState>()(
         const state = get();
         if (!state.activeWorkout) return;
         set({ activeWorkout: { ...state.activeWorkout, name } });
+      },
+
+      setWorkoutType: (workoutType: string | null) => {
+        const state = get();
+        if (!state.activeWorkout) return;
+        set({ activeWorkout: { ...state.activeWorkout, workout_type: workoutType } });
+      },
+
+      updateExerciseEquipment: (exerciseIndex: number, equipment: string) => {
+        const state = get();
+        if (!state.activeWorkout) return;
+        const exercise = state.activeWorkout.exercises[exerciseIndex]?.exercise;
+        if (!exercise) return;
+        const exercises = [...state.activeWorkout.exercises];
+        exercises[exerciseIndex] = {
+          ...exercises[exerciseIndex],
+          exercise: { ...exercise, equipment },
+        };
+        set({ activeWorkout: { ...state.activeWorkout, exercises } });
+
+        // Persist to DB for custom exercises (fire-and-forget)
+        if (!exercise.id.startsWith("custom-")) {
+          void fetch(`/api/exercises/${exercise.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ equipment }),
+          }).catch(() => {});
+        }
+      },
+
+      updateExerciseName: (exerciseIndex: number, name: string) => {
+        const state = get();
+        if (!state.activeWorkout) return;
+        const exercise = state.activeWorkout.exercises[exerciseIndex]?.exercise;
+        if (!exercise) return;
+        const exercises = [...state.activeWorkout.exercises];
+        exercises[exerciseIndex] = {
+          ...exercises[exerciseIndex],
+          exercise: { ...exercise, name },
+        };
+        set({ activeWorkout: { ...state.activeWorkout, exercises } });
+
+        // Persist to DB for custom exercises (fire-and-forget)
+        if (!exercise.id.startsWith("custom-")) {
+          void fetch(`/api/exercises/${exercise.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name }),
+          }).catch(() => {});
+        }
       },
 
       setWorkoutNote: (note: string) => {

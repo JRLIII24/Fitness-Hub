@@ -114,6 +114,7 @@ export function useTemplateActions(deps: TemplateActionsDeps) {
         started_at: new Date().toISOString(),
         exercises: [],
         notes: "",
+        workout_type: null,
       };
 
       loadWorkoutForEdit(designWorkout, `template-design-${template.id}`);

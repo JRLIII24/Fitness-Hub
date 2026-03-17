@@ -204,6 +204,7 @@ export function useWorkoutCompletion({
         durationSeconds,
         totalVolumeKg: Number(totalVolume.toFixed(2)),
         notes: workout.notes ?? "",
+        workoutType: workout.workout_type ?? null,
         setRows: queueSetRows,
       };
 
@@ -257,6 +258,7 @@ export function useWorkoutCompletion({
         duration_seconds: null,
         total_volume_kg: null,
         notes: workout.notes,
+        workout_type: workout.workout_type ?? null,
       })
       .select("id")
       .single();
@@ -275,6 +277,7 @@ export function useWorkoutCompletion({
           durationSeconds,
           totalVolumeKg: Number(totalVolume.toFixed(2)),
           notes: workout.notes ?? "",
+          workoutType: workout.workout_type ?? null,
           setRows: queueSetRows,
         };
 

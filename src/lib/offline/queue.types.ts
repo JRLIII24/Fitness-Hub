@@ -25,6 +25,7 @@ export interface SaveWorkoutPayload {
     durationSeconds: number;
     totalVolumeKg: number;
     notes: string;
+    workoutType: string | null;
     setRows: Array<{
         exerciseId: string;
         setNumber: number;

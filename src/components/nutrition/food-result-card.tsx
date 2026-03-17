@@ -5,14 +5,14 @@ import type { FoodItem } from "@/types/nutrition";
 
 export function FoodResultCard({ food }: { food: FoodItem }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3">
+    <div className="overflow-hidden rounded-xl border border-border bg-card px-4 py-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-semibold text-foreground leading-snug">{food.name}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-foreground leading-snug">{food.name}</p>
           {food.brand && (
-            <p className="text-xs text-muted-foreground">{food.brand}</p>
+            <p className="truncate text-xs text-muted-foreground">{food.brand}</p>
           )}
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {food.serving_description ?? (food.serving_size_g ? `${food.serving_size_g}g` : "1 serving")}
           </p>
         </div>

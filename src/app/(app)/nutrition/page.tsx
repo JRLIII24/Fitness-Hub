@@ -177,8 +177,8 @@ function MealSection({
   const mealCalories = entries.reduce((sum, e) => sum + getNutrition(e).calories, 0);
 
   return (
-    <Card className="glass-surface">
-      <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+    <Card className="glass-surface gap-4 py-4 sm:gap-6 sm:py-6">
+      <CardHeader className="grid-cols-[1fr_auto] grid-rows-1 items-center gap-2 space-y-0 px-4 pb-1 sm:px-6 sm:pb-2">
         <div className="flex items-center gap-2">
           <div className="glass-icon-container flex size-8 items-center justify-center rounded-lg">
             <Icon className={`size-4 ${color}`} />
@@ -191,13 +191,17 @@ function MealSection({
           </div>
         </div>
         <Link href={`/nutrition/scan?meal=${meal}`}>
-          <Button size="sm" variant="ghost" className="min-h-[44px] gap-1 text-xs">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-9 min-h-[36px] gap-1 px-2.5 text-xs sm:min-h-[44px] sm:px-3"
+          >
             <Plus className="size-3.5" />
             Add
           </Button>
         </Link>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-2 overflow-hidden px-4 sm:px-6">
         {entries.length === 0 ? (
           <p className="py-3 text-center text-xs text-muted-foreground">Nothing logged yet</p>
         ) : (
@@ -305,14 +309,14 @@ export default function NutritionPage() {
       prev.map((e) =>
         e.id === entryId
           ? {
-              ...e,
-              meal_type: updates.meal_type as MealType,
-              servings: updates.servings,
-              calories_consumed: nextNutrition.calories,
-              protein_g: nextNutrition.protein,
-              carbs_g: nextNutrition.carbs,
-              fat_g: nextNutrition.fat,
-            }
+            ...e,
+            meal_type: updates.meal_type as MealType,
+            servings: updates.servings,
+            calories_consumed: nextNutrition.calories,
+            protein_g: nextNutrition.protein,
+            carbs_g: nextNutrition.carbs,
+            fat_g: nextNutrition.fat,
+          }
           : e
       )
     );
@@ -752,7 +756,7 @@ export default function NutritionPage() {
             <CardContent className="py-10 text-center text-sm text-muted-foreground">Loading nutrition data...</CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4">
             {(["breakfast", "lunch", "dinner", "snack"] as MealType[]).map((meal) => (
               <MealSection
                 key={meal}
@@ -780,23 +784,23 @@ export default function NutritionPage() {
         snapshot={
           entries.length > 0
             ? {
-                date: format(selectedDate, "yyyy-MM-dd"),
-                totals: {
-                  calories: totalCalories,
-                  protein_g: totalProtein,
-                  carbs_g: totalCarbs,
-                  fat_g: totalFat,
-                  fiber_g: totalFiber,
-                  sugar_g: totalSugar,
-                  sodium_mg: totalSodiumMg,
-                },
-                meals: {
-                  breakfast: mealGroups.breakfast.map(mealEntryToSnapshot),
-                  lunch: mealGroups.lunch.map(mealEntryToSnapshot),
-                  dinner: mealGroups.dinner.map(mealEntryToSnapshot),
-                  snack: mealGroups.snack.map(mealEntryToSnapshot),
-                },
-              }
+              date: format(selectedDate, "yyyy-MM-dd"),
+              totals: {
+                calories: totalCalories,
+                protein_g: totalProtein,
+                carbs_g: totalCarbs,
+                fat_g: totalFat,
+                fiber_g: totalFiber,
+                sugar_g: totalSugar,
+                sodium_mg: totalSodiumMg,
+              },
+              meals: {
+                breakfast: mealGroups.breakfast.map(mealEntryToSnapshot),
+                lunch: mealGroups.lunch.map(mealEntryToSnapshot),
+                dinner: mealGroups.dinner.map(mealEntryToSnapshot),
+                snack: mealGroups.snack.map(mealEntryToSnapshot),
+              },
+            }
             : null
         }
         onClose={() => setSendMealDialogOpen(false)}

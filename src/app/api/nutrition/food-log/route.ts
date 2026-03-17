@@ -18,6 +18,9 @@ const FoodLogItemSchema = z.object({
   protein_g: z.number().min(0),
   carbs_g: z.number().min(0),
   fat_g: z.number().min(0),
+  fiber_g: z.number().min(0).optional(),
+  sugar_g: z.number().min(0).optional(),
+  sodium_mg: z.number().min(0).optional(),
   source: z.enum(["ai-scan", "usda"]).default("ai-scan"),
 });
 
@@ -55,6 +58,9 @@ export async function POST(request: Request) {
           protein_g: item.protein_g,
           carbs_g: item.carbs_g,
           fat_g: item.fat_g,
+          fiber_g: item.fiber_g ?? null,
+          sugar_g: item.sugar_g ?? null,
+          sodium_mg: item.sodium_mg ?? null,
           source: item.source,
           created_by: user.id,
         })

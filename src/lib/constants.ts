@@ -14,6 +14,7 @@ export const EQUIPMENT_TYPES = [
   "kettlebell",
   "cable",
   "machine",
+  "smith_machine",
   "bodyweight",
   "band",
 ] as const;
@@ -24,6 +25,26 @@ export const EXERCISE_CATEGORIES = [
   "cardio",
   "stretch",
 ] as const;
+
+export const WORKOUT_TYPES = [
+  "strength",
+  "hypertrophy",
+  "endurance",
+  "powerlifting",
+  "cardio",
+  "mobility",
+  "custom",
+] as const;
+
+export const WORKOUT_TYPE_LABELS: Record<string, string> = {
+  strength: "Strength",
+  hypertrophy: "Hypertrophy",
+  endurance: "Endurance",
+  powerlifting: "Powerlifting",
+  cardio: "Cardio",
+  mobility: "Mobility",
+  custom: "Custom",
+};
 
 export const SET_TYPES = [
   "warmup",
@@ -71,6 +92,7 @@ export const EQUIPMENT_LABELS: Record<string, string> = {
   kettlebell: "Kettlebell",
   cable: "Cable",
   machine: "Machine",
+  smith_machine: "Smith Machine",
   bodyweight: "Bodyweight",
   band: "Resistance Band",
 };

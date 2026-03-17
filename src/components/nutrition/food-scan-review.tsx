@@ -24,6 +24,9 @@ interface FoodScanReviewProps {
     protein_g: number;
     carbs_g: number;
     fat_g: number;
+    fiber_g?: number;
+    sugar_g?: number;
+    sodium_mg?: number;
     source?: "ai-scan" | "usda";
   }>) => void;
   onCancel: () => void;
@@ -73,6 +76,9 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
         protein_g: Math.round(item.estimated_protein_g * mult),
         carbs_g: Math.round(item.estimated_carbs_g * mult),
         fat_g: Math.round(item.estimated_fat_g * mult),
+        fiber_g: Math.round(item.estimated_fiber_g * mult),
+        sugar_g: Math.round(item.estimated_sugar_g * mult),
+        sodium_mg: Math.round(item.estimated_sodium_mg * mult),
         source: item.source,
       };
     });
@@ -115,6 +121,9 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
           const scaledP = Math.round(item.estimated_protein_g * mult);
           const scaledC = Math.round(item.estimated_carbs_g * mult);
           const scaledF = Math.round(item.estimated_fat_g * mult);
+          const scaledFi = Math.round(item.estimated_fiber_g * mult);
+          const scaledSu = Math.round(item.estimated_sugar_g * mult);
+          const scaledNa = Math.round(item.estimated_sodium_mg * mult);
           const isHighCal = scaledCal > 3000;
 
           return (
@@ -210,6 +219,21 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
                 <span className="rounded-full bg-pink-400/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-pink-400">
                   {scaledF}g F
                 </span>
+                {scaledFi > 0 && (
+                  <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-emerald-400">
+                    {scaledFi}g Fi
+                  </span>
+                )}
+                {scaledSu > 0 && (
+                  <span className="rounded-full bg-orange-400/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-orange-400">
+                    {scaledSu}g Su
+                  </span>
+                )}
+                {scaledNa > 0 && (
+                  <span className="rounded-full bg-slate-400/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-400">
+                    {scaledNa}mg Na
+                  </span>
+                )}
               </div>
 
               {/* High calorie warning */}

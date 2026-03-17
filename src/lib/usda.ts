@@ -16,6 +16,9 @@ const NUTRIENT_IDS = {
   PROTEIN: 1003,
   CARBS: 1005,
   FAT: 1004,
+  FIBER: 1079,
+  SUGAR: 2000,
+  SODIUM: 1093,
 } as const;
 
 interface UsdaNutrient {
@@ -43,6 +46,9 @@ export interface UsdaMatch {
   protein_per_100g: number;
   carbs_per_100g: number;
   fat_per_100g: number;
+  fiber_per_100g: number;
+  sugar_per_100g: number;
+  sodium_per_100g: number;
 }
 
 function extractNutrient(nutrients: UsdaNutrient[], id: number): number {
@@ -58,6 +64,9 @@ function parseFood(food: UsdaFood): UsdaMatch {
     protein_per_100g: extractNutrient(food.foodNutrients, NUTRIENT_IDS.PROTEIN),
     carbs_per_100g: extractNutrient(food.foodNutrients, NUTRIENT_IDS.CARBS),
     fat_per_100g: extractNutrient(food.foodNutrients, NUTRIENT_IDS.FAT),
+    fiber_per_100g: extractNutrient(food.foodNutrients, NUTRIENT_IDS.FIBER),
+    sugar_per_100g: extractNutrient(food.foodNutrients, NUTRIENT_IDS.SUGAR),
+    sodium_per_100g: extractNutrient(food.foodNutrients, NUTRIENT_IDS.SODIUM),
   };
 }
 
@@ -124,12 +133,24 @@ export async function searchFood(query: string): Promise<UsdaMatch | null> {
 export function scaleToGrams(
   match: UsdaMatch,
   grams: number,
-): { calories: number; protein_g: number; carbs_g: number; fat_g: number } {
+): {
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fiber_g: number;
+  sugar_g: number;
+  sodium_mg: number;
+} {
   const factor = grams / 100;
   return {
     calories: Math.round(match.calories_per_100g * factor),
     protein_g: Math.round(match.protein_per_100g * factor),
     carbs_g: Math.round(match.carbs_per_100g * factor),
     fat_g: Math.round(match.fat_per_100g * factor),
+    fiber_g: Math.round(match.fiber_per_100g * factor),
+    sugar_g: Math.round(match.sugar_per_100g * factor),
+    // USDA reports sodium in mg per 100g, so scale directly
+    sodium_mg: Math.round(match.sodium_per_100g * factor),
   };
 }

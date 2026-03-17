@@ -68,13 +68,13 @@ export function QuickStartPanel({
                 key={preset.id}
                 type="button"
                 onClick={() => onPresetChange(preset.id)}
-                className={`rounded-xl border px-3 py-2.5 text-left transition ${active
+                className={`overflow-hidden rounded-xl border px-3 py-2.5 text-left transition ${active
                   ? "border-primary/40 bg-primary/10"
                   : "border-border/70 bg-card/70 hover:bg-card"
                   }`}
               >
-                <div className="flex items-start justify-between gap-1 mb-0.5">
-                  <p className="text-xs font-semibold leading-snug">{preset.defaultName}</p>
+                <div className="flex items-start justify-between gap-1 mb-0.5 min-w-0">
+                  <p className="min-w-0 truncate text-xs font-semibold leading-snug">{preset.defaultName}</p>
                   <span
                     className="shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold capitalize"
                     style={{

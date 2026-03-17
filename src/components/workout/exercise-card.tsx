@@ -1,12 +1,13 @@
 "use client";
 
-import { memo, useState, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeftRight, ChevronDown, ChevronUp, GripVertical, NotebookPen, X } from "lucide-react";
+import { ArrowLeftRight, ChevronDown, ChevronUp, GripVertical, NotebookPen, Pencil, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SetRow } from "@/components/workout/set-row";
@@ -14,7 +15,7 @@ import { ExerciseSparkline } from "@/components/workout/exercise-sparkline";
 import { FormTipsPanel } from "@/components/workout/form-tips-panel";
 import { RpeDeloadAlert } from "@/components/workout/rpe-deload-alert";
 import { weightToDisplay } from "@/lib/units";
-import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS } from "@/lib/constants";
+import { EQUIPMENT_LABELS, EQUIPMENT_TYPES, MUSCLE_GROUP_LABELS } from "@/lib/constants";
 import type { WorkoutExercise, WorkoutSet } from "@/types/workout";
 
 export interface ExerciseCardProps {
@@ -39,6 +40,8 @@ export interface ExerciseCardProps {
   onSwapExercise: (exerciseIndex: number) => void;
   onSetExerciseNote: (exerciseIndex: number, note: string) => void;
   onStartRest: (exerciseId: string, exerciseName: string, seconds: number) => void;
+  onUpdateEquipment?: (exerciseIndex: number, equipment: string) => void;
+  onUpdateExerciseName?: (exerciseIndex: number, name: string) => void;
 }
 
 export const ExerciseCard = memo(function ExerciseCard({
@@ -57,6 +60,8 @@ export const ExerciseCard = memo(function ExerciseCard({
   onSwapExercise,
   onSetExerciseNote,
   onStartRest,
+  onUpdateEquipment,
+  onUpdateExerciseName,
 }: ExerciseCardProps) {
   const [showGhosts, setShowGhosts] = useState(() => {
     if (typeof window !== "undefined") {
@@ -82,6 +87,25 @@ export const ExerciseCard = memo(function ExerciseCard({
       wasAutoCollapsed.current = false;
     }
   }, [allSetsComplete]);
+
+  // Inline name editing
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState(exerciseBlock.exercise.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const commitNameEdit = useCallback(() => {
+    const trimmed = draftName.trim();
+    if (trimmed.length >= 2 && trimmed !== exerciseBlock.exercise.name && onUpdateExerciseName) {
+      onUpdateExerciseName(exerciseIndex, trimmed);
+    } else {
+      setDraftName(exerciseBlock.exercise.name);
+    }
+    setEditingName(false);
+  }, [draftName, exerciseBlock.exercise.name, exerciseIndex, onUpdateExerciseName]);
+
+  useEffect(() => {
+    if (editingName) nameInputRef.current?.focus();
+  }, [editingName]);
 
   // Notes visibility — hidden by default, shown if there's existing content
   const [showNotes, setShowNotes] = useState(() => Boolean(exerciseBlock.notes));
@@ -135,14 +159,57 @@ export const ExerciseCard = memo(function ExerciseCard({
               <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">
                 {exerciseBlock.exercise.category}
               </Badge>
-              {exerciseBlock.exercise.equipment ? (
+              {onUpdateEquipment && exerciseBlock.exercise.is_custom ? (
+                <select
+                  value={exerciseBlock.exercise.equipment ?? "bodyweight"}
+                  onChange={(e) => onUpdateEquipment(exerciseIndex, e.target.value)}
+                  className="h-4 cursor-pointer appearance-none rounded-full border-0 bg-secondary px-1.5 py-0 text-[9px] font-medium text-secondary-foreground outline-none"
+                  aria-label="Change equipment"
+                >
+                  {EQUIPMENT_TYPES.map((eq) => (
+                    <option key={eq} value={eq}>
+                      {EQUIPMENT_LABELS[eq] ?? eq}
+                    </option>
+                  ))}
+                </select>
+              ) : exerciseBlock.exercise.equipment ? (
                 <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">
                   {EQUIPMENT_LABELS[exerciseBlock.exercise.equipment] ?? exerciseBlock.exercise.equipment}
                 </Badge>
               ) : null}
             </div>
             <div className="flex items-start gap-1.5">
-              <p className="line-clamp-2 text-sm leading-tight">{exerciseBlock.exercise.name}</p>
+              {editingName && onUpdateExerciseName && exerciseBlock.exercise.is_custom ? (
+                <Input
+                  ref={nameInputRef}
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onBlur={commitNameEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitNameEdit();
+                    if (e.key === "Escape") {
+                      setDraftName(exerciseBlock.exercise.name);
+                      setEditingName(false);
+                    }
+                  }}
+                  className="h-6 border-transparent bg-transparent px-0 text-sm font-semibold leading-tight focus:border-border focus:bg-background"
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-left"
+                  onClick={() => {
+                    if (onUpdateExerciseName && exerciseBlock.exercise.is_custom) {
+                      setDraftName(exerciseBlock.exercise.name);
+                      setEditingName(true);
+                    }
+                  }}
+                  disabled={!onUpdateExerciseName || !exerciseBlock.exercise.is_custom}
+                >
+                  <p className="line-clamp-2 text-sm leading-tight">{exerciseBlock.exercise.name}</p>
+                  {onUpdateExerciseName && exerciseBlock.exercise.is_custom && <Pencil className="h-2.5 w-2.5 shrink-0 text-muted-foreground" />}
+                </button>
+              )}
               {trendline && (
                 <ExerciseSparkline
                   weights={trendline.weights}
@@ -391,6 +458,8 @@ export const ExerciseCard = memo(function ExerciseCard({
   const pBlock = prev.exerciseBlock;
   const nBlock = next.exerciseBlock;
   if (pBlock.exercise.id !== nBlock.exercise.id) return false;
+  if (pBlock.exercise.name !== nBlock.exercise.name) return false;
+  if (pBlock.exercise.equipment !== nBlock.exercise.equipment) return false;
   if (pBlock.notes !== nBlock.notes) return false;
   if (pBlock.sets.length !== nBlock.sets.length) return false;
   for (let i = 0; i < pBlock.sets.length; i++) {

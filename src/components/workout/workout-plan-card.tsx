@@ -258,7 +258,7 @@ function ExerciseRow({
         type="button"
         whileTap={{ scale: 0.9 }}
         onClick={onSwap}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/40 bg-card/30 text-muted-foreground transition hover:border-primary/30 hover:text-primary"
+        className="flex h-9 w-9 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg border border-border/40 bg-card/30 text-muted-foreground transition hover:border-primary/30 hover:text-primary"
         aria-label={`Swap ${planExercise.exercise.name}`}
       >
         <ArrowLeftRight className="h-3.5 w-3.5" />

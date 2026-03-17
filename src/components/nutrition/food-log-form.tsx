@@ -131,9 +131,9 @@ export function FoodLogForm({
   return (
     <div className="space-y-4 glass-surface rounded-xl p-4">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold text-foreground">{food.name}</p>
-          {food.brand && <p className="text-xs text-muted-foreground">{food.brand}</p>}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-foreground">{food.name}</p>
+          {food.brand && <p className="truncate text-xs text-muted-foreground">{food.brand}</p>}
         </div>
         <Button size="icon" variant="ghost" className="size-8 shrink-0" onClick={onCancel} aria-label="Cancel" style={{ minHeight: 44, minWidth: 44 }}>
           <X className="size-4" />

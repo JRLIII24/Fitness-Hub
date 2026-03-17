@@ -134,10 +134,22 @@ function ensureContrastSafe(hex: string): string {
   return rgbToHex(clamped.r, clamped.g, clamped.b);
 }
 
+function sRGBtoLinear(c: number): number {
+  const s = c / 255;
+  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+
+function relativeLuminance(r: number, g: number, b: number): number {
+  return 0.2126 * sRGBtoLinear(r) + 0.7152 * sRGBtoLinear(g) + 0.0722 * sRGBtoLinear(b);
+}
+
 function getContrastForeground(hex: string): "#000000" | "#ffffff" {
   const { r, g, b } = hexToRgb(hex);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.55 ? "#000000" : "#ffffff";
+  const lum = relativeLuminance(r, g, b);
+  // WCAG contrast ratio — pick whichever foreground yields higher ratio
+  const contrastWhite = 1.05 / (lum + 0.05);
+  const contrastBlack = (lum + 0.05) / 0.05;
+  return contrastBlack > contrastWhite ? "#000000" : "#ffffff";
 }
 
 export function applyAccentColor(color: string | null) {

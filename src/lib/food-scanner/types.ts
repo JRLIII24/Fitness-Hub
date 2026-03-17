@@ -11,6 +11,9 @@ export const FoodEstimationSchema = z.object({
   estimated_protein_g: z.number(),
   estimated_carbs_g: z.number(),
   estimated_fat_g: z.number(),
+  estimated_fiber_g: z.number(),
+  estimated_sugar_g: z.number(),
+  estimated_sodium_mg: z.number(),
   notes: z.string().optional(),
 });
 

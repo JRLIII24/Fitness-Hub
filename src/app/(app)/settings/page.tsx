@@ -107,7 +107,7 @@ export default async function SettingsPage() {
                   </span>
                   <span className="min-w-0 space-y-0.5">
                     <span className="block truncate text-sm font-semibold text-foreground">{title}</span>
-                    <span className="block text-xs text-muted-foreground">{description}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{description}</span>
                   </span>
                 </span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

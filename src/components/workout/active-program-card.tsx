@@ -142,16 +142,16 @@ export function ActiveProgramCard({ refreshKey }: Props) {
 
         <div className="relative space-y-3">
           {/* Header */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15">
                 <BookOpen className="h-4 w-4 text-primary" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Active Program
                 </p>
-                <p className="text-[14px] font-bold leading-tight text-foreground line-clamp-1">
+                <p className="truncate text-[14px] font-bold leading-tight text-foreground">
                   {info.programName}
                 </p>
               </div>
@@ -168,7 +168,7 @@ export function ActiveProgramCard({ refreshKey }: Props) {
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+              <span className="whitespace-nowrap rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary sm:text-[11px]">
                 {dayLabel}
               </span>
               <button

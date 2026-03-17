@@ -14,7 +14,7 @@ import { EXERCISE_LIBRARY } from "@/lib/exercise-library";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
 import type { ActiveWorkout, Exercise, WorkoutSet } from "@/types/workout";
-import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS, MUSCLE_GROUPS } from "@/lib/constants";
+import { EQUIPMENT_LABELS, MUSCLE_GROUP_LABELS, WORKOUT_TYPES, WORKOUT_TYPE_LABELS } from "@/lib/constants";
 import { getMuscleColor, MUSCLE_FILTERS } from "@/lib/muscle-colors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,7 +56,6 @@ import {
   isMissingTableError,
   slugify,
   normalizeEquipment,
-  makeCustomExercise,
 } from "@/lib/workout/exercise-resolver";
 import { RestTimerPill } from "@/components/workout/rest-timer-pill";
 import { SaveTemplateDialog } from "@/components/workout/save-template-dialog";
@@ -86,7 +85,6 @@ import { ActiveProgramCard } from "@/components/workout/active-program-card";
 import { RestoreWorkoutBanner, type WorkoutDraft } from "@/components/workout/restore-workout-banner";
 import { TrainSubNav } from "@/components/layout/train-sub-nav";
 
-type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 
 const TEMPLATE_LIKES_KEY = "workout_template_likes_v1";
 
@@ -174,6 +172,7 @@ export default function WorkoutPage() {
   const [presetId, setPresetId] = useState<WorkoutPresetId>("upper-body-strength");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("none");
   const [pendingCategories, setPendingCategories] = useState<string[]>([]);
+  const [selectedWorkoutType, setSelectedWorkoutType] = useState<string>("strength");
   const [workoutName, setWorkoutName] = useState("Upper Body Strength");
   const [setupTab, setSetupTab] = useState<"templates" | "quick">("templates");
   const [quickFilter, setQuickFilter] = useState<string>("All");
@@ -225,6 +224,9 @@ export default function WorkoutPage() {
     setExerciseNote,
     setWorkoutNote,
     updateWorkoutName,
+    setWorkoutType,
+    updateExerciseEquipment,
+    updateExerciseName,
   } = useWorkoutStore(
     useShallow((s) => ({
       activeWorkout: s.activeWorkout,
@@ -244,6 +246,9 @@ export default function WorkoutPage() {
       setExerciseNote: s.setExerciseNote,
       setWorkoutNote: s.setWorkoutNote,
       updateWorkoutName: s.updateWorkoutName,
+      setWorkoutType: s.setWorkoutType,
+      updateExerciseEquipment: s.updateExerciseEquipment,
+      updateExerciseName: s.updateExerciseName,
     }))
   );
 
@@ -1245,6 +1250,7 @@ export default function WorkoutPage() {
 
     if (!userId) return;
     startWorkout(name, userId, activeTemplateId);
+    setWorkoutType(selectedWorkoutType);
     if (userId) {
       void trackSessionIntentSet(supabase, userId, {
         workout_name: name,
@@ -1602,8 +1608,37 @@ export default function WorkoutPage() {
 
   async function handleCreateCustomExercise(name: string, muscleGroup: string, equipment: string): Promise<void> {
     try {
-      const customExercise = makeCustomExercise(name, muscleGroup as MuscleGroup, equipment);
-      await addExerciseToWorkout(customExercise);
+      // Persist to DB so it appears in the exercise library
+      const res = await fetch("/api/exercises", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          muscle_group: muscleGroup,
+          equipment,
+          category: "isolation",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to create exercise");
+      }
+
+      const data = await res.json();
+      const exercise: Exercise = {
+        id: data.id,
+        name: data.name,
+        slug: data.slug ?? "",
+        muscle_group: data.muscle_group,
+        equipment: data.equipment,
+        category: data.category,
+        instructions: data.instructions ?? null,
+        form_tips: null,
+        image_url: null,
+        is_custom: true,
+      };
+      await addExerciseToWorkout(exercise);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not create custom lift.";
       toast.error(message);
@@ -1956,6 +1991,33 @@ export default function WorkoutPage() {
                 );
               })()}
 
+              {/* Workout type selector */}
+              <div className="space-y-2 rounded-xl border border-border/70 bg-secondary/20 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  Training Style
+                </p>
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {WORKOUT_TYPES.map((wt) => {
+                    const active = selectedWorkoutType === wt;
+                    return (
+                      <button
+                        key={wt}
+                        type="button"
+                        onClick={() => setSelectedWorkoutType(wt)}
+                        className={cn(
+                          "rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize transition-all",
+                          active
+                            ? "border-[1.5px] border-primary/50 bg-primary/15 text-primary shadow-[0_0_8px_rgba(var(--primary-rgb),0.2)]"
+                            : "border border-border bg-transparent text-muted-foreground"
+                        )}
+                      >
+                        {WORKOUT_TYPE_LABELS[wt]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <Button
                 className="h-11 w-full text-base font-semibold"
                 onClick={handlePreviewPlan}
@@ -1998,6 +2060,28 @@ export default function WorkoutPage() {
                 className="h-8 flex-1 border-transparent bg-transparent px-0 text-lg font-semibold leading-tight tracking-tight focus:border-border focus:bg-background"
                 placeholder="Workout name"
               />
+            </div>
+
+            {/* Workout type inline edit */}
+            <div className="flex items-center gap-1.5 overflow-x-auto px-1 pb-1" style={{ scrollbarWidth: "none" }}>
+              {WORKOUT_TYPES.map((wt) => {
+                const active = activeWorkout.workout_type === wt;
+                return (
+                  <button
+                    key={wt}
+                    type="button"
+                    onClick={() => setWorkoutType(wt)}
+                    className={cn(
+                      "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize transition-all",
+                      active
+                        ? "border-[1.5px] border-primary/50 bg-primary/15 text-primary"
+                        : "border border-border/60 bg-transparent text-muted-foreground"
+                    )}
+                  >
+                    {WORKOUT_TYPE_LABELS[wt]}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Exercise cards */}
@@ -2086,6 +2170,8 @@ export default function WorkoutPage() {
                           onSwapExercise={setSwapSheetIndex}
                           onSetExerciseNote={setExerciseNote}
                           onStartRest={handleStartRest}
+                          onUpdateEquipment={updateExerciseEquipment}
+                          onUpdateExerciseName={updateExerciseName}
                         />
                       ))
                     )}
@@ -2166,6 +2252,10 @@ export default function WorkoutPage() {
                 await addExerciseToWorkout(exercise);
               }}
               onCreateCustomExercise={handleCreateCustomExercise}
+              workoutName={activeWorkout?.name}
+              onWorkoutNameChange={updateWorkoutName}
+              workoutType={activeWorkout?.workout_type}
+              onWorkoutTypeChange={setWorkoutType}
             />
           </div>
         ) : null}
@@ -2248,6 +2338,7 @@ export default function WorkoutPage() {
               ? (activeWorkout?.exercises[swapSheetIndex]?.exercise ?? null)
               : null
           }
+          existingExerciseNames={activeWorkout?.exercises.map((e) => e.exercise.name) ?? []}
           onSwap={handleSwapExercise}
           onClose={() => setSwapSheetIndex(null)}
         />

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Sparkles, Search, Loader2, Plus } from "lucide-react";
+import { Sparkles, Search, Loader2, Plus, ChevronDown } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -55,6 +55,7 @@ export function PlanSwapSheet({
   // AI suggestions
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiExpanded, setAiExpanded] = useState(false);
 
   // Custom exercise input
   const [showCustom, setShowCustom] = useState(false);
@@ -71,6 +72,7 @@ export function PlanSwapSheet({
       setShowCustom(false);
       setCustomName("");
       setAiSuggestions([]);
+      setAiExpanded(false);
 
       // Fetch AI suggestions
       fetchAiSuggestions(
@@ -210,30 +212,37 @@ export function PlanSwapSheet({
           </SheetTitle>
         </SheetHeader>
 
-        {/* AI Suggestions */}
-        <div className="mt-3 space-y-2">
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
-              AI Suggestions
+        {/* AI Suggestions — collapsible pill */}
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setAiExpanded((v) => !v)}
+            className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 transition-colors active:bg-primary/10"
+          >
+            {aiLoading ? (
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+            ) : (
+              <Sparkles className="h-3 w-3 text-primary" />
+            )}
+            <span className="text-[11px] font-semibold text-primary">
+              {aiLoading ? "Finding alternatives…" : `AI Suggestions${aiSuggestions.length > 0 ? ` (${aiSuggestions.length})` : ""}`}
             </span>
-          </div>
+            <ChevronDown
+              className={cn(
+                "h-3 w-3 text-primary/60 transition-transform duration-200",
+                aiExpanded && "rotate-180",
+              )}
+            />
+          </button>
 
-          {aiLoading ? (
-            <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-card/40 px-3 py-3">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">
-                Finding alternatives…
-              </span>
-            </div>
-          ) : aiSuggestions.length > 0 ? (
-            <div className="grid grid-cols-1 gap-1.5">
+          {aiExpanded && !aiLoading && aiSuggestions.length > 0 && (
+            <div className="mt-1.5 grid grid-cols-1 gap-1.5">
               {aiSuggestions.map((s) => (
                 <button
                   key={s.name}
                   type="button"
                   onClick={() => handleSelectAiSuggestion(s)}
-                  className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 text-left transition hover:border-primary/40 hover:bg-primary/10"
+                  className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-left transition active:border-primary/40 active:bg-primary/10"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold text-foreground">
@@ -247,20 +256,7 @@ export function PlanSwapSheet({
                 </button>
               ))}
             </div>
-          ) : (
-            <p className="text-[11px] text-muted-foreground">
-              No AI suggestions available — search below
-            </p>
           )}
-        </div>
-
-        {/* Divider */}
-        <div className="my-3 flex items-center gap-2">
-          <div className="h-px flex-1 bg-border/40" />
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Or browse
-          </span>
-          <div className="h-px flex-1 bg-border/40" />
         </div>
 
         {/* Muscle group tabs */}

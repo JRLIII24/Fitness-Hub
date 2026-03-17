@@ -2804,7 +2804,7 @@ export type Database = {
         | "improve_endurance"
         | "bulk"
         | "cut"
-      food_source_type: "openfoodfacts" | "usda" | "manual" | "ai-scan"
+      food_source_type: "openfoodfacts" | "usda" | "manual" | "ai-scan" | "nutritionix"
       gender_type: "male" | "female" | "other" | "prefer_not_to_say"
       meal_type: "breakfast" | "lunch" | "dinner" | "snack"
       muscle_group_type:
@@ -2978,7 +2978,7 @@ export const Constants = {
         "maintain",
         "improve_endurance",
       ],
-      food_source_type: ["openfoodfacts", "usda", "manual", "ai-scan"],
+      food_source_type: ["openfoodfacts", "usda", "manual", "ai-scan", "nutritionix"],
       gender_type: ["male", "female", "other", "prefer_not_to_say"],
       meal_type: ["breakfast", "lunch", "dinner", "snack"],
       muscle_group_type: [

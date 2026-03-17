@@ -76,3 +76,6 @@ export const EXPENDITURE_SYNC_ENABLED =
 
 export const POD_ARENA_ENABLED =
   process.env.NEXT_PUBLIC_ENABLE_POD_ARENA === "true";
+
+export const RESTAURANT_LOOKUP_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_RESTAURANT_LOOKUP === "true";

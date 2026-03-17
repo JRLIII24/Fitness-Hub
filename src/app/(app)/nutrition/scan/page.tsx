@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Barcode, Search, ArrowLeft } from "lucide-react";
+import { Barcode, Search, ArrowLeft, UtensilsCrossed } from "lucide-react";
 import { useSupabase } from "@/hooks/use-supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { FoodSearchTab } from "@/components/nutrition/food-search-tab";
 import { FoodLogForm } from "@/components/nutrition/food-log-form";
 import { CustomFoodDialog } from "@/components/nutrition/custom-food-dialog";
 import { RecentFoods } from "@/components/nutrition/recent-foods";
+import { RestaurantSearchTab } from "@/components/nutrition/restaurant-search-tab";
+import { RESTAURANT_LOOKUP_ENABLED } from "@/lib/features";
 
 export default function NutritionScanPage() {
   const supabase = useSupabase();
@@ -110,6 +112,12 @@ export default function NutritionScanPage() {
               <Search className="size-4" />
               Search Food
             </TabsTrigger>
+            {RESTAURANT_LOOKUP_ENABLED && (
+              <TabsTrigger value="restaurant" className="flex-1 gap-1.5">
+                <UtensilsCrossed className="size-4" />
+                Restaurant
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="scan">
@@ -140,6 +148,16 @@ export default function NutritionScanPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {RESTAURANT_LOOKUP_ENABLED && (
+            <TabsContent value="restaurant">
+              <Card className="mb-3">
+                <CardContent className="pt-4 space-y-3">
+                  <RestaurantSearchTab onFound={handleFoodFound} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       )}
 
@@ -157,6 +175,12 @@ export default function NutritionScanPage() {
                 <Search className="size-4" />
                 Search
               </TabsTrigger>
+              {RESTAURANT_LOOKUP_ENABLED && (
+                <TabsTrigger value="restaurant" className="flex-1 gap-1.5">
+                  <UtensilsCrossed className="size-4" />
+                  Restaurant
+                </TabsTrigger>
+              )}
             </TabsList>
             <TabsContent value="scan">
               <Card>
@@ -175,6 +199,15 @@ export default function NutritionScanPage() {
                 </CardContent>
               </Card>
             </TabsContent>
+            {RESTAURANT_LOOKUP_ENABLED && (
+              <TabsContent value="restaurant">
+                <Card>
+                  <CardContent className="pt-4">
+                    <RestaurantSearchTab onFound={handleFoodFound} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       )}

@@ -18,20 +18,20 @@ export type BodyWeightUpdate = z.infer<typeof bodyWeightUpdateSchema>;
 
 // ── Exercises ─────────────────────────────────────────────────────────────────
 
+// Must match the DB enum `muscle_group_type` (migration 002)
 const VALID_MUSCLE_GROUPS = [
-  "chest", "back", "shoulders", "biceps", "triceps", "forearms",
-  "quadriceps", "hamstrings", "glutes", "calves", "abs", "obliques",
-  "traps", "lats", "lower_back", "hip_flexors", "adductors", "abductors",
-  "neck", "full_body", "cardio", "other",
+  "chest", "back", "legs", "shoulders", "arms", "core", "full_body",
 ] as const;
 
+// Must match the DB enum `equipment_type` (migration 002 + 090)
 const VALID_EQUIPMENT = [
   "barbell", "dumbbell", "kettlebell", "machine", "cable",
-  "bodyweight", "band", "smith_machine", "other", "none",
+  "bodyweight", "band", "smith_machine",
 ] as const;
 
+// Must match the DB enum `exercise_category_type` (migration 002)
 const VALID_CATEGORIES = [
-  "compound", "isolation", "cardio", "stretching", "plyometric", "other",
+  "compound", "isolation", "cardio", "stretch",
 ] as const;
 
 export const exerciseCreateSchema = z.object({

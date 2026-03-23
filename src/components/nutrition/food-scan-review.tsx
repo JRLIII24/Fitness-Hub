@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Check, X, AlertTriangle } from "lucide-react";
+import { Check, X, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -28,8 +28,9 @@ interface FoodScanReviewProps {
     sugar_g?: number;
     sodium_mg?: number;
     source?: "ai-scan" | "usda";
-  }>) => void;
+  }>) => Promise<void> | void;
   onCancel: () => void;
+  isLogging?: boolean;
 }
 
 function getEffectiveMultiplier(item: ReviewItem): number {
@@ -39,7 +40,7 @@ function getEffectiveMultiplier(item: ReviewItem): number {
   return item.multiplier;
 }
 
-export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewProps) {
+export function FoodScanReview({ result, onConfirm, onCancel, isLogging = false }: FoodScanReviewProps) {
   const [items, setItems] = useState<ReviewItem[]>(() =>
     result.items.map((item) => ({ ...item, included: true, multiplier: 1, customGrams: null }))
   );
@@ -272,10 +273,10 @@ export function FoodScanReview({ result, onConfirm, onCancel }: FoodScanReviewPr
             <Button
               className="w-full gap-2"
               onClick={handleConfirm}
-              disabled={selectedItems.length === 0}
+              disabled={selectedItems.length === 0 || isLogging}
             >
-              <Check className="size-4" />
-              Log Selected
+              {isLogging ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+              {isLogging ? "Logging..." : "Log Selected"}
             </Button>
           </motion.div>
         </div>

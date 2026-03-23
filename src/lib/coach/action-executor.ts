@@ -19,10 +19,16 @@ import type {
   CreateTemplateActionData,
   StartWorkoutFromTemplateActionData,
   LogQuickMealActionData,
+  LogMealFromSuggestionActionData,
+  LogFoodItemActionData,
+  LogBodyWeightActionData,
   CreateProgramActionData,
+  CreateSupersetActionData,
+  AdjustRemainingSetsActionData,
   PendingAction,
 } from "./types";
 import { isDestructiveAction } from "./types";
+import { fuzzyFindExerciseIndex } from "./fuzzy-match";
 import type { Exercise, WorkoutSet } from "@/types/workout";
 
 /** Allowed navigation screens mapped to their app routes */
@@ -145,11 +151,7 @@ function findExerciseIndex(
   exerciseName: string,
 ): number {
   if (!workout) return -1;
-  const lower = exerciseName.toLowerCase();
-  return workout.exercises.findIndex(
-    (e) => e.exercise.name.toLowerCase().includes(lower) ||
-           lower.includes(e.exercise.name.toLowerCase()),
-  );
+  return fuzzyFindExerciseIndex(workout.exercises, exerciseName);
 }
 
 /**
@@ -540,6 +542,109 @@ export async function executeCoachAction(
       }
     }
 
+    case "create_superset": {
+      const d = data as unknown as CreateSupersetActionData;
+      if (!d?.exercise_a_name || !d?.exercise_b_name) {
+        return { success: false, message: "Missing exercise names for superset" };
+      }
+      if (!workout.activeWorkout) return { success: false, message: "No active workout" };
+
+      const exerciseA = await searchExercise(d.exercise_a_name);
+      const exerciseB = await searchExercise(d.exercise_b_name);
+      if (!exerciseA) return { success: false, message: `Exercise "${d.exercise_a_name}" not found` };
+      if (!exerciseB) return { success: false, message: `Exercise "${d.exercise_b_name}" not found` };
+
+      workout.addExercise(exerciseA);
+      const idxA = workout.activeWorkout.exercises.length - 1;
+      const setsCount = d.sets || 3;
+      for (let s = 1; s < setsCount; s++) workout.addSet(idxA);
+
+      workout.addExercise(exerciseB);
+      const idxB = workout.activeWorkout.exercises.length - 1;
+      for (let s = 1; s < setsCount; s++) workout.addSet(idxB);
+
+      return {
+        success: true,
+        message: `Created superset: ${exerciseA.name} + ${exerciseB.name} (${setsCount} rounds)`,
+      };
+    }
+
+    case "log_meal_from_suggestion": {
+      const d = data as unknown as LogMealFromSuggestionActionData;
+      if (!d?.meal_name) return { success: false, message: "No meal data" };
+      try {
+        const res = await fetch("/api/nutrition/quick-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: d.meal_name,
+            meal_type: d.meal_type || "snack",
+            calories: d.calories,
+            protein_g: d.protein_g,
+            carbs_g: d.carbs_g,
+            fat_g: d.fat_g,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { success: false, message: (err as { error?: string }).error || "Failed to log meal" };
+        }
+        return { success: true, message: `Logged "${d.meal_name}"` };
+      } catch {
+        return { success: false, message: "Network error logging meal" };
+      }
+    }
+
+    case "log_food_item": {
+      const d = data as unknown as LogFoodItemActionData;
+      if (!d?.food_name) return { success: false, message: "No food name" };
+      try {
+        const res = await fetch("/api/nutrition/quick-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: d.food_name,
+            meal_type: d.meal_type || "snack",
+            calories: d.calories,
+            protein_g: d.protein_g,
+            carbs_g: d.carbs_g,
+            fat_g: d.fat_g,
+            serving_size: d.serving_size,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { success: false, message: (err as { error?: string }).error || "Failed to log food" };
+        }
+        return { success: true, message: `Logged ${d.food_name} (${d.calories ?? 0} cal)` };
+      } catch {
+        return { success: false, message: "Network error logging food" };
+      }
+    }
+
+    case "log_body_weight": {
+      const d = data as unknown as LogBodyWeightActionData;
+      if (!d?.weight_kg || d.weight_kg <= 0) return { success: false, message: "Invalid weight" };
+      try {
+        const res = await fetch("/api/body/weight", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            weight_kg: d.weight_kg,
+            body_fat_pct: d.body_fat_pct ?? null,
+            note: d.note ?? null,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return { success: false, message: (err as { error?: string }).error || "Failed to log weight" };
+        }
+        return { success: true, message: `Logged body weight: ${d.weight_kg.toFixed(1)} kg` };
+      } catch {
+        return { success: false, message: "Network error logging weight" };
+      }
+    }
+
     // save_memory is handled server-side in the coach API route — no client action needed
     case "save_memory":
     // Display-only actions — no store mutation needed
@@ -552,6 +657,11 @@ export async function executeCoachAction(
     case "show_prescription":
     case "show_meal_suggestion":
     case "show_macro_breakdown":
+    case "show_readiness_card":
+    case "show_recovery_map":
+    case "show_pr_card":
+    case "show_workout_recap":
+    case "show_alternatives":
     case "none":
       return { success: true, message: "" };
 
@@ -626,6 +736,32 @@ export async function confirmAction(
         rir: d.updates?.rir ?? undefined,
       });
       return { success: true, message: `Updated set ${d.set_number} on ${ex.exercise.name}` };
+    }
+
+    case "adjust_remaining_sets": {
+      const d = data as unknown as AdjustRemainingSetsActionData;
+      if (!d?.exercise_name) return { success: false, message: "No exercise name" };
+      if (!workout.activeWorkout) return { success: false, message: "No active workout" };
+
+      const exIdx = findExerciseIndex(workout.activeWorkout, d.exercise_name);
+      if (exIdx < 0) return { success: false, message: `"${d.exercise_name}" not in workout` };
+
+      const ex = workout.activeWorkout.exercises[exIdx];
+      let adjusted = 0;
+      for (let i = 0; i < ex.sets.length; i++) {
+        if (!ex.sets[i].completed) {
+          const updates: Partial<WorkoutSet> = {};
+          if (d.new_weight_kg != null) updates.weight_kg = d.new_weight_kg;
+          if (d.new_reps != null) updates.reps = d.new_reps;
+          workout.updateSet(exIdx, i, updates);
+          adjusted++;
+        }
+      }
+
+      return {
+        success: true,
+        message: `Adjusted ${adjusted} remaining set${adjusted !== 1 ? "s" : ""} on ${ex.exercise.name}`,
+      };
     }
 
     default:

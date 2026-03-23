@@ -34,9 +34,14 @@ import { useSupabase } from "@/hooks/use-supabase";
 import { useWorkoutStore } from "@/stores/workout-store";
 import { useTimerStore } from "@/stores/timer-store";
 import { CoachFeedItem } from "./coach-feed-item";
+import { MemoryManager } from "./memory-manager";
 import { isMutationAction } from "@/lib/coach/types";
 import { executeCoachAction, confirmAction } from "@/lib/coach/action-executor";
 import { detectSimpleIntent } from "@/lib/coach/client-intent";
+import {
+  getOrCreateConversation,
+  loadConversationMessages,
+} from "@/lib/coach/conversation";
 import type {
   CoachMessage,
   CoachContext,
@@ -134,6 +139,9 @@ export function CoachChatSheet({
   });
 
   const [userId, setUserId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [showMemoryManager, setShowMemoryManager] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -153,6 +161,68 @@ export function CoachChatSheet({
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, [supabase]);
+
+  // ── Load persistent conversation on open ─────────────────────────────
+
+  useEffect(() => {
+    if (!isOpen || !userId) return;
+    let cancelled = false;
+
+    (async () => {
+      setIsLoadingHistory(true);
+      try {
+        const convId = await getOrCreateConversation(supabase, userId);
+        if (cancelled) return;
+        setConversationId(convId);
+
+        const rows = await loadConversationMessages(supabase, convId, 50);
+        if (cancelled) return;
+
+        if (rows.length > 0) {
+          const loaded: CoachMessage[] = rows.map((r) => {
+            const msg: CoachMessage = {
+              id: r.id,
+              role: r.role,
+              content: r.content,
+              timestamp: new Date(r.created_at).getTime(),
+            };
+            if (r.action) msg.action = r.action as CoachAction;
+            if (r.action_data) msg.data = r.action_data;
+            if (r.action_result) msg.actionResult = r.action_result;
+            return msg;
+          });
+          // Mark all loaded messages as already typed
+          loaded.forEach((m) => typingDoneIds.current.add(m.id));
+          setMessages(loaded);
+        }
+      } catch (e) {
+        console.error("[coach] Failed to load conversation:", e);
+      } finally {
+        if (!cancelled) setIsLoadingHistory(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [isOpen, userId, supabase]);
+
+  // ── Start new chat ──────────────────────────────────────────────────
+
+  const handleNewChat = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase
+        .from("coach_conversations")
+        .insert({ user_id: userId, session_id: null })
+        .select("id")
+        .single();
+      if (error) throw error;
+      setConversationId(data.id);
+      setMessages([]);
+      typingDoneIds.current.clear();
+    } catch (e) {
+      console.error("[coach] Failed to create new chat:", e);
+    }
+  }, [userId, supabase]);
 
   // ── Voice toggle ──────────────────────────────────────────────────────
 
@@ -301,6 +371,7 @@ export function CoachChatSheet({
           message: text.trim(),
           conversation_history: conversationHistory,
           context,
+          ...(conversationId && { conversation_id: conversationId }),
         };
 
         const res = await fetch("/api/ai/coach", {
@@ -431,6 +502,8 @@ export function CoachChatSheet({
               : m,
           ),
         );
+
+        // Messages are persisted server-side in the API route
       } catch {
         // Update the placeholder or add error message
         setMessages((prev) => {
@@ -454,7 +527,7 @@ export function CoachChatSheet({
         setHudState("idle");
       }
     },
-    [messages, context, isSending, workoutStore, timerStore, router, voiceEnabled, userId],
+    [messages, context, isSending, workoutStore, timerStore, router, voiceEnabled, userId, conversationId],
   );
 
   // ── Confirm / Dismiss pending destructive actions ────────────────────
@@ -540,30 +613,39 @@ export function CoachChatSheet({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <HudShell
-          messages={messages}
-          inputValue={inputValue}
-          setInputValue={setInputValue}
-          isSending={isSending}
-          isListening={isListening}
-          hudState={hudState}
-          voiceEnabled={voiceEnabled}
-          pills={pills}
-          context={context}
-          confirmingMsgId={confirmingMsgId}
-          onSubmit={handleSubmit}
-          onClose={onClose}
-          onMicTap={() => (isListening ? stopListening() : startListening())}
-          onToggleVoice={toggleVoice}
-          onQuickAction={handleQuickAction}
-          onConfirmAction={handleConfirmAction}
-          onDismissAction={handleDismissAction}
-          onSelectOption={handleSelectOption}
-          onTypingDone={handleTypingDone}
-          typingDoneIds={typingDoneIds.current}
-          scrollRef={scrollRef}
-          inputRef={inputRef}
-        />
+        <>
+          <HudShell
+            messages={messages}
+            inputValue={inputValue}
+            setInputValue={setInputValue}
+            isSending={isSending}
+            isListening={isListening}
+            hudState={hudState}
+            voiceEnabled={voiceEnabled}
+            pills={pills}
+            context={context}
+            confirmingMsgId={confirmingMsgId}
+            isLoadingHistory={isLoadingHistory}
+            onSubmit={handleSubmit}
+            onClose={onClose}
+            onMicTap={() => (isListening ? stopListening() : startListening())}
+            onToggleVoice={toggleVoice}
+            onQuickAction={handleQuickAction}
+            onConfirmAction={handleConfirmAction}
+            onDismissAction={handleDismissAction}
+            onSelectOption={handleSelectOption}
+            onTypingDone={handleTypingDone}
+            onNewChat={handleNewChat}
+            onOpenMemory={() => setShowMemoryManager(true)}
+            typingDoneIds={typingDoneIds.current}
+            scrollRef={scrollRef}
+            inputRef={inputRef}
+          />
+          <MemoryManager
+            isOpen={showMemoryManager}
+            onClose={() => setShowMemoryManager(false)}
+          />
+        </>
       )}
     </AnimatePresence>,
     portalTarget
@@ -889,6 +971,7 @@ function HudShell({
   pills,
   context,
   confirmingMsgId,
+  isLoadingHistory,
   onSubmit,
   onClose,
   onMicTap,
@@ -898,6 +981,8 @@ function HudShell({
   onDismissAction,
   onSelectOption,
   onTypingDone,
+  onNewChat,
+  onOpenMemory,
   typingDoneIds,
   scrollRef,
   inputRef,
@@ -912,6 +997,7 @@ function HudShell({
   pills: string[];
   context: CoachContext;
   confirmingMsgId: string | null;
+  isLoadingHistory: boolean;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
   onMicTap: () => void;
@@ -921,6 +1007,8 @@ function HudShell({
   onDismissAction: (msgId: string) => void;
   onSelectOption: (text: string) => void;
   onTypingDone: (msgId: string) => void;
+  onNewChat: () => void;
+  onOpenMemory: () => void;
   typingDoneIds: Set<string>;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -1092,7 +1180,7 @@ function HudShell({
           </div>
 
           {/* Controls */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             {/* Volt accent bar */}
             <div
               style={{
@@ -1103,6 +1191,44 @@ function HudShell({
                 boxShadow: `0 0 10px ${T.volt}60`,
               }}
             />
+            {/* New Chat — glass surface */}
+            <button
+              onClick={onNewChat}
+              title="New conversation"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                border: `1px solid ${T.border2}`,
+                background: T.glassElevated,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              <Plus size={14} color={T.text2} style={{ opacity: 0.5 }} />
+            </button>
+            {/* Memory panel — glass surface */}
+            <button
+              onClick={onOpenMemory}
+              title="APEX Memory"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                border: `1px solid ${T.border2}`,
+                background: T.glassElevated,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              <Brain size={13} color={T.text2} style={{ opacity: 0.5 }} />
+            </button>
             {/* Voice toggle — glass surface */}
             <button
               onClick={onToggleVoice}
@@ -1176,7 +1302,11 @@ function HudShell({
           <ActionPills pills={pills} />
 
           {/* Message Feed or Empty State */}
-          {messages.length === 0 ? (
+          {isLoadingHistory ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: T.text2, fontSize: 11, fontFamily: T.fontSans }}>
+              Loading conversation...
+            </div>
+          ) : messages.length === 0 ? (
             <EmptyState hudState={hudState} onQuickAction={onQuickAction} hasActiveWorkout={!!context.active_workout} />
           ) : (
             <div className="flex flex-col gap-3">

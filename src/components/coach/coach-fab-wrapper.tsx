@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AI_COACH_ENABLED, FORM_ANALYSIS_ENABLED, READINESS_SCORE_ENABLED } from "@/lib/features";
 import { useWorkoutStore } from "@/stores/workout-store";
@@ -8,6 +8,7 @@ import { CoachFab } from "./coach-fab";
 import { T, orbColors, statusMessages } from "@/lib/coach-tokens";
 import type { OrbState } from "@/lib/coach-tokens";
 import type { CoachContext } from "@/lib/coach/types";
+import { detectTrends } from "@/lib/coach/trend-detector";
 
 type MacroSummary = CoachContext["daily_macros"];
 type FormReport = CoachContext["latest_form_report"];
@@ -23,6 +24,7 @@ type CoachProfileContext = {
     key_observations: Record<string, unknown> | null;
     created_at: string;
   }> | null;
+  recent_sessions_7d?: number;
   acwr?: number | null;
   acwr_status?: "danger" | "high" | "elevated" | "optimal" | "underloaded" | null;
   fatigue_label?: string | null;
@@ -48,6 +50,8 @@ export function CoachFabWrapper() {
   const [readinessLevel, setReadinessLevel] = useState<string | null>(null);
   const [orbState, setOrbState] = useState<OrbState>("idle");
   const [showTooltip, setShowTooltip] = useState(false);
+  const [proactiveMessage, setProactiveMessage] = useState<string | undefined>();
+  const triggersChecked = useRef(false);
 
   // Fetch today's macro summary once on mount
   useEffect(() => {
@@ -96,7 +100,63 @@ export function CoachFabWrapper() {
       .catch(() => undefined);
   }, []);
 
+  // ── Proactive coaching triggers ─────────────────────────────────────────────
+  useEffect(() => {
+    if (triggersChecked.current || !profileCtx) return;
+    triggersChecked.current = true;
+
+    const sessions7d = profileCtx.recent_sessions_7d ?? 0;
+    const streak = profileCtx.current_streak ?? 0;
+
+    // 1. Rest day nudge
+    if (sessions7d >= 5 && readinessScore != null && readinessScore < 50 && !activeWorkout) {
+      setProactiveMessage(
+        "Your body could use a recovery day. Want me to plan a light mobility session instead?",
+      );
+      return;
+    }
+
+    // 2. Push day
+    if (readinessScore != null && readinessScore > 80 && streak >= 2 && !activeWorkout) {
+      setProactiveMessage(
+        "Readiness is peak today — great day to push hard. Want to plan a workout?",
+      );
+      return;
+    }
+
+    // 3. Protein alert (mid-workout)
+    if (activeWorkout && dailyMacros) {
+      const totalSets = activeWorkout.exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
+      const completedSets = activeWorkout.exercises.reduce(
+        (sum, ex) => sum + ex.sets.filter((s) => s.completed).length,
+        0,
+      );
+      if (
+        totalSets > 0 &&
+        completedSets / totalSets > 0.5 &&
+        dailyMacros.consumed_protein < dailyMacros.target_protein * 0.5
+      ) {
+        setProactiveMessage(
+          "Heads up — you're behind on protein. Get something in soon for recovery.",
+        );
+        return;
+      }
+    }
+  }, [profileCtx, readinessScore, activeWorkout, dailyMacros]);
+
   if (!AI_COACH_ENABLED) return null;
+
+  // ── Volume tracking ────────────────────────────────────────────────────────
+  const totalVolumeKg = activeWorkout?.exercises.reduce((sum, ex) =>
+    sum + ex.sets.filter(s => s.completed && s.weight_kg && s.reps)
+      .reduce((s, set) => s + (set.weight_kg! * set.reps!), 0), 0) ?? null;
+
+  // ── Trend detection ────────────────────────────────────────────────────────
+  const detectedTrends = detectTrends(
+    profileCtx?.recent_session_notes ?? null,
+    profileCtx?.current_streak ?? 0,
+    profileCtx?.recent_sessions_7d ?? 0,
+  );
 
   const context: CoachContext = {
     active_workout: activeWorkout
@@ -124,7 +184,7 @@ export function CoachFabWrapper() {
       : null,
     readiness_score: readinessScore,
     readiness_level: readinessLevel,
-    recent_sessions_7d: 0,
+    recent_sessions_7d: profileCtx?.recent_sessions_7d ?? 0,
     current_streak: profileCtx?.current_streak ?? 0,
     fitness_goal: profileCtx?.fitness_goal ?? null,
     experience_level: profileCtx?.experience_level ?? null,
@@ -135,6 +195,8 @@ export function CoachFabWrapper() {
     acwr: profileCtx?.acwr ?? null,
     acwr_status: profileCtx?.acwr_status ?? null,
     fatigue_label: profileCtx?.fatigue_label ?? null,
+    total_volume_kg: totalVolumeKg,
+    detected_trends: detectedTrends.length > 0 ? detectedTrends : null,
   };
 
   const orbColor = orbColors[orbState];
@@ -241,7 +303,13 @@ export function CoachFabWrapper() {
         )}
       </AnimatePresence>
 
-      <CoachFab context={context} orbState={orbState} onOrbStateChange={setOrbState} />
+      <CoachFab
+        context={context}
+        orbState={orbState}
+        onOrbStateChange={setOrbState}
+        initialMessage={proactiveMessage}
+        hasNotification={!!proactiveMessage}
+      />
     </div>
   );
 }

@@ -90,21 +90,42 @@ export async function saveCoachMemory(
   content: string,
   source: "coach" | "user" = "coach",
 ): Promise<CoachMemory | null> {
-  // Check for duplicate content in same category
+  // Fetch all memories in this category for fuzzy dedup
   const { data: existing } = await supabase
     .from("coach_memories")
-    .select("id")
+    .select("id, content")
     .eq("user_id", userId)
-    .eq("category", category)
-    .eq("content", content)
-    .limit(1);
+    .eq("category", category);
 
-  if (existing && existing.length > 0) {
-    // Touch the updated_at timestamp
+  // Find near-duplicate using Levenshtein similarity (>0.8 threshold)
+  const duplicate = existing?.find((m: { id: string; content: string }) => {
+    const a = m.content.toLowerCase().trim();
+    const b = content.toLowerCase().trim();
+    if (a === b) return true;
+    const maxLen = Math.max(a.length, b.length);
+    if (maxLen === 0) return false;
+    // Simple similarity: shared prefix/suffix ratio
+    let common = 0;
+    const minLen = Math.min(a.length, b.length);
+    for (let i = 0; i < minLen; i++) {
+      if (a[i] === b[i]) common++;
+      else break;
+    }
+    // Also check word overlap
+    const aWords = new Set(a.split(/\s+/));
+    const bWords = new Set(b.split(/\s+/));
+    let overlap = 0;
+    for (const w of aWords) if (bWords.has(w)) overlap++;
+    const wordSimilarity = overlap / Math.max(aWords.size, bWords.size);
+    return wordSimilarity > 0.7 || common / maxLen > 0.8;
+  });
+
+  if (duplicate) {
+    // Update to newer phrasing and touch timestamp
     const { data, error } = await supabase
       .from("coach_memories")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", existing[0].id)
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq("id", duplicate.id)
       .select()
       .single();
 

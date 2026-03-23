@@ -31,7 +31,7 @@ const VALID_EQUIPMENT = [
 
 // Must match the DB enum `exercise_category_type` (migration 002)
 const VALID_CATEGORIES = [
-  "compound", "isolation", "cardio", "stretch",
+  "compound", "isolation", "cardio", "stretch", "stretching", "plyometric", "other",
 ] as const;
 
 export const exerciseCreateSchema = z.object({

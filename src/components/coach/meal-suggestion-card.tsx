@@ -13,7 +13,7 @@ interface MealSuggestionData {
   meal_type?: string;
 }
 
-export function MealSuggestionCard({ data }: { data?: Record<string, unknown> }) {
+export function MealSuggestionCard({ data, onLogMeal }: { data?: Record<string, unknown>; onLogMeal?: (meal: MealSuggestionData) => void }) {
   if (!data) return null;
   const d = data as unknown as MealSuggestionData;
   if (!d.meal_name) return null;
@@ -66,6 +66,17 @@ export function MealSuggestionCard({ data }: { data?: Record<string, unknown> })
           </span>
         ))}
       </div>
+
+      {onLogMeal && (
+        <button
+          type="button"
+          onClick={() => onLogMeal(d)}
+          className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 active:scale-[0.97]"
+          style={{ minHeight: "44px" }}
+        >
+          Log This Meal
+        </button>
+      )}
     </motion.div>
   );
 }

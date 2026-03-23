@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { DetectedTrend } from "./trend-detector";
 
 // ── Voice Intent ──
 
@@ -69,6 +70,11 @@ export type CoachAction =
   | "show_prescription"
   | "show_meal_suggestion"
   | "show_macro_breakdown"
+  | "show_readiness_card"
+  | "show_recovery_map"
+  | "show_pr_card"
+  | "show_workout_recap"
+  | "show_alternatives"
   // Mutation actions (modify active workout)
   | "add_exercise"
   | "swap_exercise"
@@ -77,8 +83,14 @@ export type CoachAction =
   | "remove_exercise"
   | "create_and_add_exercise"
   | "start_timer"
+  | "create_superset"
+  | "adjust_remaining_sets"
   // Nutrition mutation
   | "log_quick_meal"
+  | "log_meal_from_suggestion"
+  | "log_food_item"
+  // Body metrics
+  | "log_body_weight"
   // Template actions
   | "create_template"
   | "start_workout_from_template"
@@ -99,7 +111,12 @@ export const MUTATION_ACTIONS: CoachAction[] = [
   "remove_exercise",
   "create_and_add_exercise",
   "start_timer",
+  "create_superset",
+  "adjust_remaining_sets",
   "log_quick_meal",
+  "log_meal_from_suggestion",
+  "log_food_item",
+  "log_body_weight",
   "create_template",
   "start_workout_from_template",
   "create_program",
@@ -232,6 +249,90 @@ export interface SaveMemoryActionData {
   content: string;
 }
 
+// ── New Action Data Types (Phase 1.2) ──
+
+export interface CreateSupersetActionData {
+  exercise_a_name: string;
+  exercise_b_name: string;
+  sets: number;
+  rest_between_exercises_sec: number;
+  rest_between_rounds_sec: number;
+}
+
+export interface ShowWorkoutRecapActionData {
+  total_volume_kg: number;
+  total_sets: number;
+  total_reps: number;
+  duration_minutes: number;
+  muscle_groups_hit: string[];
+  prs_hit: Array<{ exercise: string; weight_kg: number; reps: number }>;
+  coach_notes: string;
+  intensity_rating: "light" | "moderate" | "hard" | "brutal";
+}
+
+export interface ShowAlternativesActionData {
+  current_exercise: string;
+  alternatives: Array<{
+    name: string;
+    muscle_group: string;
+    reasoning: string;
+    difficulty: "easier" | "similar" | "harder";
+  }>;
+}
+
+export interface AdjustRemainingSetsActionData {
+  exercise_name: string;
+  new_weight_kg?: number;
+  new_reps?: number;
+  reason: string;
+}
+
+export interface LogMealFromSuggestionActionData {
+  meal_name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+}
+
+export interface ShowReadinessCardActionData {
+  score: number;
+  level: string;
+  domains?: Record<string, number>;
+}
+
+export interface ShowRecoveryMapActionData {
+  muscle_recovery: Record<string, number>;
+}
+
+export interface ShowPRCardActionData {
+  prs: Array<{
+    exercise: string;
+    weight_kg: number;
+    reps: number;
+    date?: string;
+  }>;
+}
+
+// ── Universal Input Data Types ──
+
+export interface LogFoodItemActionData {
+  food_name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  serving_size?: string;
+  meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+}
+
+export interface LogBodyWeightActionData {
+  weight_kg: number;
+  body_fat_pct?: number;
+  note?: string;
+}
+
 // ── Workout Plan Mode Data Types ──
 
 export interface WorkoutOptionExercise {
@@ -320,6 +421,10 @@ export interface CoachContext {
   muscle_recovery_map?: Record<string, number> | null;
   /** CNS/systemic readiness score (0-100, alias for training domain) */
   systemic_score?: number | null;
+  /** Running total volume (weight x reps) for the current session */
+  total_volume_kg?: number | null;
+  /** Auto-detected trends from recent session summaries */
+  detected_trends?: DetectedTrend[] | null;
 }
 
 export interface CoachRequest {
@@ -329,6 +434,8 @@ export interface CoachRequest {
     content: string;
   }>;
   context: CoachContext;
+  /** Persistent conversation ID for chat history */
+  conversation_id?: string;
 }
 
 const ALL_COACH_ACTIONS = [
@@ -341,6 +448,11 @@ const ALL_COACH_ACTIONS = [
   "show_prescription",
   "show_meal_suggestion",
   "show_macro_breakdown",
+  "show_readiness_card",
+  "show_recovery_map",
+  "show_pr_card",
+  "show_workout_recap",
+  "show_alternatives",
   "add_exercise",
   "swap_exercise",
   "add_sets",
@@ -348,7 +460,12 @@ const ALL_COACH_ACTIONS = [
   "remove_exercise",
   "create_and_add_exercise",
   "start_timer",
+  "create_superset",
+  "adjust_remaining_sets",
   "log_quick_meal",
+  "log_meal_from_suggestion",
+  "log_food_item",
+  "log_body_weight",
   "create_template",
   "start_workout_from_template",
   "create_program",
@@ -384,6 +501,8 @@ export const AutoregulationPrescriptionSchema = z.object({
   progressive_overload_pct: z.number(),
   reasoning_flag: z.enum(["cns_bypass", "local_fatigue", "peak", "standard"]).optional(),
   machine_substitute: z.string().optional(),
+  current_pr_weight_kg: z.number().optional(),
+  current_pr_reps: z.number().optional(),
 });
 
 export type AutoregulationPrescription = z.infer<
@@ -397,6 +516,7 @@ export const DESTRUCTIVE_ACTIONS: CoachAction[] = [
   "swap_exercise",
   "remove_exercise",
   "update_set",
+  "adjust_remaining_sets",
 ];
 
 export function isDestructiveAction(action: CoachAction): boolean {

@@ -40,6 +40,7 @@ export function FoodScanner() {
   const [description, setDescription] = useState("");
   const [result, setResult] = useState<EnrichedFoodScanResult | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isLogging, setIsLogging] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -151,6 +152,8 @@ export function FoodScanner() {
     sodium_mg?: number;
     source?: "ai-scan" | "usda";
   }>) => {
+    if (isLogging) return;
+    setIsLogging(true);
     try {
       const res = await fetch("/api/nutrition/food-log", {
         method: "POST",
@@ -167,8 +170,10 @@ export function FoodScanner() {
       reset();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to log food");
+    } finally {
+      setIsLogging(false);
     }
-  }, [reset]);
+  }, [reset, isLogging]);
 
   // Review mode
   if (state === "review" && result) {
@@ -177,6 +182,7 @@ export function FoodScanner() {
         result={result}
         onConfirm={handleConfirm}
         onCancel={reset}
+        isLogging={isLogging}
       />
     );
   }

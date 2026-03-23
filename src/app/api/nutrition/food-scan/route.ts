@@ -92,9 +92,18 @@ export async function POST(request: Request) {
       maxOutputTokens: 2048,
     });
 
+    // Deduplicate AI results by food_name (case-insensitive, keep first)
+    const seen = new Set<string>();
+    const dedupedItems = object.items.filter((item) => {
+      const key = item.food_name.toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     // Enrich with USDA data (all lookups in parallel)
     const enrichedItems: EnrichedFoodEstimation[] = await Promise.all(
-      object.items.map(async (item) => {
+      dedupedItems.map(async (item) => {
         if (!process.env.USDA_API_KEY) {
           return { ...item, usda_match: null, source: "ai-scan" as const };
         }

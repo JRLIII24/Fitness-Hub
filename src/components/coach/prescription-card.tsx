@@ -9,6 +9,8 @@ interface PrescriptionCardProps {
   prescription: AutoregulationPrescription & {
     reasoning_flag?: "cns_bypass" | "local_fatigue" | "peak" | "standard";
     machine_substitute?: string;
+    current_pr_weight_kg?: number;
+    current_pr_reps?: number;
   };
 }
 
@@ -132,6 +134,27 @@ export function PrescriptionCard({ prescription }: PrescriptionCardProps) {
           </p>
         </div>
       </div>
+
+      {/* PR comparison */}
+      {prescription.current_pr_weight_kg != null && (
+        <div
+          className="mb-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5"
+          style={{ background: "rgba(234, 179, 8, 0.08)", border: "1px solid rgba(234, 179, 8, 0.2)" }}
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "rgba(234, 179, 8, 0.9)" }}>
+            vs PR
+          </span>
+          <span className="text-[11px] font-bold tabular-nums" style={{ color: "rgba(234, 179, 8, 1)" }}>
+            {weightToDisplay(prescription.current_pr_weight_kg, isImperial, 1)} {unitLabel}
+            {prescription.current_pr_reps ? ` × ${prescription.current_pr_reps}` : ""}
+          </span>
+          <span className="ml-auto text-[10px] font-bold tabular-nums text-muted-foreground">
+            {prescription.current_pr_weight_kg > 0
+              ? `${Math.round((prescription.target_weight_kg / prescription.current_pr_weight_kg) * 100)}% of PR`
+              : ""}
+          </span>
+        </div>
+      )}
 
       {/* Progressive overload */}
       <div className="mb-2 flex items-center gap-2">

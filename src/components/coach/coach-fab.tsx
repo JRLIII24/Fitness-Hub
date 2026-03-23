@@ -16,9 +16,13 @@ interface CoachFabProps {
   orbState: OrbState;
   /** Callback to push live state changes back up to the wrapper. */
   onOrbStateChange: (s: OrbState) => void;
+  /** Proactive message to auto-send when the user opens the chat sheet. */
+  initialMessage?: string;
+  /** Show a notification dot on the FAB orb (e.g. when a proactive message is pending). */
+  hasNotification?: boolean;
 }
 
-export function CoachFab({ context, orbState, onOrbStateChange }: CoachFabProps) {
+export function CoachFab({ context, orbState, onOrbStateChange, initialMessage: externalInitialMessage, hasNotification }: CoachFabProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [initialMessage, setInitialMessage] = useState<string | undefined>();
   const [miniWaveHeights, setMiniWaveHeights] = useState([4, 8, 4, 8, 4]);
@@ -37,8 +41,9 @@ export function CoachFab({ context, orbState, onOrbStateChange }: CoachFabProps)
 
   const handleOpen = useCallback((message?: string) => {
     if (message) setInitialMessage(message);
+    else if (externalInitialMessage) setInitialMessage(externalInitialMessage);
     setIsOpen(true);
-  }, []);
+  }, [externalInitialMessage]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
@@ -202,6 +207,26 @@ export function CoachFab({ context, orbState, onOrbStateChange }: CoachFabProps)
             color={T.text1}
             style={{ position: "relative", zIndex: 1, flexShrink: 0 }}
           />
+
+          {/* Notification dot — visible when proactive message pending and sheet closed */}
+          {hasNotification && !isOpen && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: [1, 1.3, 1] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+              style={{
+                position: "absolute",
+                top: 2,
+                right: 2,
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: T.volt,
+                boxShadow: `0 0 6px ${T.volt}, 0 0 12px ${T.volt}60`,
+                zIndex: 2,
+              }}
+            />
+          )}
 
           {/* Speaking waveform bars */}
           {orbState === "speaking" && (

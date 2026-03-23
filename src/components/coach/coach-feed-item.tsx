@@ -22,6 +22,12 @@ import { MealSuggestionCard } from "./meal-suggestion-card";
 import { MacroBreakdownCard } from "./macro-breakdown-card";
 import { ActionConfirmationCard } from "./action-confirmation-card";
 import { WorkoutOptionsCard } from "./workout-options-card";
+import { ReadinessCard } from "./readiness-card";
+import { RecoveryMapCard } from "./recovery-map-card";
+import { PRCard } from "./pr-card";
+import { WorkoutRecapCard } from "./workout-recap-card";
+import { AlternativesCard } from "./alternatives-card";
+import { CoachMarkdown } from "./coach-markdown";
 import type { PresentWorkoutOptionsActionData } from "@/lib/coach/types";
 
 // ── Typewriter hook ─────────────────────────────────────────────────────────
@@ -301,13 +307,13 @@ export function CoachFeedItem({ message, isLatest, index, totalCount, onConfirmA
         </div>
       )}
 
-      {/* Response text */}
-      <p className="text-[12px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
-        {shownText}
+      {/* Response text (markdown-rendered) */}
+      <div className="text-[12px] leading-relaxed text-foreground/90">
+        <CoachMarkdown text={shownText} />
         {!isComplete && (
           <span className="inline-block w-[5px] h-[13px] bg-primary/60 ml-0.5 animate-pulse" />
         )}
-      </p>
+      </div>
 
       {/* Inline action data */}
       {hasMutation && message.action && isComplete && (
@@ -325,7 +331,12 @@ export function CoachFeedItem({ message, isLatest, index, totalCount, onConfirmA
 
       {message.action === "show_meal_suggestion" && isComplete && (
         <div className="mt-2.5">
-          <MealSuggestionCard data={message.data} />
+          <MealSuggestionCard
+            data={message.data}
+            onLogMeal={(meal) =>
+              onSelectOption?.(`Log that meal: ${meal.meal_name}`)
+            }
+          />
         </div>
       )}
 
@@ -356,6 +367,39 @@ export function CoachFeedItem({ message, isLatest, index, totalCount, onConfirmA
           data={message.data as unknown as PresentWorkoutOptionsActionData}
           onSelectOption={onSelectOption ?? (() => {})}
         />
+      )}
+
+      {message.action === "show_readiness_card" && isComplete && (
+        <div className="mt-2.5">
+          <ReadinessCard data={message.data as { score: number; level: string; domains?: Record<string, number> }} />
+        </div>
+      )}
+
+      {message.action === "show_recovery_map" && isComplete && (
+        <div className="mt-2.5">
+          <RecoveryMapCard data={message.data as { muscle_recovery: Record<string, number> }} />
+        </div>
+      )}
+
+      {message.action === "show_pr_card" && isComplete && (
+        <div className="mt-2.5">
+          <PRCard data={message.data as { prs: Array<{ exercise: string; weight_kg: number; reps: number; date?: string }> }} />
+        </div>
+      )}
+
+      {message.action === "show_workout_recap" && isComplete && (
+        <div className="mt-2.5">
+          <WorkoutRecapCard data={message.data as unknown as Parameters<typeof WorkoutRecapCard>[0]["data"]} />
+        </div>
+      )}
+
+      {message.action === "show_alternatives" && isComplete && (
+        <div className="mt-2.5">
+          <AlternativesCard
+            data={message.data as unknown as Parameters<typeof AlternativesCard>[0]["data"]}
+            onSelectOption={onSelectOption}
+          />
+        </div>
       )}
 
       {/* Pending action confirmation */}

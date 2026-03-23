@@ -26,6 +26,10 @@ import {
   saveCoachMemory,
   formatMemoriesForPrompt,
 } from "@/lib/coach/memory";
+import {
+  getOrCreateConversation,
+  saveMessage,
+} from "@/lib/coach/conversation";
 import { getCachedOrComputeFatigueSnapshot } from "@/lib/fatigue/server";
 import { getCachedOrComputeReadiness } from "@/lib/readiness/server";
 
@@ -175,6 +179,27 @@ export async function POST(request: Request) {
                 memData.content,
               );
             }
+          }
+
+          // Persist conversation messages server-side (fire-and-forget)
+          try {
+            const convId = body.conversation_id
+              ? body.conversation_id
+              : await getOrCreateConversation(supabase, user.id);
+            await Promise.all([
+              saveMessage(supabase, convId, user.id, {
+                role: "user",
+                content: body.message,
+              }),
+              saveMessage(supabase, convId, user.id, {
+                role: "assistant",
+                content: final.reply ?? "",
+                action: action !== "none" ? (action as import("@/lib/coach/types").CoachAction) : undefined,
+                actionData: data ?? undefined,
+              }),
+            ]);
+          } catch (e) {
+            logger.error("Failed to persist conversation:", e);
           }
 
           controller.enqueue(

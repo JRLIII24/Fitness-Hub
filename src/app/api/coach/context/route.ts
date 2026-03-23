@@ -89,6 +89,16 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(3);
 
+    // ── Sessions in the last 7 days ───────────────────────────────────────────
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const { count: recentSessionCount } = await supabase
+      .from("workout_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .gte("started_at", sevenDaysAgo.toISOString());
+
     // ── ACWR from fatigue engine (non-critical) ───────────────────────────────
     let acwr: number | null = null;
     let acwr_status: string | null = null;
@@ -117,6 +127,7 @@ export async function GET() {
       level: profile?.level ?? 1,
       recent_prs: recent_prs.length > 0 ? recent_prs : null,
       recent_session_notes: summaries && summaries.length > 0 ? summaries : null,
+      recent_sessions_7d: recentSessionCount ?? 0,
       acwr,
       acwr_status,
       fatigue_label,

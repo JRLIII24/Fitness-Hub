@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, EQUIPMENT_LABELS, EQUIPMENT_TYPES } from "@/lib/constants";
 
 interface Exercise {
   id: string;
@@ -133,13 +134,11 @@ export function CreateCustomExerciseDialog({ open, onClose, onCreated }: Props) 
                 <SelectValue placeholder="Select muscle group" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="chest">Chest</SelectItem>
-                <SelectItem value="back">Back</SelectItem>
-                <SelectItem value="legs">Legs</SelectItem>
-                <SelectItem value="shoulders">Shoulders</SelectItem>
-                <SelectItem value="arms">Arms</SelectItem>
-                <SelectItem value="core">Core</SelectItem>
-                <SelectItem value="full_body">Full Body</SelectItem>
+                {MUSCLE_GROUPS.map((mg) => (
+                  <SelectItem key={mg} value={mg}>
+                    {MUSCLE_GROUP_LABELS[mg] ?? mg}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -151,12 +150,11 @@ export function CreateCustomExerciseDialog({ open, onClose, onCreated }: Props) 
                 <SelectValue placeholder="Select equipment" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="barbell">Barbell</SelectItem>
-                <SelectItem value="dumbbell">Dumbbell</SelectItem>
-                <SelectItem value="cable">Cable</SelectItem>
-                <SelectItem value="machine">Machine</SelectItem>
-                <SelectItem value="bodyweight">Bodyweight</SelectItem>
-                <SelectItem value="band">Band</SelectItem>
+                {EQUIPMENT_TYPES.map((eq) => (
+                  <SelectItem key={eq} value={eq}>
+                    {EQUIPMENT_LABELS[eq] ?? eq}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

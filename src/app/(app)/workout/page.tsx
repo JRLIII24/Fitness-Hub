@@ -465,6 +465,15 @@ export default function WorkoutPage() {
     return () => window.removeEventListener("rest-timer-complete", handleRestComplete);
   }, []);
 
+  // Refresh template list when AI coach creates a new template
+  useEffect(() => {
+    function handleTemplateCreated() {
+      if (userId) loadTemplates(userId);
+    }
+    window.addEventListener("template-created", handleTemplateCreated);
+    return () => window.removeEventListener("template-created", handleTemplateCreated);
+  }, [userId, loadTemplates]);
+
   useEffect(() => {
     let active = true;
 

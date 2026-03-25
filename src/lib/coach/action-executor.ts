@@ -368,40 +368,14 @@ export async function executeCoachAction(
           (data as Record<string, unknown>).created_template_id = result.template_id;
         }
 
-        // If the AI requested immediate start, kick off the workout right now
-        if (d.start_immediately && !workout.activeWorkout && stores.userId) {
-          try {
-            const teRes = await fetch(`/api/templates/${result.template_id}/exercises`);
-            if (teRes.ok) {
-              const { template_name, exercises: templateExercises } = await teRes.json() as {
-                template_name: string;
-                exercises: Array<{ exercises: Exercise; target_sets: number | null }>;
-              };
-              workout.startWorkout(template_name || d.template_name, stores.userId, result.template_id);
-              for (const te of templateExercises) {
-                const exercise = te.exercises;
-                if (!exercise) continue;
-                workout.addExercise(exercise);
-                const exIdx = workout.activeWorkout!.exercises.length - 1;
-                const targetSets = te.target_sets || 3;
-                for (let s = 1; s < targetSets; s++) {
-                  workout.addSet(exIdx);
-                }
-              }
-              router.push("/workout");
-              return {
-                success: true,
-                message: `Created and started "${d.template_name}" with ${result.exercise_count} exercises`,
-              };
-            }
-          } catch {
-            // Fall through — template was still saved successfully
-          }
+        // Notify the workout page to refresh its template list
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("template-created", { detail: { templateId: result.template_id } }));
         }
 
         return {
           success: true,
-          message: `Created "${d.template_name}" with ${result.exercise_count} exercises`,
+          message: `Created "${d.template_name}" with ${result.exercise_count} exercises. You can find it in your templates.`,
         };
       } catch (e) {
         return { success: false, message: `Failed to create template: ${e instanceof Error ? e.message : "network error"}` };

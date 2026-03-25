@@ -15,7 +15,10 @@ interface WorkoutState {
   startWorkout: (name: string, userId: string, templateId?: string) => void;
   loadWorkoutForEdit: (workout: ActiveWorkout, workoutSessionId: string) => void;
   cancelWorkout: (userId: string) => void;
-  finishWorkout: (userId: string) => ActiveWorkout | null;
+  /** Return a snapshot of the active workout WITHOUT clearing state */
+  snapshotWorkout: () => ActiveWorkout | null;
+  /** Clear workout state and delete server draft — call only after DB save confirms */
+  clearWorkout: (userId: string) => void;
 
   // Workout metadata actions
   updateWorkoutName: (name: string) => void;
@@ -53,6 +56,22 @@ interface WorkoutState {
 
 function generateId() {
   return uuid();
+}
+
+/** Fire-and-forget draft persistence — best-effort server backup */
+function persistDraft(workout: ActiveWorkout) {
+  void fetch("/api/workout/draft", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      draft_data: {
+        workoutName: workout.name,
+        startedAt: workout.started_at,
+        templateId: workout.template_id ?? null,
+        exercises: workout.exercises,
+      },
+    }),
+  }).catch(() => {});
 }
 
 function createEmptySet(exerciseId: string, setNumber: number): WorkoutSet {
@@ -189,17 +208,15 @@ export const useWorkoutStore = create<WorkoutState>()(
         void deleteActiveWorkoutSession(userId);
       },
 
-      finishWorkout: (userId: string) => {
-        // Capture workout reference before clearing state
+      snapshotWorkout: () => {
         const workout = get().activeWorkout;
+        if (!workout) return null;
+        return structuredClone(workout);
+      },
 
-        // Clear local state IMMEDIATELY
+      clearWorkout: (userId: string) => {
         set({ activeWorkout: null, isWorkoutActive: false, editingWorkoutId: null });
-
-        // Remove active session from database in background
         void deleteActiveWorkoutSession(userId);
-
-        return workout;
       },
 
       addExercise: (exercise: Exercise) => {
@@ -213,26 +230,26 @@ export const useWorkoutStore = create<WorkoutState>()(
           notes: "",
         };
 
-        set({
-          activeWorkout: {
-            ...state.activeWorkout,
-            exercises: [...state.activeWorkout.exercises, newExercise],
-          },
-        });
+        const updated = {
+          ...state.activeWorkout,
+          exercises: [...state.activeWorkout.exercises, newExercise],
+        };
+        set({ activeWorkout: updated });
+        persistDraft(updated);
       },
 
       removeExercise: (exerciseIndex: number) => {
         const state = get();
         if (!state.activeWorkout) return;
 
-        set({
-          activeWorkout: {
-            ...state.activeWorkout,
-            exercises: state.activeWorkout.exercises.filter(
-              (_, i) => i !== exerciseIndex
-            ),
-          },
-        });
+        const updated = {
+          ...state.activeWorkout,
+          exercises: state.activeWorkout.exercises.filter(
+            (_, i) => i !== exerciseIndex
+          ),
+        };
+        set({ activeWorkout: updated });
+        persistDraft(updated);
       },
 
       swapExercise: (exerciseIndex: number, newExercise: Exercise) => {
@@ -253,12 +270,9 @@ export const useWorkoutStore = create<WorkoutState>()(
           })),
         };
 
-        set({
-          activeWorkout: {
-            ...state.activeWorkout,
-            exercises,
-          },
-        });
+        const updated = { ...state.activeWorkout, exercises };
+        set({ activeWorkout: updated });
+        persistDraft(updated);
       },
 
       reorderExercise: (from: number, to: number) => {
@@ -269,12 +283,9 @@ export const useWorkoutStore = create<WorkoutState>()(
         const [moved] = exercises.splice(from, 1);
         exercises.splice(to, 0, moved);
 
-        set({
-          activeWorkout: {
-            ...state.activeWorkout,
-            exercises,
-          },
-        });
+        const updated = { ...state.activeWorkout, exercises };
+        set({ activeWorkout: updated });
+        persistDraft(updated);
       },
 
       toggleExerciseCollapse: (exerciseIndex: number) => {
@@ -456,21 +467,7 @@ export const useWorkoutStore = create<WorkoutState>()(
         };
 
         set({ activeWorkout: updatedWorkout });
-
-        // Persist draft server-side so the workout can be restored if the app crashes.
-        // Fire-and-forget — failures are silent (best-effort only).
-        void fetch("/api/workout/draft", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            draft_data: {
-              workoutName: updatedWorkout.name,
-              startedAt: updatedWorkout.started_at,
-              templateId: updatedWorkout.template_id ?? null,
-              exercises: updatedWorkout.exercises,
-            },
-          }),
-        }).catch(() => {});
+        persistDraft(updatedWorkout);
       },
     }),
     {

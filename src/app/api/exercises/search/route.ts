@@ -108,11 +108,14 @@ export async function GET(request: Request) {
       });
     }
 
-    // Apply limit and ordering
-    supabaseQuery = supabaseQuery.order("name", { ascending: true }).limit(limit);
+    // Apply limit and ordering — custom exercises first so user's own exercises take priority
+    supabaseQuery = supabaseQuery
+      .order("is_custom", { ascending: false })
+      .order("name", { ascending: true })
+      .limit(limit);
 
     // Execute query
-    const { data: exercises, error } = await supabaseQuery;
+    let { data: exercises, error } = await supabaseQuery;
 
     if (error) {
       logger.error("Exercise search error:", error);
@@ -120,6 +123,36 @@ export async function GET(request: Request) {
         { error: "Failed to search exercises" },
         { status: 500 }
       );
+    }
+
+    // Fallback: if full-text search returned nothing, try ilike partial match
+    if (query && query.trim().length > 0 && (!exercises || exercises.length === 0)) {
+      let fallbackQuery = supabase
+        .from("exercises")
+        .select("id, name, slug, muscle_group, equipment, category, instructions, image_url, gif_url, source, is_custom");
+
+      if (muscleGroups) {
+        const groups = muscleGroups.split(",").map((g) => g.trim()).filter(Boolean);
+        if (groups.length === 1) {
+          fallbackQuery = fallbackQuery.eq("muscle_group", groups[0] as any);
+        } else if (groups.length > 1) {
+          fallbackQuery = fallbackQuery.in("muscle_group", groups as any);
+        }
+      }
+      if (equipment) fallbackQuery = fallbackQuery.eq("equipment", equipment as any);
+      if (category) fallbackQuery = fallbackQuery.eq("category", category as any);
+      if (source) fallbackQuery = fallbackQuery.eq("source", source);
+
+      fallbackQuery = fallbackQuery
+        .ilike("name", `%${query.trim()}%`)
+        .order("is_custom", { ascending: false })
+        .order("name", { ascending: true })
+        .limit(limit);
+
+      const { data: fallbackExercises, error: fallbackError } = await fallbackQuery;
+      if (!fallbackError && fallbackExercises && fallbackExercises.length > 0) {
+        exercises = fallbackExercises;
+      }
     }
 
     const normalizedExercises = (exercises ?? []).map((exercise) => ({

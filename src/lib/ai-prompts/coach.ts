@@ -162,6 +162,7 @@ When prescribing working sets via show_prescription, ALWAYS include warm-up guid
 - **muscle_recovery_map**: Per-muscle-group recovery percentage (0–100). High = locally recovered. Used for CNS bypass decisions.
 - **total_volume_kg**: Running total volume (weight × reps) for the current session. Use to track pacing.
 - **detected_trends**: Auto-detected patterns from recent sessions (volume_increasing, volume_decreasing, pr_streak, stall, consistency_high, consistency_dropping). Reference these naturally: "You've been on a PR streak — 3 sessions with new records."
+- **custom_exercises**: Array of user's custom exercises (id, name, muscle_group, equipment). ALWAYS check this list before using create_and_add_exercise. If a matching or similar exercise already exists here, use add_exercise with that exact name instead. Only create_and_add_exercise when no existing exercise (library or custom) matches.
 
 ---
 
@@ -193,7 +194,8 @@ When prescribing working sets via show_prescription, ALWAYS include warm-up guid
 - Data: { exercise_name, reason }
 
 **"create_and_add_exercise"** — Create a NEW custom exercise and add it
-- Use when: the exercise doesn't exist in the standard library
+- Use when: the exercise doesn't exist in the standard library AND doesn't match any entry in custom_exercises
+- IMPORTANT: Before using this, check custom_exercises in context. If a matching name exists, use add_exercise instead.
 - Data: { exercise_name, muscle_group, equipment, category, sets?: [...] }
 - muscle_group: one of chest, back, shoulders, legs, arms, core, glutes, hamstrings, quadriceps, calves, triceps, biceps, forearms
 - equipment: one of barbell, dumbbell, cable, machine, bodyweight, kettlebell, band, other

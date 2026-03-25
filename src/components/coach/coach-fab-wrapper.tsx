@@ -48,6 +48,7 @@ export function CoachFabWrapper() {
   const [profileCtx, setProfileCtx] = useState<CoachProfileContext | null>(null);
   const [readinessScore, setReadinessScore] = useState<number | null>(null);
   const [readinessLevel, setReadinessLevel] = useState<string | null>(null);
+  const [customExercises, setCustomExercises] = useState<CoachContext["custom_exercises"]>(null);
   const [orbState, setOrbState] = useState<OrbState>("idle");
   const [showTooltip, setShowTooltip] = useState(false);
   const [proactiveMessage, setProactiveMessage] = useState<string | undefined>();
@@ -81,7 +82,10 @@ export function CoachFabWrapper() {
     fetch("/api/coach/context")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data) setProfileCtx(data as CoachProfileContext);
+        if (data) {
+          setProfileCtx(data as CoachProfileContext);
+          if (data.custom_exercises) setCustomExercises(data.custom_exercises);
+        }
       })
       .catch(() => undefined);
   }, []);
@@ -197,6 +201,7 @@ export function CoachFabWrapper() {
     fatigue_label: profileCtx?.fatigue_label ?? null,
     total_volume_kg: totalVolumeKg,
     detected_trends: detectedTrends.length > 0 ? detectedTrends : null,
+    custom_exercises: customExercises,
   };
 
   const orbColor = orbColors[orbState];

@@ -107,19 +107,36 @@ function describeDestructiveAction(
   return `Execute ${action}`;
 }
 
-/** Search for an exercise by name via the API */
+/** Search for an exercise by name via the API, scoring candidates and preferring custom exercises */
 async function searchExercise(name: string): Promise<Exercise | null> {
   try {
     const res = await fetch(
-      `/api/exercises/search?query=${encodeURIComponent(name)}&limit=1`,
+      `/api/exercises/search?query=${encodeURIComponent(name)}&limit=5`,
     );
     if (!res.ok) return null;
     const data = await res.json();
     const exercises = data.exercises ?? data;
-    if (Array.isArray(exercises) && exercises.length > 0) {
-      return exercises[0] as Exercise;
+    if (!Array.isArray(exercises) || exercises.length === 0) return null;
+    if (exercises.length === 1) return exercises[0] as Exercise;
+
+    // Score candidates: exact > substring > other; prefer custom exercises
+    const nameLower = name.toLowerCase().trim();
+    let bestExercise = exercises[0] as Exercise;
+    let bestScore = -1;
+
+    for (const ex of exercises) {
+      const candidate = ((ex as Exercise).name ?? "").toLowerCase().trim();
+      let score = 0;
+      if (candidate === nameLower) score = 100;
+      else if (candidate.includes(nameLower) || nameLower.includes(candidate)) score = 80;
+      if ((ex as { is_custom?: boolean }).is_custom) score += 10;
+      if (score > bestScore) {
+        bestScore = score;
+        bestExercise = ex as Exercise;
+      }
     }
-    return null;
+
+    return bestExercise;
   } catch {
     return null;
   }

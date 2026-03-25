@@ -425,6 +425,13 @@ export interface CoachContext {
   total_volume_kg?: number | null;
   /** Auto-detected trends from recent session summaries */
   detected_trends?: DetectedTrend[] | null;
+  /** User's custom exercises — AI should prefer these over creating new ones */
+  custom_exercises?: Array<{
+    id: string;
+    name: string;
+    muscle_group: string;
+    equipment: string | null;
+  }> | null;
 }
 
 export interface CoachRequest {

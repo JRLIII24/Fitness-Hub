@@ -120,6 +120,15 @@ export async function GET() {
       logger.error("ACWR computation failed (non-critical):", e);
     }
 
+    // ── User's custom exercises ──────────────────────────────────────────────
+    const { data: customExercises } = await supabase
+      .from("exercises")
+      .select("id, name, muscle_group, equipment")
+      .eq("is_custom", true)
+      .eq("created_by", user.id)
+      .order("name", { ascending: true })
+      .limit(50);
+
     return NextResponse.json({
       fitness_goal: profile?.fitness_goal ?? null,
       experience_level: profile?.experience_level ?? null,
@@ -131,6 +140,9 @@ export async function GET() {
       acwr,
       acwr_status,
       fatigue_label,
+      custom_exercises: customExercises && customExercises.length > 0
+        ? customExercises.map((e) => ({ id: e.id, name: e.name, muscle_group: e.muscle_group, equipment: e.equipment }))
+        : null,
     });
   } catch {
     return NextResponse.json({ error: "Failed to fetch coach context" }, { status: 500 });

@@ -31,7 +31,8 @@ function isMissingTableError(error: unknown): boolean {
 interface UseWorkoutCompletionArgs {
   supabase: SupabaseClient;
   userId: string | null;
-  finishWorkout: (userId: string) => ActiveWorkout | null;
+  snapshotWorkout: () => ActiveWorkout | null;
+  clearWorkout: (userId: string) => void;
   cancelWorkout: (userId: string) => void;
   previousByExerciseId: Record<string, Array<{ reps: number | null; weight: number | null }>>;
   ghostWorkoutData: GhostWorkoutData;
@@ -45,7 +46,8 @@ interface UseWorkoutCompletionArgs {
 export function useWorkoutCompletion({
   supabase,
   userId,
-  finishWorkout,
+  snapshotWorkout,
+  clearWorkout,
   cancelWorkout,
   previousByExerciseId,
   ghostWorkoutData,
@@ -68,7 +70,7 @@ export function useWorkoutCompletion({
 
   const handleFinishWorkout = useCallback(async () => {
     if (!userId) return;
-    const workout = finishWorkout(userId);
+    const workout = snapshotWorkout();
     if (!workout) return;
 
     // Ensure user profile exists (in case the auto-create trigger didn't fire)
@@ -209,6 +211,8 @@ export function useWorkoutCompletion({
       };
 
       await enqueueMutation("SAVE_WORKOUT_SESSION", queuePayload, offlineSessionId);
+      clearWorkout(userId);
+      void fetch("/api/workout/draft", { method: "DELETE" }).catch(() => {});
 
       toast.info("Workout saved offline", {
         description: "It will sync automatically when you reconnect.",
@@ -283,6 +287,8 @@ export function useWorkoutCompletion({
 
         try {
           await enqueueMutation("SAVE_WORKOUT_SESSION", queuePayload, offlineSessionId);
+          clearWorkout(userId);
+          void fetch("/api/workout/draft", { method: "DELETE" }).catch(() => {});
           toast.info("Workout saved offline", {
             description: "It will sync automatically when you reconnect.",
             duration: 5000,
@@ -295,13 +301,14 @@ export function useWorkoutCompletion({
       }
 
       if (sessionError && isMissingTableError(sessionError)) {
+        clearWorkout(userId);
         setDbFeaturesAvailable(false);
         toast.message(
           `${workout.name} finished locally, but history sync is unavailable until migrations are applied.`
         );
         return;
       }
-      toast.error(sessionError?.message ?? "Failed to save workout session.");
+      toast.error(sessionError?.message ?? "Failed to save workout session. Your progress is preserved — try again.");
       return;
     }
 
@@ -322,13 +329,14 @@ export function useWorkoutCompletion({
 
     if (setsError) {
       if (isMissingTableError(setsError)) {
+        clearWorkout(userId);
         setDbFeaturesAvailable(false);
         toast.message(
           `${workout.name} finished locally, but set history sync is unavailable until migrations are applied.`
         );
         return;
       }
-      toast.error(setsError.message);
+      toast.error(setsError.message ?? "Failed to save sets. Your progress is preserved — try again.");
       return;
     }
 
@@ -353,9 +361,13 @@ export function useWorkoutCompletion({
       .eq("user_id", userId);
 
     if (completeError) {
-      toast.error(completeError.message ?? "Workout saved, but completion sync failed.");
+      toast.error(completeError.message ?? "Workout saved, but completion sync failed. Your progress is preserved — try again.");
       return;
     }
+
+    // DB save confirmed — safe to clear local state and draft
+    clearWorkout(userId);
+    void fetch("/api/workout/draft", { method: "DELETE" }).catch(() => {});
 
     // Auto-advance training program if this workout is linked to one.
     // Awaited so the next day's template exists before the card re-mounts.
@@ -486,7 +498,8 @@ export function useWorkoutCompletion({
     }
   }, [
     userId,
-    finishWorkout,
+    snapshotWorkout,
+    clearWorkout,
     supabase,
     previousByExerciseId,
     ghostWorkoutData,
